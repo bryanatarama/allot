@@ -1598,7 +1598,7 @@ body { padding:0; overflow-x: hidden; }
       // ===== Header pills =====
       const whereEl = document.getElementById("where");
       const specEl = document.getElementById("specVersion");
-      const BUILD_STAMP = "v387-pages";
+      const BUILD_STAMP = "v388-pages";
       const SPEC_VERSION = "";
       specEl.textContent = "Spec: " + SPEC_VERSION;
       whereEl.textContent = "Here: " + window.location.href;
@@ -5422,7 +5422,7 @@ async function saveCategoriesServer_(){
   showCatError_("");
   try{
     setCatStatus_("Saving…");
-    const MAX = 20; // ✅ force spec value (prevents "only first 6" bugs)
+    const MAX = CategoriesState.maxRows;
     const rows = normalizeFixedRows_(CategoriesState.rows, MAX, 3);
 
     // No formulas
@@ -5488,7 +5488,7 @@ async function saveCategoriesServer_(){
           el.textContent = t;
           el.className = "status-pill" + (type === "ok" ? " status-ok" : type === "warn" ? " status-warn" : type === "save" ? " status-warn" : "");
           el.style.cursor = (type === "save") ? "pointer" : "default";
-          el.onclick = (type === "save") ? (() => saveCategoriesServer_()) : null;
+          el.onclick = (type === "save") ? ((ev) => { if (ev) { ev.stopPropagation(); ev.preventDefault(); } saveCategoriesServer_(); }) : null;
         }
       }
       function showCatError_(msg){
