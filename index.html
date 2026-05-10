@@ -1598,7 +1598,7 @@ body { padding:0; overflow-x: hidden; }
       // ===== Header pills =====
       const whereEl = document.getElementById("where");
       const specEl = document.getElementById("specVersion");
-      const BUILD_STAMP = "v388-pages";
+      const BUILD_STAMP = "v389-pages";
       const SPEC_VERSION = "";
       specEl.textContent = "Spec: " + SPEC_VERSION;
       whereEl.textContent = "Here: " + window.location.href;
@@ -2444,9 +2444,9 @@ function renderDebtLocal_(){
     const mtdSum = round2_((m.mtdPaid || []).reduce((s,x) => s + (Number(x)||0), 0));
     const paidPct = m.totalMins > 0 ? Math.round((mtdSum / m.totalMins) * 100) : 0;
     debtKpisEl.innerHTML = "";
-    debtKpisEl.appendChild(debtKpiCard_("Total Minimums", formatMoney_(m.totalMins)));
+    debtKpisEl.appendChild(debtKpiCard_("Total Paid This Month", formatMoney_(mtdSum)));
     debtKpisEl.appendChild(debtKpiCard_("Minimums Paid", paidPct + "%"));
-    debtKpisEl.appendChild(debtKpiCard_("Coverage Gap", formatMoney_(m.shortfall), m.shortfall > 0));
+    debtKpisEl.appendChild(debtKpiCard_("Total Minimums", formatMoney_(m.totalMins)));
     debtKpisEl.appendChild(debtKpiCard_("Extra Available", formatMoney_(m.extraAfterMins)));
     if (debtPoolLineEl) debtPoolLineEl.textContent = "Debt pool this deposit: " + formatMoney_(m.debtPool);
     updateDebtUIState_();
@@ -2737,6 +2737,7 @@ function computeDebtAllocations_() {
   const sumMinAlloc = round2_(minAlloc.reduce((s, x) => s + (Number(x) || 0), 0));
 
   const totalMinNeed = round2_(minNeed.reduce((s, n) => s + (Number(n) || 0), 0));
+  const totalAllMins = round2_(minTargets.reduce((s, x) => s + (Number(x) || 0), 0));
   const minStillUnmet = round2_(Math.max(0, totalMinNeed - sumMinAlloc));
 
   // ✅ HARD GATE: no extra until mins are fully met
@@ -2777,7 +2778,8 @@ function computeDebtAllocations_() {
     minAlloc, extraAlloc,
     thisDepositPay,
     totalPay, postBal,
-    totalMins: totalMinNeed,
+    totalMins: totalAllMins,
+    totalMinNeed,
     extraAfterMins,
     shortfall
   };
@@ -2842,9 +2844,9 @@ const depSum = round2_((m.thisDepositPay || []).reduce((s,x)=> s + (Number(x)||0
     const warn = m.needsBalance.some(Boolean);
     const paidPct = m.totalMins > 0 ? Math.round((mtdSum / m.totalMins) * 100) : 0;
     debtKpisEl.innerHTML = "";
-    debtKpisEl.appendChild(debtKpiCard_("Total Minimums", formatMoney_(m.totalMins)));
+    debtKpisEl.appendChild(debtKpiCard_("Total Paid This Month", formatMoney_(mtdSum)));
     debtKpisEl.appendChild(debtKpiCard_("Minimums Paid", paidPct + "%"));
-    debtKpisEl.appendChild(debtKpiCard_("Coverage Gap", formatMoney_(m.shortfall), m.shortfall > 0));
+    debtKpisEl.appendChild(debtKpiCard_("Total Minimums", formatMoney_(m.totalMins)));
     debtKpisEl.appendChild(debtKpiCard_("Extra Available", formatMoney_(m.extraAfterMins)));
     if (debtPoolLineEl) debtPoolLineEl.textContent = "Debt pool this deposit: " + formatMoney_(m.debtPool);
     updateDebtUIState_();
