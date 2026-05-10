@@ -1598,7 +1598,7 @@ body { padding:0; overflow-x: hidden; }
       // ===== Header pills =====
       const whereEl = document.getElementById("where");
       const specEl = document.getElementById("specVersion");
-      const BUILD_STAMP = "v386-pages";
+      const BUILD_STAMP = "v387-pages";
       const SPEC_VERSION = "";
       specEl.textContent = "Spec: " + SPEC_VERSION;
       whereEl.textContent = "Here: " + window.location.href;
@@ -5460,7 +5460,7 @@ async function saveCategoriesServer_(){
       // Expense Categories — local-only (persist browser)
       // ============================================================
       const CategoriesState = {
-        maxRows: 20,
+        maxRows: 100,
         rows: [],
         dirty: false,
         loadedOnce: false,

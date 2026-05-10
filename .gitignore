@@ -39,3 +39,6 @@ conversation_transcript.log
 
 # Generic logs
 *.log
+
+# Local data backups (e.g., ideas-backup-YYYY-MM-DD.json)
+ideas-backup-*.json
