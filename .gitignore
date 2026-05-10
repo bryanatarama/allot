@@ -1,0 +1,41 @@
+# OS / editor noise
+.DS_Store
+.claude/
+.vscode/
+.idea/
+
+# Local tool state
+.wrangler/
+.clasp.json
+.claspignore
+
+# Backend (Cloudflare Worker) — kept out of public repo until secrets are env-ized
+worker/
+
+# Sibling projects living in this directory
+ideas-app/
+intro/
+
+# Internal reference doc (not part of public scope)
+BUDGETER_PROJECT_REFERENCE_v9.md
+push-ref.sh
+
+# Discord <-> Claude Code pipeline (separate project, not part of Allot)
+discord_listener.py
+discord_send.py
+discord_listener.log
+claude_stream_task.py
+claude-pty.py
+claude-session.sh
+tty-bridge.py
+inject-to-claude.sh
+poll-claude.sh
+poll-claude.log
+start-discord-listener.sh
+startup-sync-check.sh
+daily-sync.sh
+daily-sync.log
+conversation_transcript.log
+
+# Generic logs
+*.log
