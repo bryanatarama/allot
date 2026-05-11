@@ -1598,7 +1598,7 @@ body { padding:0; overflow-x: hidden; }
       // ===== Header pills =====
       const whereEl = document.getElementById("where");
       const specEl = document.getElementById("specVersion");
-      const BUILD_STAMP = "v389-pages";
+      const BUILD_STAMP = "v390-pages";
       const SPEC_VERSION = "";
       specEl.textContent = "Spec: " + SPEC_VERSION;
       whereEl.textContent = "Here: " + window.location.href;
@@ -2505,7 +2505,7 @@ function getDebtInputsOrdered_(){
     const apr = Number(it.apr || 0) || 0;
     const minPmt = Number(it.minPayment || 0) || 0;
     return { key:c.key, name:c.name, balance, apr, minPmt, notes:String(it.notes||"") };
-  });
+  }).sort((a, b) => (b.apr || 0) - (a.apr || 0)); // highest APR first; rows with 0 APR sink to bottom
 }
 
       function formatPctFixed2_(raw) {
