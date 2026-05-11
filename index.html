@@ -1155,7 +1155,6 @@ body { padding:0; overflow-x: hidden; }
           <div class="tab-actions">
             <span id="catStatus" class="status-pill">Idle</span>
             <button id="catReloadBtn" type="button">Reload</button>
-            <button id="catAddRowBtn" type="button">Add Row</button>
             <button id="catSaveBtn" type="button" disabled style="display:none">Save</button>
           </div>
         </div>
@@ -1174,6 +1173,9 @@ body { padding:0; overflow-x: hidden; }
             </thead>
             <tbody id="catTbody"></tbody>
           </table>
+        </div>
+        <div style="margin-top:8px;">
+          <button id="catAddRowBtn" type="button">+ Add Row</button>
         </div>
 
       </div>
@@ -1307,7 +1309,6 @@ body { padding:0; overflow-x: hidden; }
             </details>
             <div class="tab-actions" style="margin-bottom:12px;flex-wrap:wrap;gap:8px;">
               <button id="catReloadBtn2" type="button">Reload</button>
-              <button id="catAddRowBtn2" type="button">Add Row</button>
               <button id="catSaveBtn2" type="button" disabled style="display:none">Save</button>
             </div>
             <div id="catError2" class="error" style="display:none;margin-bottom:8px;"></div>
@@ -1323,6 +1324,9 @@ body { padding:0; overflow-x: hidden; }
                 </thead>
                 <tbody id="catTbody2"></tbody>
               </table>
+            </div>
+            <div style="margin-top:8px;">
+              <button id="catAddRowBtn2" type="button">+ Add Row</button>
             </div>
           </div>
         </details>
@@ -1598,7 +1602,7 @@ body { padding:0; overflow-x: hidden; }
       // ===== Header pills =====
       const whereEl = document.getElementById("where");
       const specEl = document.getElementById("specVersion");
-      const BUILD_STAMP = "v390-pages";
+      const BUILD_STAMP = "v391-pages";
       const SPEC_VERSION = "";
       specEl.textContent = "Spec: " + SPEC_VERSION;
       whereEl.textContent = "Here: " + window.location.href;
@@ -5405,6 +5409,7 @@ async function loadCategoriesServer_(){
     CategoriesState.rows = normalizeFixedRows_(mapped, CategoriesState.maxRows, 3);
     CategoriesState.dirty = false;
     CategoriesState.loadedOnce = true;
+    CategoriesState.displayCount = computeBaselineCatDisplayCount_();
 
     renderCategories_();
     setCfgCategories_(CategoriesState.rows);
@@ -5466,7 +5471,21 @@ async function saveCategoriesServer_(){
         rows: [],
         dirty: false,
         loadedOnce: false,
+        displayCount: 1, // how many rows to actually render; grows via Add Row
       };
+
+      // Compute baseline display count: last filled row + 1 (always at least 1)
+      function computeBaselineCatDisplayCount_() {
+        const rows = CategoriesState.rows || [];
+        let lastFilled = -1;
+        for (let i = 0; i < rows.length; i++) {
+          const r = rows[i];
+          if (r && (String(r[0]||"").trim() || String(r[1]||"").trim() || String(r[2]||"").trim())) {
+            lastFilled = i;
+          }
+        }
+        return Math.max(lastFilled + 1, 1);
+      }
       const catStatusEl = document.getElementById("catStatus");
       const catErrorEl = document.getElementById("catError");
       const catTbody = document.getElementById("catTbody");
@@ -5503,7 +5522,7 @@ async function saveCategoriesServer_(){
       function updateCatUIState_(){
         const invalid = anyInvalidCells_("#catTable") || anyInvalidCells_("#catTable2");
         const rowCount = String(CategoriesState.rows.filter(r => String((r && r[0]) || "").trim()).length);
-        const atMax = CategoriesState.rows.length >= CategoriesState.maxRows;
+        const atMax = CategoriesState.displayCount >= CategoriesState.maxRows;
         for (const [save, reload, add, rc] of [
           [catSaveBtn,  catReloadBtn,  catAddRowBtn,  catRowCountEl],
           [catSaveBtn2, catReloadBtn2, catAddRowBtn2, catRowCount2El],
@@ -5599,10 +5618,14 @@ async function saveCategoriesServer_(){
       function renderCategories_(){
         const rows = CategoriesState.rows || [];
         const accounts = (AccountsState.lockedNames && AccountsState.lockedNames.length) ? AccountsState.lockedNames : ["Bills","Debt","Savings","Spending"];
+        // Ensure displayCount stays at least at the last-filled-row + 1 (covers cross-device sync arrivals)
+        const baseline = computeBaselineCatDisplayCount_();
+        if (CategoriesState.displayCount < baseline) CategoriesState.displayCount = baseline;
+        if (CategoriesState.displayCount > CategoriesState.maxRows) CategoriesState.displayCount = CategoriesState.maxRows;
         for (const tbody of [catTbody, catTbody2]) {
           if (!tbody) continue;
           tbody.innerHTML = "";
-          for (let i = 0; i < CategoriesState.maxRows; i++) {
+          for (let i = 0; i < CategoriesState.displayCount; i++) {
             tbody.appendChild(buildCatRow_(i, rows[i] || ["","",""], accounts));
           }
         }
@@ -5619,6 +5642,7 @@ async function saveCategoriesServer_(){
         }
         CategoriesState.dirty = false;
         CategoriesState.loadedOnce = true;
+        CategoriesState.displayCount = computeBaselineCatDisplayCount_();
         renderCategories_();
         setCfgCategories_(CategoriesState.rows);
       }
@@ -5633,30 +5657,23 @@ async function saveCategoriesServer_(){
 
       catReloadBtn.addEventListener("click", async () => { await loadCategoriesServer_(); });
       catSaveBtn.addEventListener("click", async () => { await saveCategoriesServer_(); });
-      catAddRowBtn.addEventListener("click", () => {
-        if ((CategoriesState.rows || []).length >= CategoriesState.maxRows) return;
-        CategoriesState.rows.push(["","",""]);
+      function addCatRow_(focusTbody) {
+        if (CategoriesState.displayCount >= CategoriesState.maxRows) return;
+        // Ensure rows array padded enough to hold the new row
         while (CategoriesState.rows.length < CategoriesState.maxRows) CategoriesState.rows.push(["","",""]);
         CategoriesState.rows = CategoriesState.rows.slice(0, CategoriesState.maxRows);
-        CategoriesState.dirty = true;
+        CategoriesState.displayCount += 1;
         renderCategories_();
-        focusFirstEmptyRow_(catTbody, CategoriesState.rows, 0, CategoriesState.maxRows);
+        if (focusTbody) focusFirstEmptyRow_(focusTbody, CategoriesState.rows, 0, CategoriesState.displayCount);
         setCfgCategories_(CategoriesState.rows);
-      });
+      }
+
+      catAddRowBtn.addEventListener("click", () => addCatRow_(catTbody));
 
       // Embedded Edit Categories buttons (Budgeter tab)
       if (catReloadBtn2) catReloadBtn2.addEventListener("click", async () => { await loadCategoriesServer_(); });
       if (catSaveBtn2)   catSaveBtn2.addEventListener("click",   async () => { await saveCategoriesServer_(); });
-      if (catAddRowBtn2) catAddRowBtn2.addEventListener("click", () => {
-        if ((CategoriesState.rows || []).length >= CategoriesState.maxRows) return;
-        CategoriesState.rows.push(["","",""]);
-        while (CategoriesState.rows.length < CategoriesState.maxRows) CategoriesState.rows.push(["","",""]);
-        CategoriesState.rows = CategoriesState.rows.slice(0, CategoriesState.maxRows);
-        CategoriesState.dirty = true;
-        renderCategories_();
-        if (catTbody2) focusFirstEmptyRow_(catTbody2, CategoriesState.rows, 0, CategoriesState.maxRows);
-        setCfgCategories_(CategoriesState.rows);
-      });
+      if (catAddRowBtn2) catAddRowBtn2.addEventListener("click", () => addCatRow_(catTbody2));
 
       // Chevron animation + lazy load for Edit Categories collapsible
       const _editCatSection = document.getElementById("editCatSection");
