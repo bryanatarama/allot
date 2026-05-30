@@ -1602,7 +1602,7 @@ body { padding:0; overflow-x: hidden; }
       // ===== Header pills =====
       const whereEl = document.getElementById("where");
       const specEl = document.getElementById("specVersion");
-      const BUILD_STAMP = "v391-pages";
+      const BUILD_STAMP = "v392-pages";
       const SPEC_VERSION = "";
       specEl.textContent = "Spec: " + SPEC_VERSION;
       whereEl.textContent = "Here: " + window.location.href;
@@ -4290,6 +4290,19 @@ function resetPaidMTD_(){
         });
       }
 
+      function showDueDatePassedModal_(rows) {
+        const titleEl = document.getElementById("mfModalTitle");
+        const subEl   = document.getElementById("mfModalSub");
+        const nextLabel = getNextMonthLabel_();
+        if (titleEl) titleEl.textContent = "Due Date Passed";
+        if (subEl)   subEl.innerHTML = `These bills' due dates have already passed this cycle. Fund them toward <strong>${escapeHtml_(nextLabel)}</strong> or skip and use that money for other categories.`;
+        return showManualFundedModal_(rows).then(choices => {
+          if (titleEl) titleEl.textContent = "Funding for Next Month";
+          if (subEl)   subEl.innerHTML = `These bills are marked as <strong>already paid this month</strong>. Choose whether to fund them toward next month or skip.`;
+          return choices;
+        });
+      }
+
       function renderEngineBillsSplitTable_() {
         if (!engOutTbody) return;
 
@@ -4536,12 +4549,22 @@ function resetPaidMTD_(){
 
   // Check for manually-funded (next-month) rows with non-zero allocations
   const manualFunded = loadManualFunded_();
+  const _dueDatesForPrompt = loadBillDueDates_();
+  const _todayDay = new Date().getDate();
   const pendingNextMonth = [];
+  const pendingDueDatePassed = [];
   for (let i = 0; i < cats.length; i++){
     const key = cats[i].key;
     const amt = Number(allocs[i] || 0) || 0;
-    if (manualFunded[key] && amt > 0){
+    if (!(amt > 0)) continue;
+    if (manualFunded[key]){
       pendingNextMonth.push({ key, name: cats[i].name || cats[i].categoryName || key, alloc: amt });
+    } else {
+      const dd = _dueDatesForPrompt[key];
+      const ddClamped = (typeof dd === "number") ? Math.max(1, Math.min(28, dd)) : 0;
+      if (ddClamped >= 2 && _todayDay >= ddClamped) {
+        pendingDueDatePassed.push({ key, name: cats[i].name || cats[i].categoryName || key, alloc: amt });
+      }
     }
   }
 
@@ -4550,6 +4573,11 @@ function resetPaidMTD_(){
   if (pendingNextMonth.length) {
     nextMonthChoices = await showManualFundedModal_(pendingNextMonth);
   }
+  let dueDateChoices = {};
+  if (pendingDueDatePassed.length) {
+    dueDateChoices = await showDueDatePassedModal_(pendingDueDatePassed);
+  }
+  const dueDatePassedKeys = new Set(pendingDueDatePassed.map(r => r.key));
 
   // Apply allocations to Paid MTD (additive)
   const nextPaidByKey = Object.assign({}, paidState.paidByKey || {});
@@ -4570,6 +4598,15 @@ function resetPaidMTD_(){
         allocsByKey[key] = 0;
       }
       // Never add to current-month paidByKey
+    } else if (dueDatePassedKeys.has(key)) {
+      // Due-date-passed row: user chose fund (normal) or skip
+      const choice = dueDateChoices[key] || "fund";
+      if (choice === "fund" && add > 0) {
+        allocsByKey[key] = add;
+        nextPaidByKey[key] = round2_((Number(nextPaidByKey[key] || 0) || 0) + add);
+      } else {
+        allocsByKey[key] = 0;
+      }
     } else {
       allocsByKey[key] = add;
       nextPaidByKey[key] = round2_((Number(nextPaidByKey[key] || 0) || 0) + add);
