@@ -126,6 +126,40 @@
         #debtTable td:nth-child(4)::before { content: "Min Pmt"; display: block; font-size: .7em; color: var(--muted); margin-bottom: 3px; }
         #debtTable td:nth-child(7)::before { content: "Total Pay"; display: block; font-size: .7em; color: var(--muted); margin-bottom: 3px; }
       }
+      /* Paid-off debt rows: italic + faded so they're clearly inactive but still editable */
+      #debtTable tr.debt-paid-off { opacity:.55; }
+      #debtTable tr.debt-paid-off td:first-child,
+      #debtTable tr.debt-paid-off input.cell-input { font-style:italic; }
+
+      /* Debt-zero "keep or delete" modal */
+      #debtZeroModal { display:none; position:fixed; inset:0; z-index:9999;
+        background:rgba(8,12,19,0.85); align-items:center; justify-content:center; }
+      #debtZeroModal.open { display:flex; }
+      #debtZeroModal .modal-box {
+        background:var(--card); border:1px solid var(--border); border-radius:12px;
+        padding:24px; max-width:440px; width:92%;
+      }
+      #debtZeroModal h3 { margin:0 0 6px; font-size:1.1em; color:var(--text); }
+      #debtZeroModal .modal-sub { color:var(--muted); font-size:.88em; margin:0 0 16px; }
+      #debtZeroModal .zero-option {
+        border:1px solid var(--border); border-radius:10px;
+        padding:12px 14px; margin-bottom:10px; background:var(--panel2);
+      }
+      #debtZeroModal .zero-option h4 { margin:0 0 4px; font-size:.95em; color:var(--text); }
+      #debtZeroModal .zero-option p { margin:0; font-size:.83em; color:var(--muted); line-height:1.5; }
+      #debtZeroModal .modal-footer { display:flex; gap:10px; justify-content:flex-end; margin-top:14px; flex-wrap:wrap; }
+      #debtZeroModal .btn-keep {
+        background:var(--accent-bg, rgba(56,189,248,.12)); border:1px solid var(--accent-border, rgba(56,189,248,.35));
+        color:var(--accent-text, #38bdf8); border-radius:8px; padding:8px 18px;
+        font-family:inherit; font-size:.9em; font-weight:700; cursor:pointer;
+      }
+      #debtZeroModal .btn-delete {
+        background:var(--danger-bg); border:1px solid var(--danger-border);
+        color:var(--danger-text); border-radius:8px; padding:8px 18px;
+        font-family:inherit; font-size:.9em; font-weight:700; cursor:pointer;
+      }
+      #debtZeroModal .btn-keep:disabled,
+      #debtZeroModal .btn-delete:disabled { opacity:.4; cursor:not-allowed; }
       .tab-footer { margin-top:10px; display:flex; justify-content:space-between; gap:10px; flex-wrap:wrap; }
       .hint { color: var(--muted); font-size:.9em; }
 
@@ -207,6 +241,61 @@
         flex-shrink: 0;
       }
       #engBillsTable td[data-role="target"] input { flex: 1; min-width: 0; }
+      /* Hide browser-default spinner arrows on number inputs in the bills table */
+      #engBillsTable input[type="number"]::-webkit-outer-spin-button,
+      #engBillsTable input[type="number"]::-webkit-inner-spin-button {
+        -webkit-appearance: none;
+        margin: 0;
+      }
+      #engBillsTable input[type="number"] { -moz-appearance: textfield; appearance: textfield; }
+
+      /* Edit mode — show reorder/delete/inputs; lock Paid? (view mode locks Target $) */
+      #engBillsTable .row-reorder,
+      #engBillsTable .row-delete { display: none; }
+      #engBillsTable.edit-mode .row-reorder { display: inline-flex; gap: 4px; align-items: center; }
+      #engBillsTable.edit-mode .row-delete  { display: inline-flex; }
+      /* View mode: Target $ is read-only — only editable inside Edit mode */
+      #engBillsTable:not(.edit-mode) td[data-role="target"] input { opacity: .55; pointer-events: none; }
+      /* Edit mode: Paid? is locked — only clickable in view mode */
+      #engBillsTable.edit-mode td[data-role="paid"] input { opacity: .35; pointer-events: none; }
+      #engBillsTable.edit-mode .name-display { display: none; }
+      #engBillsTable.edit-mode .name-input,
+      #engBillsTable.edit-mode .type-select { display: inline-block; }
+      #engBillsTable .name-input,
+      #engBillsTable .type-select { display: none; }
+      #engBillsTable .name-input {
+        background: var(--panel); border: 1px solid var(--border); color: var(--text);
+        border-radius: 6px; padding: 4px 8px; font-family: inherit; font-size: .92em;
+        width: 100%; box-sizing: border-box;
+      }
+      #engBillsTable .type-select {
+        background: var(--panel); border: 1px solid var(--border); color: var(--text);
+        border-radius: 6px; padding: 3px 6px; font-family: inherit; font-size: .82em;
+      }
+      #engBillsTable .type-select.unclassified {
+        border-color: var(--danger-text); color: var(--danger-text);
+      }
+      #engBillsTable .reorder-btn,
+      #engBillsTable .row-delete {
+        background: none; border: 1px solid transparent; color: var(--muted);
+        cursor: pointer; padding: 3px 6px; border-radius: 6px;
+        font-size: .8em; line-height: 1; font-family: inherit;
+      }
+      #engBillsTable .reorder-btn:hover { background: rgba(56,189,248,.08); color: var(--accent-text, #38bdf8); border-color: var(--accent-border, rgba(56,189,248,.25)); }
+      #engBillsTable .reorder-btn:disabled { opacity: .25; cursor: not-allowed; background: none; border-color: transparent; color: var(--muted); }
+      #engBillsTable .row-delete:hover { background: rgba(248,113,145,.08); color: var(--danger-text); border-color: var(--danger-border); }
+      #engBillsTable .row-delete.confirming {
+        background: var(--danger-bg); color: var(--danger-text);
+        border-color: var(--danger-border); font-weight: 600;
+      }
+      #engBillsAddBar { display: none; margin: 10px 0 14px; gap: 8px; justify-content: flex-start; }
+      #engBillsAddBar.show { display: flex; }
+      #engBillsAddNewBtn {
+        background: var(--panel2); border: 1px dashed var(--border); color: var(--accent-text, #38bdf8);
+        border-radius: 8px; padding: 8px 14px; font-family: inherit; font-size: .88em;
+        cursor: pointer; font-weight: 600;
+      }
+      #engBillsAddNewBtn:hover { border-color: var(--accent-border, rgba(56,189,248,.5)); background: rgba(56,189,248,.06); }
 
       /* Already Paid */
       #engBillsTable td[data-role="paid"] {
@@ -454,6 +543,57 @@
 #doublePostModal .modal-sub { color:var(--muted); font-size:.88em; margin:0 0 8px; }
 #doublePostModal .modal-detail { color:var(--text); font-size:.92em; margin:0 0 20px; line-height:1.7; }
 #doublePostModal .modal-footer { display:flex; gap:10px; justify-content:flex-end; }
+/* Classify-reminder modal (bills-table edit-mode save) */
+#classifyReminderModal {
+  display:none; position:fixed; inset:0; z-index:9999;
+  background:rgba(8,12,19,0.85); align-items:center; justify-content:center;
+}
+#classifyReminderModal.open { display:flex; }
+#classifyReminderModal .modal-box {
+  background:var(--card); border:1px solid var(--border); border-radius:12px;
+  padding:24px; max-width:440px; width:92%;
+}
+#classifyReminderModal h3 { margin:0 0 8px; font-size:1.05em; color:var(--text); }
+#classifyReminderModal .modal-sub { color:var(--text); font-size:.88em; margin:0 0 16px; line-height:1.55; }
+#classifyReminderModal .modal-footer { display:flex; gap:10px; justify-content:flex-end; }
+/* Redirect-paid modal (fires when Paid? is checked while allocation exists) */
+#redirectPaidModal {
+  display:none; position:fixed; inset:0; z-index:9999;
+  background:rgba(8,12,19,0.85); align-items:center; justify-content:center;
+}
+#redirectPaidModal.open { display:flex; }
+#redirectPaidModal .modal-box {
+  background:var(--card); border:1px solid var(--border); border-radius:12px;
+  padding:24px; max-width:460px; width:92%;
+}
+#redirectPaidModal h3 { margin:0 0 6px; font-size:1.05em; color:var(--text); }
+#redirectPaidModal .modal-sub { color:var(--muted); font-size:.88em; margin:0 0 16px; line-height:1.5; }
+#redirectPaidModal .rp-option {
+  display:block; border:1px solid var(--border); border-radius:10px;
+  padding:12px 14px; margin-bottom:10px; cursor:pointer;
+  background:var(--panel2);
+}
+#redirectPaidModal .rp-option:has(input:checked) {
+  border-color:var(--accent-border, rgba(56,189,248,.45));
+  background:rgba(56,189,248,.06);
+}
+#redirectPaidModal .rp-option-header { display:flex; align-items:center; gap:10px; }
+#redirectPaidModal .rp-option-header input[type="radio"] { flex-shrink:0; accent-color:var(--accent); }
+#redirectPaidModal .rp-option-label { font-weight:600; font-size:.95em; color:var(--text); }
+#redirectPaidModal .rp-option-detail { font-size:.82em; color:var(--muted); margin-top:4px; padding-left:24px; line-height:1.5; }
+#redirectPaidModal .rp-move-select {
+  margin-top:8px; margin-left:24px; padding:6px 10px;
+  background:var(--panel); border:1px solid var(--border); border-radius:6px;
+  color:var(--text); font-family:inherit; font-size:.88em; max-width:100%;
+}
+#redirectPaidModal .rp-move-select:disabled { opacity:.4; cursor:not-allowed; }
+#redirectPaidModal .modal-footer { display:flex; gap:10px; justify-content:flex-end; margin-top:14px; }
+#redirectPaidModal .btn-confirm-rp {
+  background:var(--accent-bg, rgba(56,189,248,.12)); border:1px solid var(--accent-border, rgba(56,189,248,.4));
+  color:var(--accent-text, #38bdf8); border-radius:8px; padding:8px 18px;
+  font-family:inherit; font-size:.9em; font-weight:700; cursor:pointer;
+}
+#redirectPaidModal .btn-confirm-rp:disabled { opacity:.4; cursor:not-allowed; }
 /* Clear custom pct modal */
 #clearPctModal {
   display:none; position:fixed; inset:0; z-index:9999;
@@ -1236,6 +1376,15 @@ body { padding:0; overflow-x: hidden; }
         <!-- Bills % Split format -->
         <div style="display:none"><button id="budViewBtn-default" type="button"></button><button id="budViewBtn-computed" type="button"></button><span id="budViewStatus"></span></div>
 
+        <!-- Edit mode toggle: lets the user rename/reorder/add/delete bills safely -->
+        <div id="engBillsEditBar" style="display:flex;justify-content:flex-end;gap:8px;margin-bottom:8px;align-items:center;">
+          <span id="engBillsEditLabel" class="muted" style="font-size:.78em;margin-right:auto;">Rename, reorder, change type, add or remove categories</span>
+          <span id="engBillsEditHint" class="muted" style="font-size:.78em;margin-right:auto;display:none;">Edit mode — Paid? is locked. Target $ becomes editable. Save or Cancel to exit.</span>
+          <button id="engBillsEditBtn" type="button" class="btn btn2" style="font-size:.85em;padding:5px 12px;">Edit</button>
+          <button id="engBillsCancelBtn" type="button" class="btn btn2" style="font-size:.85em;padding:5px 12px;display:none;">Cancel</button>
+          <button id="engBillsSaveBtn" type="button" class="btn" style="font-size:.85em;padding:5px 12px;display:none;background:var(--accent-bg, rgba(56,189,248,.12));border:1px solid var(--accent-border, rgba(56,189,248,.4));color:var(--accent-text, #38bdf8);font-weight:700;">Save</button>
+        </div>
+
         <div class="table-wrap" style="margin-bottom:12px;">
           <table id="engBillsTable" class="grid">
             <thead>
@@ -1261,6 +1410,10 @@ body { padding:0; overflow-x: hidden; }
               </tr>
             </tfoot>
           </table>
+        </div>
+
+        <div id="engBillsAddBar">
+          <button id="engBillsAddNewBtn" type="button">+ Add Category</button>
         </div>
 
         <div style="margin-top:12px" class="dev-only">
@@ -1602,7 +1755,7 @@ body { padding:0; overflow-x: hidden; }
       // ===== Header pills =====
       const whereEl = document.getElementById("where");
       const specEl = document.getElementById("specVersion");
-      const BUILD_STAMP = "v392-pages";
+      const BUILD_STAMP = "v405-pages";
       const SPEC_VERSION = "";
       specEl.textContent = "Spec: " + SPEC_VERSION;
       whereEl.textContent = "Here: " + window.location.href;
@@ -2041,6 +2194,93 @@ async function saveDebtItemsServer_(){
   return { ok:true };
 }
 
+// Fully delete a debt category: drops the underlying category row, removes the
+// debt item entry, and syncs both to the server. Use for one-time credit lines
+// (e.g. Affirm) that won't come back. Revolving cards should just be zeroed out
+// instead — they'll italicize/fade in place and stay editable.
+async function removeDebtCategory_(key){
+  if (!key) return;
+  if (typeof ensureCategoriesLoaded_ === "function") {
+    await ensureCategoriesLoaded_();
+  }
+  const rows = (CategoriesState.rows || []).slice();
+  const target = rows.findIndex(r => {
+    const n = String((r && r[0]) || "").trim().toLowerCase();
+    const ta = String((r && r[1]) || "").trim();
+    return ta === "Debt" && n === key;
+  });
+  if (target < 0) return;
+  rows.splice(target, 1);
+  // Compact + repad so any other gaps in the list also collapse here.
+  const compact = compactRows_(rows, CategoriesState.maxRows, 3);
+  CategoriesState.rows = compact;
+  CategoriesState.displayCount = (typeof computeBaselineCatDisplayCount_ === "function")
+    ? computeBaselineCatDisplayCount_()
+    : CategoriesState.displayCount;
+  CategoriesState.dirty = true;
+  setCfgCategories_(compact);
+
+  if (appState.debtItems && appState.debtItems[key]) {
+    delete appState.debtItems[key];
+    saveDebtItemsToStorage_();
+  }
+
+  await saveCategoriesServer_();
+  try { await saveDebtItemsServer_(); } catch(_){}
+
+  if (typeof renderDebtLocal_ === "function") renderDebtLocal_();
+  if (typeof renderCategories_ === "function") { try { renderCategories_(); } catch(_){} }
+}
+
+// Modal: ask the user whether a zero'd-out debt is a revolving card (keep) or
+// a one-time credit line (delete). Triggered from the balance input's blur
+// handler when the value transitions from positive → 0.
+let _debtZeroPendingKey = null;
+function openDebtZeroModal_(key, name){
+  if (!key) return;
+  const modal = document.getElementById("debtZeroModal");
+  const titleEl = document.getElementById("debtZeroTitle");
+  if (!modal) return;
+  _debtZeroPendingKey = key;
+  if (titleEl && name) titleEl.textContent = `${name} — balance set to $0`;
+  modal.classList.add("open");
+}
+function closeDebtZeroModal_(){
+  _debtZeroPendingKey = null;
+  const modal = document.getElementById("debtZeroModal");
+  if (modal) modal.classList.remove("open");
+  const titleEl = document.getElementById("debtZeroTitle");
+  if (titleEl) titleEl.textContent = "Balance set to $0";
+  const keepBtn = document.getElementById("debtZeroKeepBtn");
+  const delBtn  = document.getElementById("debtZeroDeleteBtn");
+  if (keepBtn) keepBtn.disabled = false;
+  if (delBtn)  { delBtn.disabled = false; delBtn.textContent = "Delete category"; }
+}
+window.addEventListener("DOMContentLoaded", () => {
+  const keepBtn = document.getElementById("debtZeroKeepBtn");
+  const delBtn  = document.getElementById("debtZeroDeleteBtn");
+  const modal   = document.getElementById("debtZeroModal");
+  if (keepBtn) keepBtn.addEventListener("click", () => closeDebtZeroModal_());
+  if (delBtn)  delBtn.addEventListener("click", async () => {
+    const key = _debtZeroPendingKey;
+    if (!key) { closeDebtZeroModal_(); return; }
+    delBtn.disabled = true;
+    if (keepBtn) keepBtn.disabled = true;
+    delBtn.textContent = "Deleting…";
+    try {
+      await removeDebtCategory_(key);
+    } catch(err) {
+      if (typeof showDebtError_ === "function") showDebtError_(String(err?.message || err));
+    } finally {
+      closeDebtZeroModal_();
+    }
+  });
+  // Click outside the box to dismiss = same as Keep
+  if (modal) modal.addEventListener("click", (e) => {
+    if (e.target === modal) closeDebtZeroModal_();
+  });
+});
+
 let debtSaveRaf_ = 0;
 function scheduleDebtSave_(){
   if (debtSaveRaf_) cancelAnimationFrame(debtSaveRaf_);
@@ -2082,36 +2322,17 @@ function saveDebtItemsToStorage_(){
       }
 
       function normalizePaidMonth_(){
+        // Calendar-month reset for ALL bills: on the 1st, every "Paid?"
+        // checkbox clears regardless of a bill's due-date cycle. Matches the
+        // manualFunded behavior so the user gets a consistent fresh-slate
+        // model every month — most people think of bills calendar-month-style
+        // and want to build up toward each due date from this month's
+        // paychecks, not carry funded status across months.
         const st = loadPaidState_();
         const cur = monthKeyLocal_();
-        const dueDates = loadBillDueDates_();
-        const cycleStartByBill = { ...(st.cycleStartByBill || {}) };
-        let newPaidByKey = { ...(st.paidByKey || {}) };
-        let changed = false;
-
-        // Global month rollover: reset bills with default (1st) due date
-        if (st.monthKey !== cur) {
-          Object.keys(newPaidByKey).forEach(key => {
-            const dd = dueDates[key];
-            if (!dd || dd === 1) { delete newPaidByKey[key]; changed = true; }
-          });
-          if (changed) savePostSnapshot_(null);
-        }
-
-        // Per-bill: reset bills whose due-date cycle has rolled over
-        Object.entries(dueDates).forEach(([key, dueDay]) => {
-          if (!dueDay || dueDay === 1) return;
-          const currentStart = billCycleStart_(dueDay);
-          if (cycleStartByBill[key] !== currentStart) {
-            delete newPaidByKey[key];
-            cycleStartByBill[key] = currentStart;
-            changed = true;
-          }
-        });
-
-        if (st.monthKey !== cur || changed) {
-          savePaidState_({ monthKey: cur, paidByKey: newPaidByKey, cycleStartByBill });
-        }
+        if (st.monthKey === cur) return;
+        savePaidState_({ monthKey: cur, paidByKey: {}, cycleStartByBill: {} });
+        savePostSnapshot_(null);
       }
 
       function loadPostSnapshot_(){
@@ -2222,7 +2443,11 @@ function wireDebtButtons_(){
       // - SOURCE: Expense Categories tab
       // - FILTER: Target Account must be Bills
       // - KEY: lowercased name (current architecture)
-      function getCfgCategoryRows_() {
+      // opts.includeEmpty — include rows with empty names (used by bills-table edit mode to render in-progress new rows)
+      // opts.forceIncludeIdxs — Set of row indices to include regardless of target-account filter (used by edit mode so a row whose type was just changed to Debt stays visible until Save)
+      function getCfgCategoryRows_(opts) {
+        const includeEmpty     = !!(opts && opts.includeEmpty);
+        const forceIncludeIdxs = (opts && opts.forceIncludeIdxs) || null;
         const rows = appState.cfgCategories || [];
         const out = [];
         const seen = new Set();
@@ -2230,12 +2455,14 @@ function wireDebtButtons_(){
         for (let idx = 0; idx < rows.length; idx++) {
           const r = rows[idx];
           const name = String((r && r[0]) || "").trim();
-          if (!name) continue; // ✅ only blank names are excluded
+          if (!name && !includeEmpty) continue;
           const targetAccount = String((r && r[1]) || "").trim();
-          if (targetAccount !== BillsTargetName) continue; // ✅ only Bills-targeted rows are part of Bills % Split
+          const isBills = (targetAccount === BillsTargetName);
+          const forced = forceIncludeIdxs && forceIncludeIdxs.has(idx);
+          if (!isBills && !forced) continue;
 
-          const key = name.toLowerCase();
-          if (seen.has(key)) continue; // guard against key collision in current storage model
+          const key = name ? name.toLowerCase() : `__row${idx}`;
+          if (seen.has(key)) continue;
           seen.add(key);
 
           const cfgDescriptor = normalizeDescriptor_((r && r[2]) || "");
@@ -2327,6 +2554,23 @@ function getDebtCategoryRows_(){
         return rows;
       }
 
+      // Collapse gaps: shift all filled rows to the top, push empty rows to the
+      // bottom, then re-pad to maxRows. A row is "filled" if any of its cells
+      // has trimmed text. Preserves relative order of filled rows.
+      function compactRows_(rows, maxRows, numCols) {
+        const filled = [];
+        for (const r of (rows || [])) {
+          const any = (r || []).some(c => String(c ?? "").trim());
+          if (any) {
+            const out = [];
+            for (let c = 0; c < numCols; c++) out.push(String((r && r[c]) ?? ""));
+            filled.push(out);
+          }
+        }
+        while (filled.length < maxRows) filled.push(Array(numCols).fill(""));
+        return filled.slice(0, maxRows);
+      }
+
       function focusFirstEmptyRow_(tbodyEl, rows, nameColIndex, maxRows) {
         for (let i = 0; i < maxRows; i++) {
           const name = String((rows[i] && rows[i][nameColIndex]) || "").trim();
@@ -2386,6 +2630,9 @@ function renderDebtLocal_(){
     const tr = document.createElement("tr");
     tr.setAttribute("data-idx", String(i));
 
+    const balanceNum = Number(it.balance || 0) || 0;
+    if (!(balanceNum > 0)) tr.classList.add("debt-paid-off");
+
     tr.innerHTML = `
       <td class="mono">${escapeHtml_(r.name)}</td>
       <td><input class="cell-input mono" data-k="${r.key}" data-f="balance" type="text" inputmode="decimal" value="${escapeHtml_(formatMoneyInput_(String(it.balance ?? "")))}"></td>
@@ -2426,8 +2673,38 @@ function renderDebtLocal_(){
       saveDebtItemsToStorage_();
       DebtState.dirty = true;
       scheduleDebtRecalc_();
+
+      // Toggle paid-off style live as the balance changes
+      if (f === "balance") {
+        const tr = inp.closest("tr");
+        if (tr) {
+          const v = Number(rawFromFormatted_(inp.value) || 0) || 0;
+          tr.classList.toggle("debt-paid-off", !(v > 0));
+        }
+      }
     });
     validateNoFormula_(inp, inp.value);
+  });
+
+  // Track balance pre-edit so we can detect a positive → zero transition and
+  // ask the user whether to keep the row (revolving card) or delete it (one-time
+  // credit line). Registered BEFORE the format-on-focus/blur handlers below so
+  // we read the raw value before formatting touches it.
+  debtTbody.querySelectorAll('input[data-f="balance"]').forEach(inp => {
+    inp.addEventListener("focus", () => {
+      inp.dataset.prevRaw = String(rawFromFormatted_(inp.value) || "");
+    });
+    inp.addEventListener("blur", () => {
+      const prev = Number(inp.dataset.prevRaw || 0) || 0;
+      const now  = Number(rawFromFormatted_(inp.value) || 0) || 0;
+      inp.dataset.prevRaw = "";
+      if (prev > 0 && now === 0) {
+        const k = inp.getAttribute("data-k");
+        const tr = inp.closest("tr");
+        const name = tr ? (tr.querySelector("td:first-child")?.textContent || k) : k;
+        if (typeof openDebtZeroModal_ === "function") openDebtZeroModal_(k, String(name).trim());
+      }
+    });
   });
 
 
@@ -4155,23 +4432,19 @@ function resetPaidMTD_(){
       const NEXT_MONTH_PAID_LS_KEY = "BUDGETER_NEXT_MONTH_PAID";
 
       function loadManualFunded_() {
+        // Calendar-month reset: when the month rolls over, ALL manual-funded
+        // flags drop, regardless of a bill's due-date cycle. Keeps the June
+        // dashboard truly fresh ($0 paid, 0% funded) on the 1st instead of
+        // carrying car/insurance/internet into the new month just because
+        // their cycles haven't crossed their due dates yet.
         try {
           const raw = localStorage.getItem(MANUAL_FUNDED_LS_KEY);
           if (!raw) return {};
           const obj = JSON.parse(raw);
+          if (obj.monthKey !== monthKeyLocal_()) return {};
           const flags = obj.flags || {};
-          const dueDates = loadBillDueDates_();
-          const cycleStartByBill = obj.cycleStartByBill || {};
           const result = {};
-          Object.entries(flags).forEach(([key, val]) => {
-            if (!val) return;
-            const dueDay = dueDates[key];
-            if (!dueDay || dueDay === 1) {
-              if (obj.monthKey === monthKeyLocal_()) result[key] = val;
-            } else {
-              if (cycleStartByBill[key] === billCycleStart_(dueDay)) result[key] = val;
-            }
-          });
+          Object.entries(flags).forEach(([key, val]) => { if (val) result[key] = val; });
           return result;
         } catch(e) { return {}; }
       }
@@ -4276,6 +4549,145 @@ function resetPaidMTD_(){
         });
       }
 
+      // Underfunded = target > current paid AND not already marked manualFunded.
+      // Used by the redirect-paid modal to populate split/move targets.
+      function getUnderfundedBills_(excludeKey){
+        const cats = (typeof getCfgCategoryRows_ === "function" ? getCfgCategoryRows_() : []).filter(c => {
+          const d = (typeof normalizeDescriptor_ === "function" ? normalizeDescriptor_(c.cfgDescriptor || "") : (c.cfgDescriptor || ""));
+          return d === "Bills" || d === "Living expenses";
+        });
+        const paidByKey = (loadPaidState_().paidByKey) || {};
+        const mf = loadManualFunded_();
+        const out = [];
+        for (const c of cats){
+          if (c.key === excludeKey) continue;
+          if (mf[c.key]) continue;
+          const target = Number(appState.billsSplit?.[c.key]?.monthlyTarget || 0) || 0;
+          if (!(target > 0)) continue;
+          const paid = Number(paidByKey[c.key] || 0) || 0;
+          const deficit = round2_(target - paid);
+          if (deficit > 0.005) out.push({ key: c.key, name: c.name, target, paid, deficit });
+        }
+        out.sort((a, b) => b.deficit - a.deficit);
+        return out;
+      }
+
+      // Prompt the user when they tick Paid? on a bill that already has money
+      // allocated this month. Returns: {choice: "leave"|"split"|"move"|"cancel", target?: key}
+      function showRedirectPaidModal_({ name, alloc, underfundedBills }){
+        return new Promise(resolve => {
+          const modal = document.getElementById("redirectPaidModal");
+          const sub = document.getElementById("rpModalSub");
+          const select = document.getElementById("rpMoveTarget");
+          const confirmBtn = document.getElementById("rpModalConfirmBtn");
+          const cancelBtn = document.getElementById("rpModalCancelBtn");
+          if (!modal || !sub || !select || !confirmBtn || !cancelBtn) {
+            resolve({ choice: "leave" });
+            return;
+          }
+          sub.innerHTML = `<strong>${escapeHtml_(name)}</strong> had <strong>${escapeHtml_(formatMoney_(alloc))}</strong> allocated this month. Where should that money go?`;
+
+          // Populate the move-to dropdown with underfunded bills
+          select.innerHTML = "";
+          if (underfundedBills.length){
+            underfundedBills.forEach(b => {
+              const opt = document.createElement("option");
+              opt.value = b.key;
+              opt.textContent = `${b.name} — needs ${formatMoney_(b.deficit)} more`;
+              select.appendChild(opt);
+            });
+          } else {
+            const opt = document.createElement("option");
+            opt.value = "";
+            opt.textContent = "No underfunded bills";
+            select.appendChild(opt);
+          }
+
+          const radios = modal.querySelectorAll('input[name="rp-choice"]');
+          const splitRadio = modal.querySelector('input[name="rp-choice"][value="split"]');
+          const moveRadio  = modal.querySelector('input[name="rp-choice"][value="move"]');
+          const leaveRadio = modal.querySelector('input[name="rp-choice"][value="leave"]');
+
+          // Disable split/move when no underfunded targets exist
+          if (!underfundedBills.length) {
+            if (splitRadio) { splitRadio.disabled = true; splitRadio.checked = false; }
+            if (moveRadio)  { moveRadio.disabled  = true; moveRadio.checked  = false; }
+            if (leaveRadio) leaveRadio.checked = true;
+          } else {
+            if (splitRadio) splitRadio.disabled = false;
+            if (moveRadio)  moveRadio.disabled  = false;
+            if (leaveRadio) leaveRadio.checked = true;  // default
+            if (moveRadio)  moveRadio.checked = false;
+            if (splitRadio) splitRadio.checked = false;
+          }
+          select.disabled = !(moveRadio && moveRadio.checked);
+
+          const onRadioChange = (e) => { select.disabled = !(moveRadio && moveRadio.checked); };
+          radios.forEach(r => r.addEventListener("change", onRadioChange));
+
+          const cleanup = (result) => {
+            modal.classList.remove("open");
+            confirmBtn.removeEventListener("click", onConfirm);
+            cancelBtn.removeEventListener("click", onCancel);
+            radios.forEach(r => r.removeEventListener("change", onRadioChange));
+            resolve(result);
+          };
+          const onConfirm = () => {
+            const choice = modal.querySelector('input[name="rp-choice"]:checked')?.value || "leave";
+            const target = (choice === "move") ? (select.value || null) : null;
+            cleanup({ choice, target });
+          };
+          const onCancel = () => cleanup({ choice: "cancel" });
+          confirmBtn.addEventListener("click", onConfirm);
+          cancelBtn.addEventListener("click", onCancel);
+
+          modal.classList.add("open");
+        });
+      }
+
+      // Apply the user's redirect choice: move/split allocation from srcKey to
+      // other bills by updating both paidByKey AND the post snapshot so the
+      // dashboard math reflects the new distribution.
+      function applyPaidRedirect_(srcKey, alloc, result){
+        if (!srcKey || !(alloc > 0) || !result || result.choice === "leave" || result.choice === "cancel") return;
+        const snap = loadPostSnapshot_();
+        if (!snap || !snap.allocsByKey) return;
+        const paidState = loadPaidState_();
+        const paidByKey = Object.assign({}, paidState.paidByKey || {});
+        const allocsByKey = Object.assign({}, snap.allocsByKey || {});
+
+        const subtractFromSrc = () => {
+          paidByKey[srcKey] = Math.max(0, round2_((paidByKey[srcKey] || 0) - alloc));
+          allocsByKey[srcKey] = Math.max(0, round2_((allocsByKey[srcKey] || 0) - alloc));
+        };
+
+        if (result.choice === "move" && result.target && result.target !== srcKey){
+          subtractFromSrc();
+          const t = result.target;
+          paidByKey[t]   = round2_((paidByKey[t]   || 0) + alloc);
+          allocsByKey[t] = round2_((allocsByKey[t] || 0) + alloc);
+        } else if (result.choice === "split"){
+          const underfunded = getUnderfundedBills_(srcKey);
+          if (!underfunded.length) return;
+          const totalDeficit = underfunded.reduce((s, b) => s + b.deficit, 0);
+          if (!(totalDeficit > 0)) return;
+          subtractFromSrc();
+          let remaining = alloc;
+          for (let i = 0; i < underfunded.length; i++){
+            const b = underfunded[i];
+            const isLast = (i === underfunded.length - 1);
+            const share = isLast ? remaining : round2_((b.deficit / totalDeficit) * alloc);
+            remaining = round2_(remaining - share);
+            paidByKey[b.key]   = round2_((paidByKey[b.key]   || 0) + share);
+            allocsByKey[b.key] = round2_((allocsByKey[b.key] || 0) + share);
+          }
+        } else {
+          return;
+        }
+        savePaidState_({ ...paidState, paidByKey });
+        savePostSnapshot_({ ...snap, allocsByKey });
+      }
+
       function showMetDepositModal_(metRows) {
         const titleEl = document.getElementById("mfModalTitle");
         const subEl   = document.getElementById("mfModalSub");
@@ -4303,21 +4715,358 @@ function resetPaidMTD_(){
         });
       }
 
+      // Edit-mode state for the merged bills table. While `active`, the user
+      // can rename/reorder/add/delete rows; Target $ and Paid? are locked.
+      // The `snapshot` lets Cancel restore the exact pre-edit state. Each row
+      // tracks `originalKey` so on Save we know which keyed state (billsSplit,
+      // paidByKey, manualFunded, nextMonthPaid) needs to migrate.
+      const BillsEditState = {
+        active: false,
+        snapshot: null,
+        // Map from current rowIndex (in CategoriesState.rows) → originalName at edit start
+        originalNameByRowIdx: new Map(),
+        // Same for targetAccount — lets us keep rows visible in the bills table
+        // even if the user just changed their type to Debt (so they can revert).
+        originalTargetByRowIdx: new Map(),
+      };
+
+      function snapshotBillsState_() {
+        const snap = {
+          categoriesRows: (CategoriesState.rows || []).map(r => Array.isArray(r) ? r.slice() : ["", "", ""]),
+          billsSplit: JSON.parse(JSON.stringify(appState.billsSplit || {})),
+          paidState: JSON.parse(JSON.stringify(loadPaidState_())),
+          manualFunded: JSON.parse(JSON.stringify(loadManualFunded_())),
+          nextMonthPaid: JSON.parse(JSON.stringify(loadNextMonthPaid_())),
+        };
+        return snap;
+      }
+
+      function setBillsEditUIState_() {
+        const tbl = document.getElementById("engBillsTable");
+        const editBtn = document.getElementById("engBillsEditBtn");
+        const cancelBtn = document.getElementById("engBillsCancelBtn");
+        const saveBtn = document.getElementById("engBillsSaveBtn");
+        const hint = document.getElementById("engBillsEditHint");
+        const label = document.getElementById("engBillsEditLabel");
+        const addBar = document.getElementById("engBillsAddBar");
+        if (!tbl) return;
+        if (BillsEditState.active) {
+          tbl.classList.add("edit-mode");
+          if (editBtn) editBtn.style.display = "none";
+          if (cancelBtn) cancelBtn.style.display = "";
+          if (saveBtn) saveBtn.style.display = "";
+          if (hint) hint.style.display = "";
+          if (label) label.style.display = "none";
+          if (addBar) addBar.classList.add("show");
+        } else {
+          tbl.classList.remove("edit-mode");
+          if (editBtn) editBtn.style.display = "";
+          if (cancelBtn) cancelBtn.style.display = "none";
+          if (saveBtn) saveBtn.style.display = "none";
+          if (hint) hint.style.display = "none";
+          if (label) label.style.display = "";
+          if (addBar) addBar.classList.remove("show");
+        }
+      }
+
+      // Save-time reminder when the user has named categories with no type set.
+      // Returns true if the user wants to save anyway, false if they want to go back.
+      function showClassifyReminderModal_(namesText){
+        return new Promise(resolve => {
+          const modal   = document.getElementById("classifyReminderModal");
+          const body    = document.getElementById("classifyReminderBody");
+          const goBack  = document.getElementById("classifyReminderBackBtn");
+          const saveAny = document.getElementById("classifyReminderSaveBtn");
+          if (!modal || !body || !goBack || !saveAny) { resolve(true); return; }
+          body.innerHTML = `The following categories don't have a type yet: <strong>${escapeHtml_(namesText)}</strong>.<br><br>Without a type they won't be allocated money. Pick <em>Go back</em> to classify them, or <em>Save anyway</em> to keep them as-is.`;
+          const cleanup = (val) => {
+            modal.classList.remove("open");
+            goBack.removeEventListener("click", onBack);
+            saveAny.removeEventListener("click", onSave);
+            resolve(val);
+          };
+          const onBack = () => cleanup(false);
+          const onSave = () => cleanup(true);
+          goBack.addEventListener("click", onBack);
+          saveAny.addEventListener("click", onSave);
+          modal.classList.add("open");
+        });
+      }
+
+      async function enterBillsEditMode_() {
+        if (BillsEditState.active) return;
+        if (typeof ensureCategoriesLoaded_ === "function") {
+          await ensureCategoriesLoaded_();
+        }
+        BillsEditState.snapshot = snapshotBillsState_();
+        BillsEditState.active = true;
+        // Capture original names + targets per row so we can detect renames AND
+        // keep rows visible even after a type-to-Debt change during this session.
+        BillsEditState.originalNameByRowIdx = new Map();
+        BillsEditState.originalTargetByRowIdx = new Map();
+        (CategoriesState.rows || []).forEach((r, idx) => {
+          const n = String((r && r[0]) || "").trim();
+          const t = String((r && r[1]) || "").trim();
+          if (n) {
+            BillsEditState.originalNameByRowIdx.set(idx, n);
+            BillsEditState.originalTargetByRowIdx.set(idx, t);
+          }
+        });
+        setBillsEditUIState_();
+        renderEngineBillsSplitTable_();
+      }
+
+      // Migrate a key in all per-key state (called from Save when a name changed)
+      function migrateBillKey_(oldKey, newKey) {
+        if (!oldKey || !newKey || oldKey === newKey) return;
+        // appState.billsSplit
+        if (appState.billsSplit && appState.billsSplit[oldKey]) {
+          appState.billsSplit[newKey] = appState.billsSplit[oldKey];
+          delete appState.billsSplit[oldKey];
+        }
+        // paidState
+        const ps = loadPaidState_();
+        if (ps.paidByKey && ps.paidByKey[oldKey] !== undefined) {
+          ps.paidByKey[newKey] = ps.paidByKey[oldKey];
+          delete ps.paidByKey[oldKey];
+          savePaidState_(ps);
+        }
+        // manualFunded — load raw to preserve monthKey, mutate flags
+        try {
+          const raw = localStorage.getItem(MANUAL_FUNDED_LS_KEY);
+          if (raw) {
+            const obj = JSON.parse(raw);
+            if (obj && obj.flags && obj.flags[oldKey]) {
+              obj.flags[newKey] = obj.flags[oldKey];
+              delete obj.flags[oldKey];
+              if (obj.cycleStartByBill && obj.cycleStartByBill[oldKey] !== undefined) {
+                obj.cycleStartByBill[newKey] = obj.cycleStartByBill[oldKey];
+                delete obj.cycleStartByBill[oldKey];
+              }
+              localStorage.setItem(MANUAL_FUNDED_LS_KEY, JSON.stringify(obj));
+              workerSet_("manualFunded", obj).catch(()=>{});
+            }
+          }
+        } catch(_){}
+        // nextMonthPaid
+        const nmp = loadNextMonthPaid_();
+        if (nmp[oldKey] !== undefined) {
+          nmp[newKey] = nmp[oldKey];
+          delete nmp[oldKey];
+          saveNextMonthPaid_(nmp);
+        }
+        // postSnapshot.allocsByKey (current-month snapshot)
+        try {
+          const snap = loadPostSnapshot_();
+          if (snap && snap.allocsByKey && snap.allocsByKey[oldKey] !== undefined) {
+            snap.allocsByKey[newKey] = snap.allocsByKey[oldKey];
+            delete snap.allocsByKey[oldKey];
+            savePostSnapshot_(snap);
+          }
+        } catch(_){}
+      }
+
+      // Remove all per-key state for a deleted bill
+      function purgeBillKey_(key) {
+        if (!key) return;
+        if (appState.billsSplit && appState.billsSplit[key]) {
+          delete appState.billsSplit[key];
+        }
+        const ps = loadPaidState_();
+        if (ps.paidByKey && ps.paidByKey[key] !== undefined) {
+          delete ps.paidByKey[key];
+          savePaidState_(ps);
+        }
+        try {
+          const raw = localStorage.getItem(MANUAL_FUNDED_LS_KEY);
+          if (raw) {
+            const obj = JSON.parse(raw);
+            if (obj && obj.flags && obj.flags[key]) {
+              delete obj.flags[key];
+              if (obj.cycleStartByBill) delete obj.cycleStartByBill[key];
+              localStorage.setItem(MANUAL_FUNDED_LS_KEY, JSON.stringify(obj));
+              workerSet_("manualFunded", obj).catch(()=>{});
+            }
+          }
+        } catch(_){}
+        const nmp = loadNextMonthPaid_();
+        if (nmp[key] !== undefined) {
+          delete nmp[key];
+          saveNextMonthPaid_(nmp);
+        }
+        try {
+          const snap = loadPostSnapshot_();
+          if (snap && snap.allocsByKey && snap.allocsByKey[key] !== undefined) {
+            delete snap.allocsByKey[key];
+            savePostSnapshot_(snap);
+          }
+        } catch(_){}
+      }
+
+      async function exitBillsEditMode_(commit) {
+        if (!BillsEditState.active) return;
+        if (commit) {
+          // Validation: any non-empty named row that's still Bills-targeted but
+          // has no descriptor is "unclassified". Block save until resolved.
+          const unclassified = [];
+          (CategoriesState.rows || []).forEach((r, idx) => {
+            const n = String((r && r[0]) || "").trim();
+            const t = String((r && r[1]) || "").trim();
+            const d = String((r && r[2]) || "").trim();
+            if (n && t === "Bills" && !d) {
+              unclassified.push({ name: n, rowIdx: idx });
+            }
+          });
+          if (unclassified.length) {
+            const names = unclassified.map(u => `"${u.name}"`).join(", ");
+            const proceed = await showClassifyReminderModal_(names);
+            if (!proceed) return; // user wants to go back and classify
+          }
+          // 1) Diff names against snapshot to find renames + deletes + adds
+          const origByIdx = BillsEditState.originalNameByRowIdx;
+          // For renames, we walk current rows; if originalName exists for this rowIdx and differs from current, migrate.
+          // For deletes: rows in snapshot but not in current (by name match) → purge.
+          // For adds: rows in current not in snapshot → create billsSplit entry on demand.
+          const snapRows = (BillsEditState.snapshot.categoriesRows || []);
+          const snapNames = new Set();
+          snapRows.forEach(r => {
+            const n = String((r && r[0]) || "").trim();
+            if (n) snapNames.add(n.toLowerCase());
+          });
+          const curNames = new Set();
+          (CategoriesState.rows || []).forEach(r => {
+            const n = String((r && r[0]) || "").trim();
+            if (n) curNames.add(n.toLowerCase());
+          });
+          // Detect renames (rowIdx-aligned): original name from map vs current row name
+          (CategoriesState.rows || []).forEach((r, idx) => {
+            const curName = String((r && r[0]) || "").trim();
+            const origName = origByIdx.get(idx);
+            if (!curName || !origName) return;
+            if (origName !== curName) {
+              const oldKey = origName.toLowerCase();
+              const newKey = curName.toLowerCase();
+              migrateBillKey_(oldKey, newKey);
+            }
+          });
+          // Detect deletes
+          snapNames.forEach(oldKey => {
+            if (!curNames.has(oldKey)) purgeBillKey_(oldKey);
+          });
+          // Compact + persist
+          CategoriesState.rows = compactRows_(CategoriesState.rows, CategoriesState.maxRows, 3);
+          CategoriesState.displayCount = (typeof computeBaselineCatDisplayCount_ === "function") ? computeBaselineCatDisplayCount_() : CategoriesState.displayCount;
+          setCfgCategories_(CategoriesState.rows);
+          try { await saveCategoriesServer_(); } catch(_){}
+          try { saveBillsSplitToStorage_(); } catch(_){}
+          try { if (typeof scheduleBillsTargetsSave_ === "function") scheduleBillsTargetsSave_(); } catch(_){}
+        } else {
+          // Restore from snapshot
+          const s = BillsEditState.snapshot;
+          if (s) {
+            CategoriesState.rows = (s.categoriesRows || []).map(r => Array.isArray(r) ? r.slice() : ["", "", ""]);
+            CategoriesState.displayCount = (typeof computeBaselineCatDisplayCount_ === "function") ? computeBaselineCatDisplayCount_() : CategoriesState.displayCount;
+            setCfgCategories_(CategoriesState.rows);
+            appState.billsSplit = JSON.parse(JSON.stringify(s.billsSplit || {}));
+            saveBillsSplitToStorage_();
+          }
+        }
+        BillsEditState.active = false;
+        BillsEditState.snapshot = null;
+        BillsEditState.originalNameByRowIdx = new Map();
+        BillsEditState.originalTargetByRowIdx = new Map();
+        setBillsEditUIState_();
+        renderEngineBillsSplitTable_();
+        try { if (typeof renderCategories_ === "function") renderCategories_(); } catch(_){}
+      }
+
+      function moveBillsRow_(rowIdx, direction){
+        if (!BillsEditState.active) return;
+        const rows = CategoriesState.rows || [];
+        if (rowIdx < 0 || rowIdx >= rows.length) return;
+        // Find swap target: the previous/next row whose targetAccount is "Bills"
+        const step = direction === "up" ? -1 : 1;
+        let other = rowIdx + step;
+        while (other >= 0 && other < rows.length) {
+          const ta = String((rows[other] && rows[other][1]) || "").trim();
+          const nm = String((rows[other] && rows[other][0]) || "").trim();
+          if (nm && ta === "Bills") break;
+          other += step;
+        }
+        if (other < 0 || other >= rows.length) return;
+        // Swap
+        const tmp = rows[rowIdx];
+        rows[rowIdx] = rows[other];
+        rows[other] = tmp;
+        // Swap originalNameByRowIdx mapping too so rename detection stays correct
+        const mapA = BillsEditState.originalNameByRowIdx.get(rowIdx);
+        const mapB = BillsEditState.originalNameByRowIdx.get(other);
+        if (mapA !== undefined) BillsEditState.originalNameByRowIdx.set(other, mapA); else BillsEditState.originalNameByRowIdx.delete(other);
+        if (mapB !== undefined) BillsEditState.originalNameByRowIdx.set(rowIdx, mapB); else BillsEditState.originalNameByRowIdx.delete(rowIdx);
+        setCfgCategories_(rows);
+        renderEngineBillsSplitTable_();
+      }
+
+      function deleteBillsRowDraft_(rowIdx){
+        if (!BillsEditState.active) return;
+        const rows = CategoriesState.rows || [];
+        if (rowIdx < 0 || rowIdx >= rows.length) return;
+        rows[rowIdx] = ["", "", ""];
+        BillsEditState.originalNameByRowIdx.delete(rowIdx);
+        setCfgCategories_(rows);
+        renderEngineBillsSplitTable_();
+      }
+
+      function addBillsRowDraft_(){
+        if (!BillsEditState.active) return;
+        const rows = CategoriesState.rows || [];
+        // Find first empty slot OR push to end. New rows default to Bills
+        // target with no descriptor — the user must explicitly classify them
+        // (Bills / Living / Debt) before Save, which triggers the validation
+        // modal if they skip it.
+        let idx = -1;
+        for (let i = 0; i < rows.length; i++) {
+          const nm = String((rows[i] && rows[i][0]) || "").trim();
+          if (!nm) { idx = i; break; }
+        }
+        if (idx < 0) {
+          if (rows.length >= CategoriesState.maxRows) return;
+          rows.push(["", "Bills", ""]);
+          idx = rows.length - 1;
+        } else {
+          rows[idx] = ["", "Bills", ""];
+        }
+        setCfgCategories_(rows);
+        renderEngineBillsSplitTable_();
+        // Focus the new row's name input
+        setTimeout(() => {
+          const tr = document.querySelector(`#engOutTbody tr[data-row-idx="${idx}"]`);
+          const inp = tr ? tr.querySelector(".name-input") : null;
+          if (inp) { inp.focus(); inp.select?.(); }
+        }, 30);
+      }
+
       function renderEngineBillsSplitTable_() {
         if (!engOutTbody) return;
 
-        // Load + group categories for display order
-        const catsRaw = getCfgCategoryRows_();
-        const bills = [];
-        const living = [];
-        const unset = [];
-        for (const c of catsRaw){
-          const d = normalizeDescriptor_(c.cfgDescriptor);
-          if (d === "Bills") bills.push(c);
-          else if (d === "Living expenses") living.push(c);
-          else unset.push(c);
+        // In edit mode the user drives order explicitly; in view mode we still
+        // respect the raw CategoriesState.rows order (no auto-grouping) so the
+        // bills table and Categories editor stay consistent and the user's
+        // reorders persist. Edit mode also includes empty-name rows (so a fresh
+        // Add Category row appears as a typeable input) and any row that was
+        // originally Bills before the user changed its type (so they can revert
+        // before saving).
+        let catsRaw;
+        if (BillsEditState.active) {
+          const forceIdxs = new Set();
+          BillsEditState.originalTargetByRowIdx?.forEach((tgt, idx) => {
+            if (tgt === "Bills") forceIdxs.add(idx);
+          });
+          catsRaw = getCfgCategoryRows_({ includeEmpty: true, forceIncludeIdxs: forceIdxs });
+        } else {
+          catsRaw = getCfgCategoryRows_();
         }
-        const cats = bills.concat(living).concat(unset);
+        const cats = catsRaw;
 
         engOutTbody.innerHTML = "";
         appState.billsSplit = appState.billsSplit || {};
@@ -4344,24 +5093,158 @@ function resetPaidMTD_(){
           const monthlyTarget = String(rowState.monthlyTarget ?? "0");
 
           const tr = document.createElement("tr");
+          tr.dataset.rowIdx = String(c.rowIndex);
+          tr.dataset.key = key;
 
-          // Category (locked)
+          // Category cell — view mode shows name; edit mode adds reorder ↑↓,
+          // editable name input, and delete ✕ in the same cell so the existing
+          // mobile grid (name spans full width) accommodates them naturally.
           {
             const td = document.createElement("td");
             td.className = "mono";
-            td.textContent = categoryName;
+            const wrap = document.createElement("span");
+            wrap.style.cssText = "display:flex;align-items:center;gap:8px;width:100%;";
+
+            // Reorder buttons (edit-mode only via CSS)
+            const reorder = document.createElement("span");
+            reorder.className = "row-reorder";
+            const upBtn = document.createElement("button");
+            upBtn.type = "button"; upBtn.className = "reorder-btn"; upBtn.textContent = "▲"; upBtn.title = "Move up";
+            upBtn.addEventListener("click", (e) => { e.preventDefault(); e.stopPropagation(); moveBillsRow_(c.rowIndex, "up"); });
+            const downBtn = document.createElement("button");
+            downBtn.type = "button"; downBtn.className = "reorder-btn"; downBtn.textContent = "▼"; downBtn.title = "Move down";
+            downBtn.addEventListener("click", (e) => { e.preventDefault(); e.stopPropagation(); moveBillsRow_(c.rowIndex, "down"); });
+            reorder.appendChild(upBtn);
+            reorder.appendChild(downBtn);
+            wrap.appendChild(reorder);
+
+            // View-mode display
+            const nameDisplay = document.createElement("span");
+            nameDisplay.className = "name-display";
+            nameDisplay.textContent = categoryName;
+            nameDisplay.style.flex = "1";
+            wrap.appendChild(nameDisplay);
+
+            // Edit-mode name input
+            const nameInput = document.createElement("input");
+            nameInput.type = "text";
+            nameInput.className = "name-input";
+            nameInput.value = categoryName;
+            nameInput.style.flex = "1";
+            nameInput.addEventListener("input", () => {
+              const v = nameInput.value;
+              if (CategoriesState.rows[c.rowIndex]) {
+                CategoriesState.rows[c.rowIndex][0] = v;
+                appState.cfgCategories = CategoriesState.rows;
+                nameDisplay.textContent = v;
+              }
+            });
+            wrap.appendChild(nameInput);
+
+            // Delete (two-click confirm)
+            const delBtn = document.createElement("button");
+            delBtn.type = "button"; delBtn.className = "row-delete"; delBtn.textContent = "✕"; delBtn.title = "Delete this bill";
+            delBtn.addEventListener("click", (e) => {
+              e.preventDefault(); e.stopPropagation();
+              if (delBtn.classList.contains("confirming")) {
+                deleteBillsRowDraft_(c.rowIndex);
+              } else {
+                // reset other confirming buttons
+                engOutTbody.querySelectorAll(".row-delete.confirming").forEach(b => {
+                  b.classList.remove("confirming"); b.textContent = "✕";
+                });
+                delBtn.classList.add("confirming");
+                delBtn.textContent = "Delete?";
+                setTimeout(() => {
+                  if (delBtn.classList.contains("confirming")) {
+                    delBtn.classList.remove("confirming"); delBtn.textContent = "✕";
+                  }
+                }, 3500);
+              }
+            });
+            wrap.appendChild(delBtn);
+
+            td.appendChild(wrap);
             tr.appendChild(td);
           }
 
-          // ✅ Descriptor (locked, from Expense Categories tab)
+          // Descriptor cell — view shows badge; edit shows dropdown.
+          // Dropdown options: Bills / Living Exp / Debt. Picking Debt changes
+          // the targetAccount (so the row leaves the bills table and shows up
+          // in the Debt tab on Save).
           {
             const td = document.createElement("td");
             td.className = "mono";
             td.style.whiteSpace = "nowrap";
             td.dataset.role = "desc";
-            const label = descriptor === "Living expenses" ? "Living Exp" : (descriptor || "—");
-            td.textContent = label;
-            td.title = "Set this in the Categories tab.";
+            // Compute current dropdown value from targetAccount + descriptor
+            const currentType =
+              (c.targetAccount === "Debt") ? "Debt" :
+              (descriptor === "Living expenses") ? "Living Expenses" :
+              (descriptor === "Bills") ? "Bills" : "";
+            const labelText =
+              currentType === "Living Expenses" ? "Living Exp" :
+              currentType === "Debt" ? "Debt" :
+              currentType === "Bills" ? "Bills" : "— pick a type —";
+            const display = document.createElement("span");
+            display.className = "name-display";
+            display.textContent = labelText;
+            if (!currentType) display.style.color = "var(--danger-text)";
+            td.appendChild(display);
+
+            const sel = document.createElement("select");
+            sel.className = "type-select";
+            if (!currentType) sel.classList.add("unclassified");
+            const options = [
+              { v: "",                 t: "— pick a type —" },
+              { v: "Bills",            t: "Bills" },
+              { v: "Living Expenses",  t: "Living Exp" },
+              { v: "Debt",             t: "Debt (moves to Debt tab)" },
+            ];
+            options.forEach(({ v, t }) => {
+              const o = document.createElement("option");
+              o.value = v;
+              o.textContent = t;
+              if (currentType === v) o.selected = true;
+              if (v === "" && currentType !== "") {
+                // hide the placeholder once a type is set
+                o.style.display = "none";
+              }
+              sel.appendChild(o);
+            });
+            sel.addEventListener("change", () => {
+              const v = sel.value;
+              const row = CategoriesState.rows[c.rowIndex];
+              if (!row) return;
+              if (v === "Debt") {
+                row[1] = "Debt";
+                row[2] = "";
+                display.textContent = "Debt";
+                display.style.color = "";
+                sel.classList.remove("unclassified");
+              } else if (v === "Living Expenses") {
+                row[1] = "Bills";
+                row[2] = "Living expenses";
+                display.textContent = "Living Exp";
+                display.style.color = "";
+                sel.classList.remove("unclassified");
+              } else if (v === "Bills") {
+                row[1] = "Bills";
+                row[2] = "Bills";
+                display.textContent = "Bills";
+                display.style.color = "";
+                sel.classList.remove("unclassified");
+              } else {
+                row[1] = "Bills";
+                row[2] = "";
+                display.textContent = "— pick a type —";
+                display.style.color = "var(--danger-text)";
+                sel.classList.add("unclassified");
+              }
+              appState.cfgCategories = CategoriesState.rows;
+            });
+            td.appendChild(sel);
+            td.title = "Bills/Living draw from this tab's pool. Debt moves the row to the Debt tab.";
             tr.appendChild(td);
           }
 
@@ -4436,7 +5319,28 @@ function resetPaidMTD_(){
             cb.title = "Check if you already paid this bill this month. Funding will target next month instead.";
             cb.checked = !!flags[key];
             cb.style.cssText = "width:32px;height:32px;cursor:pointer;accent-color:var(--accent);flex-shrink:0;";
-            cb.addEventListener("change", () => {
+            cb.addEventListener("change", async () => {
+              // When CHECKING the box, if this bill already has allocation
+              // from a post snapshot this month, offer the user the choice to
+              // redirect that money. Unchecking just clears the flag.
+              if (cb.checked) {
+                const snap = loadPostSnapshot_();
+                const alloc = Number(snap?.allocsByKey?.[key] || 0) || 0;
+                const sameMonth = !!(snap && snap.monthKey === monthKeyLocal_());
+                if (sameMonth && alloc > 0.005) {
+                  const underfundedBills = getUnderfundedBills_(key);
+                  const result = await showRedirectPaidModal_({
+                    name: categoryName,
+                    alloc,
+                    underfundedBills,
+                  });
+                  if (result.choice === "cancel") {
+                    cb.checked = false;
+                    return;
+                  }
+                  try { applyPaidRedirect_(key, alloc, result); } catch(_){}
+                }
+              }
               const cur = loadManualFunded_();
               if (cb.checked) {
                 cur[key] = true;
@@ -4510,7 +5414,7 @@ function resetPaidMTD_(){
 
   // Ask about bills fully funded by the LAST deposit (before new post runs)
   const _snap = loadPostSnapshot_();
-  if (_snap && _snap.allocsByKey && _snap.monthKey === getMonthKey_()) {
+  if (_snap && _snap.allocsByKey && _snap.monthKey === monthKeyLocal_()) {
     const _mf = loadManualFunded_();
     const _paidState = loadPaidState_();
     const _paidByKey = _paidState?.paidByKey || {};
@@ -4739,7 +5643,7 @@ function buildBaselineHealthSnapshot_(){
   const guardDeposit = guard && isFinite(Number(guard.deposit)) ? Number(guard.deposit) : null;
 
   return {
-    spec, build, exec,
+    spec, build,
     deposit: {
       inputStr: depInputStr,
       inputNum: depInputNum,
@@ -4771,7 +5675,6 @@ rows.push(["—", "—"]);
 
   rows.push(["Spec Version", s.spec || "—"]);
   rows.push(["Build Stamp", s.build || "—"]);
-  rows.push(["Exec URL", s.exec || "—"]);
   rows.push(["—", "—"]);
 
   rows.push(["Engine deposit (input)", s.deposit.inputStr !== "" ? s.deposit.inputStr : "—"]);
@@ -5443,7 +6346,7 @@ async function loadCategoriesServer_(){
     const rows = (res.state && Array.isArray(res.state.rows)) ? res.state.rows : [];
     const mapped = rows.map(r => [String(r?.[0] ?? ""), String(r?.[1] ?? ""), String(r?.[2] ?? "")]);
 
-    CategoriesState.rows = normalizeFixedRows_(mapped, CategoriesState.maxRows, 3);
+    CategoriesState.rows = compactRows_(normalizeFixedRows_(mapped, CategoriesState.maxRows, 3), CategoriesState.maxRows, 3);
     CategoriesState.dirty = false;
     CategoriesState.loadedOnce = true;
     CategoriesState.displayCount = computeBaselineCatDisplayCount_();
@@ -5467,7 +6370,9 @@ async function saveCategoriesServer_(){
   try{
     setCatStatus_("Saving…");
     const MAX = CategoriesState.maxRows;
-    const rows = normalizeFixedRows_(CategoriesState.rows, MAX, 3);
+    // Compact first: any empty rows above filled ones get squeezed out so the
+    // saved order is contiguous (no gaps).
+    const rows = compactRows_(normalizeFixedRows_(CategoriesState.rows, MAX, 3), MAX, 3);
 
     // No formulas
     for (const r of rows){
@@ -6334,6 +7239,18 @@ document.addEventListener("click", async (e) => {
       if (b && !b.dataset.wired){ b.dataset.wired="1"; b.addEventListener("click", () => resetAllMTD_()); }
     } catch(_){}
 
+    // Bills table Edit / Save / Cancel / Add wiring
+    try{
+      const editBtn = document.getElementById("engBillsEditBtn");
+      const cancelBtn = document.getElementById("engBillsCancelBtn");
+      const saveBtn = document.getElementById("engBillsSaveBtn");
+      const addBtn = document.getElementById("engBillsAddNewBtn");
+      if (editBtn && !editBtn.dataset.wired) { editBtn.dataset.wired = "1"; editBtn.addEventListener("click", () => enterBillsEditMode_()); }
+      if (cancelBtn && !cancelBtn.dataset.wired) { cancelBtn.dataset.wired = "1"; cancelBtn.addEventListener("click", () => exitBillsEditMode_(false)); }
+      if (saveBtn && !saveBtn.dataset.wired) { saveBtn.dataset.wired = "1"; saveBtn.addEventListener("click", () => exitBillsEditMode_(true)); }
+      if (addBtn && !addBtn.dataset.wired) { addBtn.dataset.wired = "1"; addBtn.addEventListener("click", () => addBillsRowDraft_()); }
+    } catch(_){}
+
     // Refresh button
     try{
       const rb = document.getElementById("refreshBtn");
@@ -6551,7 +7468,7 @@ document.addEventListener("click", async (e) => {
 })();
 
     // ── Onboarding Slideshow ─────────────────────────────────
-    const OB_TOTAL = 18;
+    const OB_TOTAL = 19;
     let _obIdx = 0;
 
     const TOUR_STEPS = [
@@ -6569,6 +7486,7 @@ document.addEventListener("click", async (e) => {
       { type: 'spotlight', tab: 'budgeter',  tabLabel: '⚖️ Allot',   target: '#editCatSection',   title: '⚠️ Set This Up First',   body: 'This table is where you tell Allot what you pay for every month. Your bills, living expenses, debt — all of it goes here. Nothing else in the app works until this is filled in.', scrollBlock: 'start', openDetails: '#editCatSection' },
       { type: 'spotlight', tab: 'budgeter',  tabLabel: '⚖️ Allot',   target: '#catFirstRow',      title: '📝 How to Fill It In',   body: 'Each row is one expense. Name — what the bill is. Target Account — which of your 4 pools pays it (Bills, Debt, Savings, or Spending). Type — Bills for fixed monthly bills, Living Expenses for flexible spending like groceries or gas.', openDetails: '#editCatSection' },
       { type: 'spotlight', tab: 'budgeter',  tabLabel: '⚖️ Allot',   target: '#engBillsTable',    title: '📋 Your Bills',          body: 'Bills are funded top-to-bottom in priority order. Put your most critical expenses at the top so they always get covered first.' },
+      { type: 'spotlight', tab: 'budgeter',  tabLabel: '⚖️ Allot',   target: '#engBillsEditBar',  title: '✏️ Edit Mode',           body: 'Tap Edit to rename a category, change its type (Bills / Living / Debt), reorder priority, or add and delete categories. Target $ and Paid? lock while you edit so you don\'t change them by accident. Save commits your changes; Cancel discards them.' },
       { type: 'spotlight', tab: 'budgeter',  tabLabel: '⚖️ Allot',   target: '#engBillsTable',    title: '✅ The Paid Checkbox',    body: 'Already paid a bill this month? Check the box. Allot will skip it for this deposit and fund it toward next month instead — so you\'re never double-counting.' },
       // ── Debt tab ──────────────────────────────────────────────
       { type: 'spotlight', tab: 'debt',      tabLabel: '📉 Debt',     target: '#debtTable',        title: '📝 Add Your Debts',      body: 'Enter each debt here — name, current balance, APR, and minimum payment. Allot uses these to calculate exactly how to split your debt pool each deposit.' },
@@ -7207,6 +8125,26 @@ document.addEventListener("click", async (e) => {
     </div>
   </div>
 
+  <!-- Debt zeroed-out: keep or delete? -->
+  <div id="debtZeroModal" role="dialog" aria-modal="true">
+    <div class="modal-box">
+      <h3 id="debtZeroTitle">Balance set to $0</h3>
+      <p class="modal-sub" id="debtZeroSub">What do you want to do with this debt category?</p>
+      <div class="zero-option">
+        <h4>Keep it at $0</h4>
+        <p>Best for <strong>revolving credit</strong> — credit cards or lines you might use again. The row stays in your list (italic, faded) and you can re-enter a balance any time it gets charged. No category cleanup needed later.</p>
+      </div>
+      <div class="zero-option">
+        <h4>Delete it</h4>
+        <p>Best for <strong>one-time credit</strong> — Affirm payments, paid-off personal loans, or any debt you won't reuse. Removes the category entirely; you'd have to re-create it under Categories if you ever needed it back.</p>
+      </div>
+      <div class="modal-footer">
+        <button id="debtZeroKeepBtn" class="btn-keep">Keep at $0</button>
+        <button id="debtZeroDeleteBtn" class="btn-delete">Delete category</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Clear Custom Percentages Modal -->
   <div id="clearPctModal" role="dialog" aria-modal="true">
     <div class="modal-box">
@@ -7233,6 +8171,53 @@ document.addEventListener("click", async (e) => {
   </div>
 
   <!-- Manual Funded Confirmation Modal -->
+  <!-- Save-time classify-reminder modal: fires from bills-table edit mode -->
+  <div id="classifyReminderModal" role="dialog" aria-modal="true">
+    <div class="modal-box">
+      <h3>Set a type for these categories?</h3>
+      <p class="modal-sub" id="classifyReminderBody"></p>
+      <div class="modal-footer">
+        <button id="classifyReminderSaveBtn" class="btn btn2">Save anyway</button>
+        <button id="classifyReminderBackBtn" class="btn-confirm-rp">Go back</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Redirect-paid modal: fires when Paid? is checked on a bill that has allocation from a prior post this month -->
+  <div id="redirectPaidModal" role="dialog" aria-modal="true" aria-labelledby="rpModalTitle">
+    <div class="modal-box">
+      <h3 id="rpModalTitle">Mark Bill as Paid</h3>
+      <p class="modal-sub" id="rpModalSub">This bill has money allocated this month. Where should that money go?</p>
+      <div id="rpModalOptions">
+        <label class="rp-option">
+          <span class="rp-option-header">
+            <input type="radio" name="rp-choice" value="leave" checked>
+            <span class="rp-option-label">Leave allocation alone</span>
+          </span>
+          <div class="rp-option-detail">Keep the money assigned to this bill. Future deposits skip it, and the leftover stays as a buffer toward next month.</div>
+        </label>
+        <label class="rp-option">
+          <span class="rp-option-header">
+            <input type="radio" name="rp-choice" value="split">
+            <span class="rp-option-label">Split across underfunded bills</span>
+          </span>
+          <div class="rp-option-detail">Distribute the freed money proportionally across bills that are below their monthly target.</div>
+        </label>
+        <label class="rp-option">
+          <span class="rp-option-header">
+            <input type="radio" name="rp-choice" value="move">
+            <span class="rp-option-label">Move all to one bill</span>
+          </span>
+          <select id="rpMoveTarget" class="rp-move-select" disabled></select>
+        </label>
+      </div>
+      <div class="modal-footer">
+        <button id="rpModalCancelBtn" class="btn btn2">Cancel</button>
+        <button id="rpModalConfirmBtn" class="btn-confirm-rp">Confirm</button>
+      </div>
+    </div>
+  </div>
+
   <div id="manualFundedModal" role="dialog" aria-modal="true" aria-labelledby="mfModalTitle">
     <div class="modal-box">
       <h3 id="mfModalTitle">Funding for Next Month</h3>
