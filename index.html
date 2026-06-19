@@ -1755,7 +1755,7 @@ body { padding:0; overflow-x: hidden; }
       // ===== Header pills =====
       const whereEl = document.getElementById("where");
       const specEl = document.getElementById("specVersion");
-      const BUILD_STAMP = "v409-pages";
+      const BUILD_STAMP = "v410-pages";
       const SPEC_VERSION = "";
       specEl.textContent = "Spec: " + SPEC_VERSION;
       whereEl.textContent = "Here: " + window.location.href;
@@ -4525,6 +4525,8 @@ function resetPaidMTD_(){
         try {
           localStorage.setItem(NEXT_MONTH_PAID_LS_KEY, JSON.stringify(obj));
         } catch(e) {}
+        // Sync forward-funded amounts across devices (8th synced KV key).
+        workerSet_("nextMonthPaid", obj || {}).catch(()=>{});
       }
 
       function getNextMonthLabel_() {
@@ -7194,7 +7196,7 @@ document.addEventListener("click", async (e) => {
 
       async function syncDepositStateFromKV_() {
         const _s = (p) => p.catch(() => ({ ok: false, state: null }));
-        const [ps, snap, guard, hist, profile, customPcts, manualFunded] = await Promise.all([
+        const [ps, snap, guard, hist, profile, customPcts, manualFunded, nextMonthPaid] = await Promise.all([
           _s(workerGet_("paidState")),
           _s(workerGet_("postSnapshot")),
           _s(workerGet_("postGuard")),
@@ -7202,6 +7204,7 @@ document.addEventListener("click", async (e) => {
           _s(workerGet_("splitterProfile")),
           _s(workerGet_("splitterCustomPcts")),
           _s(workerGet_("manualFunded")),
+          _s(workerGet_("nextMonthPaid")),
         ]);
         let synced = 0;
         if (ps?.ok && ps.state)     { try { localStorage.setItem(LS_KEY_BILLS_PAID,      JSON.stringify(ps.state));   synced++; } catch(_){} }
@@ -7223,6 +7226,7 @@ document.addEventListener("click", async (e) => {
           } catch(_){}
         }
         if (manualFunded?.ok && manualFunded.state) { try { localStorage.setItem(MANUAL_FUNDED_LS_KEY, JSON.stringify(manualFunded.state)); synced++; } catch(_){} }
+        if (nextMonthPaid?.ok && nextMonthPaid.state) { try { localStorage.setItem(NEXT_MONTH_PAID_LS_KEY, JSON.stringify(nextMonthPaid.state)); synced++; } catch(_){} }
         return synced;
       }
 
