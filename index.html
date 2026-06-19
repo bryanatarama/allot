@@ -1755,7 +1755,7 @@ body { padding:0; overflow-x: hidden; }
       // ===== Header pills =====
       const whereEl = document.getElementById("where");
       const specEl = document.getElementById("specVersion");
-      const BUILD_STAMP = "v405-pages";
+      const BUILD_STAMP = "v406-pages";
       const SPEC_VERSION = "";
       specEl.textContent = "Spec: " + SPEC_VERSION;
       whereEl.textContent = "Here: " + window.location.href;
@@ -3683,6 +3683,15 @@ dashPreviewTbody.appendChild(tr);
       function renderDashboardAppTables_(){
     // Each render is isolated so one failure never blocks the others
     try { if (typeof renderDepositPreviewApp_ === "function") renderDepositPreviewApp_(); } catch(e){ console.warn("[render] renderDepositPreviewApp_ threw:", e); }
+    // Keep the Allot pool tiles in sync with funding state (met) just like the Home
+    // tiles above — otherwise toggling a bill's Paid box (or posting/resetting) flips
+    // billsFullyFunded_() and the Home tiles update while Allot stays stale. Skip the
+    // rebuild while a custom-% Allot tile is focused so we don't drop the user's input.
+    try {
+      const _engTiles = document.getElementById("engRowsTbody");
+      const _editingAllotTile = !!(_engTiles && _engTiles.contains(document.activeElement));
+      if (!_editingAllotTile && typeof renderEngineSplitterRows_ === "function") renderEngineSplitterRows_();
+    } catch(e){ console.warn("[render] renderEngineSplitterRows_ threw:", e); }
     try { if (typeof renderAppSummaryTable_ === "function") renderAppSummaryTable_(); } catch(e){ console.warn("[render] renderAppSummaryTable_ threw:", e); }
     try { if (typeof renderAppCategoryTable_ === "function") renderAppCategoryTable_(); } catch(e){ console.warn("[render] renderAppCategoryTable_ threw:", e); }
     try { if (typeof renderDepositHistory_ === "function") renderDepositHistory_(); } catch(e){ console.warn("[render] renderDepositHistory_ threw:", e); }
