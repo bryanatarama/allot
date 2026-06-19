@@ -1755,7 +1755,7 @@ body { padding:0; overflow-x: hidden; }
       // ===== Header pills =====
       const whereEl = document.getElementById("where");
       const specEl = document.getElementById("specVersion");
-      const BUILD_STAMP = "v406-pages";
+      const BUILD_STAMP = "v407-pages";
       const SPEC_VERSION = "";
       specEl.textContent = "Spec: " + SPEC_VERSION;
       whereEl.textContent = "Here: " + window.location.href;
@@ -1974,6 +1974,27 @@ function billsFullyFunded_(){
   return considered > 0;
 }
 
+// True when at least one bill is being forward-funded toward next month and
+// that next-month need isn't fully pre-funded yet. Mirrors billsFullyFunded_'s
+// row filtering. Used to keep the Bills bucket funded (instead of reallocating
+// to Debt/Savings/Spending) so forward-fund deposits flow into next month.
+function billsHaveForwardFundNeed_(){
+  const cats = getCfgCategoryRows_();
+  const manualFunded = loadManualFunded_();
+  const nextMonthPaid = loadNextMonthPaid_();
+  for (const c of cats){
+    const key = c.key;
+    if (!key || !manualFunded[key]) continue;
+    const desc = normalizeDescriptor_(c.cfgDescriptor || "");
+    if (!desc) continue;
+    const mt = Number(appState.billsSplit?.[key]?.monthlyTarget || 0) || 0;
+    if (!(mt > 0)) continue;
+    const nm = Number(nextMonthPaid[key] || 0) || 0;
+    if (nm + 0.005 < mt) return true;
+  }
+  return false;
+}
+
 function computeEffectiveSplitterAmounts_(deposit){
   const rows = EngineState?.state?.splitter?.rows || [];
   let billsDec=0, debtDec=0, savDec=0, spendDec=0;
@@ -1996,6 +2017,15 @@ function computeEffectiveSplitterAmounts_(deposit){
 
   const met = billsFullyFunded_();
   if (!met || !(base.Bills > 0)) return { met, base, effective: base, reallocated: 0 };
+
+  // Forward-funding: bills are funded for this month but the user is pre-funding
+  // them toward next month. Keep the Bills bucket at its full base allocation so
+  // the money flows into next month's bills (via nextMonthPaid) instead of being
+  // reallocated. Reallocation remains the behavior when NOT forward-funding (the
+  // "skip" path, and once next month is fully pre-funded).
+  if (billsHaveForwardFundNeed_()) {
+    return { met, base, effective: base, reallocated: 0, forwardFunding: true };
+  }
 
   const moved = base.Bills;
   const effective = {
@@ -2331,7 +2361,17 @@ function saveDebtItemsToStorage_(){
         const st = loadPaidState_();
         const cur = monthKeyLocal_();
         if (st.monthKey === cur) return;
-        savePaidState_({ monthKey: cur, paidByKey: {}, cycleStartByBill: {} });
+        // Carry forward-funded amounts into the new month as already-paid before
+        // resetting, so pre-funding actually counts toward the month it targeted.
+        // (manualFunded flags drop on rollover, so these bills read from paidByKey.)
+        const carried = loadNextMonthPaid_();
+        const seededPaidByKey = {};
+        for (const k of Object.keys(carried || {})) {
+          const amt = Number(carried[k] || 0) || 0;
+          if (amt > 0) seededPaidByKey[k] = round2_(amt);
+        }
+        savePaidState_({ monthKey: cur, paidByKey: seededPaidByKey, cycleStartByBill: {} });
+        saveNextMonthPaid_({}); // consumed — now reflected in paidByKey
         savePostSnapshot_(null);
       }
 
@@ -5421,6 +5461,11 @@ function resetPaidMTD_(){
   const confirmed = await showConfirmDepositModal_(formatted);
   if (!confirmed) return;
 
+  // Bills the user chose to forward-fund in the "fully funded last deposit"
+  // prompt below. Tracked so the next-month prompt (Part B) doesn't ask about
+  // the same bills again, and so they're funded automatically.
+  const justForwardFundedKeys = new Set();
+
   // Ask about bills fully funded by the LAST deposit (before new post runs)
   const _snap = loadPostSnapshot_();
   if (_snap && _snap.allocsByKey && _snap.monthKey === monthKeyLocal_()) {
@@ -5443,7 +5488,7 @@ function resetPaidMTD_(){
       const _choices = await showMetDepositModal_(_metRows);
       const _mf2 = loadManualFunded_();
       for (const { key: k } of _metRows) {
-        if (_choices[k] === "fund") _mf2[k] = true;
+        if (_choices[k] === "fund") { _mf2[k] = true; justForwardFundedKeys.add(k); }
       }
       saveManualFunded_(_mf2);
       recomputeBillsAllocations_(true, { log: false });
@@ -5471,7 +5516,10 @@ function resetPaidMTD_(){
     const amt = Number(allocs[i] || 0) || 0;
     if (!(amt > 0)) continue;
     if (manualFunded[key]){
-      pendingNextMonth.push({ key, name: cats[i].name || cats[i].categoryName || key, alloc: amt });
+      // Skip re-prompting bills the user just forward-funded above; funded below.
+      if (!justForwardFundedKeys.has(key)) {
+        pendingNextMonth.push({ key, name: cats[i].name || cats[i].categoryName || key, alloc: amt });
+      }
     } else {
       const dd = _dueDatesForPrompt[key];
       const ddClamped = (typeof dd === "number") ? Math.max(1, Math.min(28, dd)) : 0;
@@ -5486,6 +5534,9 @@ function resetPaidMTD_(){
   if (pendingNextMonth.length) {
     nextMonthChoices = await showManualFundedModal_(pendingNextMonth);
   }
+  // Bills already chosen to forward-fund in the prompt above are funded toward
+  // next month without re-asking.
+  for (const k of justForwardFundedKeys) nextMonthChoices[k] = "fund";
   let dueDateChoices = {};
   if (pendingDueDatePassed.length) {
     dueDateChoices = await showDueDatePassedModal_(pendingDueDatePassed);
