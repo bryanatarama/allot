@@ -1755,7 +1755,7 @@ body { padding:0; overflow-x: hidden; }
       // ===== Header pills =====
       const whereEl = document.getElementById("where");
       const specEl = document.getElementById("specVersion");
-      const BUILD_STAMP = "v408-pages";
+      const BUILD_STAMP = "v409-pages";
       const SPEC_VERSION = "";
       specEl.textContent = "Spec: " + SPEC_VERSION;
       whereEl.textContent = "Here: " + window.location.href;
@@ -3878,7 +3878,9 @@ function renderDepositPreviewApp_(){
   const billsPayPool   = round2_(billsPoolTotal * BILLS_GROUP_SHARE);
   const livingPool     = round2_(billsPoolTotal * LIVING_GROUP_SHARE);
 
-  const billsAcct = split.met ? 0 : billsPayPool;
+  // Zero the Bills tile only when bills are met AND we're reallocating — in
+  // forward-fund mode the bills pool is kept (flowing to next month), so show it.
+  const billsAcct = (split.met && !split.forwardFunding) ? 0 : billsPayPool;
   const debtAcct  = round2_(Number(split.effective.Debt || 0) || 0);
   const savAcct   = round2_(Number(split.effective.Savings || 0) || 0);
   const spendAcct = round2_((Number(split.effective.Spending || 0) || 0) + livingPool);
@@ -3920,7 +3922,7 @@ function dashTileLiveAmts_(deposit) {
   const bpay = round2_(bp * BILLS_GROUP_SHARE);
   const lp = round2_(bp * LIVING_GROUP_SHARE);
   return [
-    s.met ? 0 : bpay,
+    (s.met && !s.forwardFunding) ? 0 : bpay,
     round2_(Number(s.effective.Debt || 0) || 0),
     round2_(Number(s.effective.Savings || 0) || 0),
     round2_((Number(s.effective.Spending || 0) || 0) + lp),
@@ -6776,7 +6778,7 @@ async function saveCategoriesServer_(){
           const label = String(labels[i] || rows[i]?.category || "");
           const acctSub = profileAccountSublabel_(i);
           let amt;
-          if (label === "Bills")    amt = split.met ? 0 : _engBillsPay;
+          if (label === "Bills")    amt = (split.met && !split.forwardFunding) ? 0 : _engBillsPay;
           else if (label === "Spending") amt = round2_((Number(split.effective.Spending || 0) || 0) + _engLiving);
           else amt = Number(split.effective?.[label] || 0) || 0;
 
