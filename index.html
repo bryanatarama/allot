@@ -1755,7 +1755,7 @@ body { padding:0; overflow-x: hidden; }
       // ===== Header pills =====
       const whereEl = document.getElementById("where");
       const specEl = document.getElementById("specVersion");
-      const BUILD_STAMP = "v407-pages";
+      const BUILD_STAMP = "v408-pages";
       const SPEC_VERSION = "";
       specEl.textContent = "Spec: " + SPEC_VERSION;
       whereEl.textContent = "Here: " + window.location.href;
@@ -7289,9 +7289,19 @@ document.addEventListener("click", async (e) => {
       try { savePostGuard_(null); } catch(_) {}
       try { savePaidState_({ monthKey: monthKeyLocal_(), paidByKey: {} }); } catch(_) {}
       try { localStorage.removeItem(MANUAL_FUNDED_LS_KEY); } catch(_) {}
-      try { renderDepositPreviewApp_(); } catch(_) {}
+      // Forward-funded amounts must roll back too — otherwise reversing a deposit
+      // that pre-funded next month leaves the next-month funding stranded.
+      try { localStorage.removeItem(NEXT_MONTH_PAID_LS_KEY); } catch(_) {}
+      try { saveNextMonthPaid_({}); } catch(_) {}
+      // renderDashboardAppTables_ refreshes Home tiles AND the Allot pool tiles.
+      try { renderDashboardAppTables_(); } catch(_) {}
       try { if (typeof renderBillsSplitTable_ === 'function') renderBillsSplitTable_(); } catch(_) {}
     }
+    // Exposed on window so the centralized wiring in the second <script> (a
+    // separate IIFE) can reach it — without this, the button handler sees
+    // `reverseLastDeposit_` as undefined (it's scoped inside boot_) and the
+    // click silently does nothing.
+    window.reverseLastDeposit_ = reverseLastDeposit_;
 
     // Master Reset wiring (safe)
     try{
