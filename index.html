@@ -1755,7 +1755,7 @@ body { padding:0; overflow-x: hidden; }
       // ===== Header pills =====
       const whereEl = document.getElementById("where");
       const specEl = document.getElementById("specVersion");
-      const BUILD_STAMP = "v410-pages";
+      const BUILD_STAMP = "v411-pages";
       const SPEC_VERSION = "";
       specEl.textContent = "Spec: " + SPEC_VERSION;
       whereEl.textContent = "Here: " + window.location.href;
@@ -1843,6 +1843,12 @@ function bootMark_(label){
       const LS_KEY_SESSION = "BUDGETER_SESSION_V1";
       const WORKER_URL = "https://lingering-truth-5f8b.bryanatarama.workers.dev";
 
+      // Becomes true only after the initial KV sync completes at boot. Until then we
+      // must NOT push to KV: writing before we've read the server (and before auth is
+      // ready) can 401, or clobber another device's state with stale local data
+      // (notably the month-rollover path, which runs at parse time).
+      let _kvSyncReady = false;
+
       function getAuthToken_() { const s = getSession_(); return s?.token || ''; }
 
       function _handleWorkerStatus_(status) {
@@ -1863,15 +1869,23 @@ function bootMark_(label){
       }
 
       async function workerSet_(key, data) {
-        const r = await fetch(WORKER_URL + '?api=userSet', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': 'Bearer ' + getAuthToken_(),
-          },
-          body: JSON.stringify({ key, data }),
-        });
-        if (!r.ok) _handleWorkerStatus_(r.status);
+        // Don't write to KV until the boot sync has run (see _kvSyncReady).
+        if (!_kvSyncReady) return { ok: true, deferred: true };
+        let r;
+        try {
+          r = await fetch(WORKER_URL + '?api=userSet', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': 'Bearer ' + getAuthToken_(),
+            },
+            body: JSON.stringify({ key, data }),
+          });
+        } catch (e) {
+          console.warn('[kv] write failed (network):', key, e);
+          throw e;
+        }
+        if (!r.ok) { console.warn('[kv] write failed:', key, r.status); _handleWorkerStatus_(r.status); }
         return r.json();
       }
 
@@ -1880,6 +1894,7 @@ function bootMark_(label){
       }
       function saveBillDueDates_(dates) {
         try { localStorage.setItem(LS_KEY_BILL_DUE_DATES, JSON.stringify(dates || {})); } catch(_) {}
+        workerSet_("billDueDates", dates || {}).catch(()=>{});
       }
 
       // Returns "YYYY-MM-DD" string of when the current cycle started for a given due day
@@ -2008,6 +2023,12 @@ function computeEffectiveSplitterAmounts_(deposit){
     if (cat === "Spending") spendDec = dec;
   }
 
+  // Normalize so the four buckets always consume exactly the deposit even if the
+  // configured percentages don't sum to 100% (otherwise money silently leaks or
+  // over-allocates). No-op when they already sum to 100%.
+  const sumDec = billsDec + debtDec + savDec + spendDec;
+  if (sumDec > 0) { billsDec /= sumDec; debtDec /= sumDec; savDec /= sumDec; spendDec /= sumDec; }
+
   const base = {
     Bills:    round2_(deposit * billsDec),
     Debt:     round2_(deposit * debtDec),
@@ -2027,7 +2048,11 @@ function computeEffectiveSplitterAmounts_(deposit){
     return { met, base, effective: base, reallocated: 0, forwardFunding: true };
   }
 
-  const moved = base.Bills;
+  // Reallocate only the bills-PAY portion (0.8). The living portion (0.2) always
+  // routes to the Spending tile via livingPool in the renderers; reallocating the
+  // full base.Bills here would double-count that 0.2 and make the tiles sum to
+  // more than the deposit.
+  const moved = round2_(base.Bills * BILLS_GROUP_SHARE);
   const effective = {
     Bills: 0,
     Debt:     round2_(base.Debt    + moved * REALLOC_WHEN_BILLS_MET.Debt),
@@ -2372,6 +2397,10 @@ function saveDebtItemsToStorage_(){
         }
         savePaidState_({ monthKey: cur, paidByKey: seededPaidByKey, cycleStartByBill: {} });
         saveNextMonthPaid_({}); // consumed — now reflected in paidByKey
+        // Persist the manualFunded clear so it actually propagates to other devices
+        // (loadManualFunded_ already drops stale-month flags on read, but never wrote
+        // the cleared state back, so the clear never synced).
+        saveManualFunded_({});
         savePostSnapshot_(null);
       }
 
@@ -2675,14 +2704,14 @@ function renderDebtLocal_(){
 
     tr.innerHTML = `
       <td class="mono">${escapeHtml_(r.name)}</td>
-      <td><input class="cell-input mono" data-k="${r.key}" data-f="balance" type="text" inputmode="decimal" value="${escapeHtml_(formatMoneyInput_(String(it.balance ?? "")))}"></td>
-      <td><input class="cell-input mono" data-k="${r.key}" data-f="apr" type="text" inputmode="decimal" value="${escapeHtml_(formatAprInput_(String(it.apr ?? "")))}"></td>
-      <td><input class="cell-input mono" data-k="${r.key}" data-f="minPayment" type="text" inputmode="decimal" value="${escapeHtml_(formatMoneyInput_(String(it.minPayment ?? "")))}"></td>
+      <td><input class="cell-input mono" data-k="${escapeHtml_(r.key)}" data-f="balance" type="text" inputmode="decimal" value="${escapeHtml_(formatMoneyInput_(String(it.balance ?? "")))}"></td>
+      <td><input class="cell-input mono" data-k="${escapeHtml_(r.key)}" data-f="apr" type="text" inputmode="decimal" value="${escapeHtml_(formatAprInput_(String(it.apr ?? "")))}"></td>
+      <td><input class="cell-input mono" data-k="${escapeHtml_(r.key)}" data-f="minPayment" type="text" inputmode="decimal" value="${escapeHtml_(formatMoneyInput_(String(it.minPayment ?? "")))}"></td>
       <td class="mono" data-role="minAlloc">${escapeHtml_(formatMoney_(m.minAlloc[i] || 0))}</td>
       <td class="mono" data-role="extraAlloc">${escapeHtml_(formatMoney_(m.extraAlloc[i] || 0))}</td>
       <td class="mono" data-role="totalPay">${escapeHtml_(formatMoney_(m.totalPay[i] || 0))}</td>
       <td class="mono" data-role="postBal">${escapeHtml_(formatMoney_(m.postBal[i] || 0))}</td>
-      <td><input class="cell-input mono" data-k="${r.key}" data-f="notes" type="text" value="${escapeHtml_(String(it.notes ?? ""))}"></td>
+      <td><input class="cell-input mono" data-k="${escapeHtml_(r.key)}" data-f="notes" type="text" value="${escapeHtml_(String(it.notes ?? ""))}"></td>
     `;
     debtTbody.appendChild(tr);
   }
@@ -3626,7 +3655,7 @@ dashPreviewTbody.appendChild(tr);
         const rows = model.rows;
         const totalTarget = rows.reduce((s,r)=> s + (Number(r.monthlyTarget)||0), 0);
         const totalPaid = rows.reduce((s,r)=> s + (Number(r.paidMTD)||0), 0);
-        const fundingPct = (totalTarget > 0) ? (totalPaid / totalTarget) : 0;
+        const fundingPct = (totalTarget > 0 && isFinite(totalTarget) && isFinite(totalPaid)) ? (totalPaid / totalTarget) : 0;
 
         const fullyFundedCount = rows.filter(r => (Number(r.monthlyTarget)||0) > 0 && (Number(r.paidMTD)||0) >= (Number(r.monthlyTarget)||0) - 0.005).length;
         const targetCount = rows.filter(r => (Number(r.monthlyTarget)||0) > 0).length;
@@ -3635,7 +3664,7 @@ dashPreviewTbody.appendChild(tr);
         const nextMonthRows = rows.filter(r => r.alreadyPaid && (Number(r.monthlyTarget)||0) > 0);
         const nextMonthTarget = nextMonthRows.reduce((s,r) => s + (Number(r.monthlyTarget)||0), 0);
         const nextMonthTotal = nextMonthRows.reduce((s,r) => s + (Number(nextMonthPaid[r.key]||0)||0), 0);
-        const nextMonthPct = (nextMonthTarget > 0) ? (nextMonthTotal / nextMonthTarget) : 0;
+        const nextMonthPct = (nextMonthTarget > 0 && isFinite(nextMonthTarget) && isFinite(nextMonthTotal)) ? (nextMonthTotal / nextMonthTarget) : 0;
 
         const pctFmt = (fundingPct * 100).toFixed(1) + "%";
         const barW = Math.min(100, Math.round(fundingPct * 100));
@@ -4908,6 +4937,13 @@ function resetPaidMTD_(){
           delete nmp[oldKey];
           saveNextMonthPaid_(nmp);
         }
+        // billDueDates
+        const dd = loadBillDueDates_();
+        if (dd[oldKey] !== undefined) {
+          dd[newKey] = dd[oldKey];
+          delete dd[oldKey];
+          saveBillDueDates_(dd);
+        }
         // postSnapshot.allocsByKey (current-month snapshot)
         try {
           const snap = loadPostSnapshot_();
@@ -4946,6 +4982,11 @@ function resetPaidMTD_(){
         if (nmp[key] !== undefined) {
           delete nmp[key];
           saveNextMonthPaid_(nmp);
+        }
+        const dd = loadBillDueDates_();
+        if (dd[key] !== undefined) {
+          delete dd[key];
+          saveBillDueDates_(dd);
         }
         try {
           const snap = loadPostSnapshot_();
@@ -7196,7 +7237,7 @@ document.addEventListener("click", async (e) => {
 
       async function syncDepositStateFromKV_() {
         const _s = (p) => p.catch(() => ({ ok: false, state: null }));
-        const [ps, snap, guard, hist, profile, customPcts, manualFunded, nextMonthPaid] = await Promise.all([
+        const [ps, snap, guard, hist, profile, customPcts, manualFunded, nextMonthPaid, billDueDates, billsSplitRatio] = await Promise.all([
           _s(workerGet_("paidState")),
           _s(workerGet_("postSnapshot")),
           _s(workerGet_("postGuard")),
@@ -7205,6 +7246,8 @@ document.addEventListener("click", async (e) => {
           _s(workerGet_("splitterCustomPcts")),
           _s(workerGet_("manualFunded")),
           _s(workerGet_("nextMonthPaid")),
+          _s(workerGet_("billDueDates")),
+          _s(workerGet_("billsSplitRatio")),
         ]);
         let synced = 0;
         if (ps?.ok && ps.state)     { try { localStorage.setItem(LS_KEY_BILLS_PAID,      JSON.stringify(ps.state));   synced++; } catch(_){} }
@@ -7227,6 +7270,8 @@ document.addEventListener("click", async (e) => {
         }
         if (manualFunded?.ok && manualFunded.state) { try { localStorage.setItem(MANUAL_FUNDED_LS_KEY, JSON.stringify(manualFunded.state)); synced++; } catch(_){} }
         if (nextMonthPaid?.ok && nextMonthPaid.state) { try { localStorage.setItem(NEXT_MONTH_PAID_LS_KEY, JSON.stringify(nextMonthPaid.state)); synced++; } catch(_){} }
+        if (billDueDates?.ok && billDueDates.state) { try { localStorage.setItem(LS_KEY_BILL_DUE_DATES, JSON.stringify(billDueDates.state)); synced++; } catch(_){} }
+        if (billsSplitRatio?.ok && billsSplitRatio.state) { try { localStorage.setItem(LS_KEY_BILLS_SPLIT_RATIO, JSON.stringify(billsSplitRatio.state)); applyBillsSplitRatio_(); synced++; } catch(_){} }
         return synced;
       }
 
@@ -7477,6 +7522,7 @@ document.addEventListener("click", async (e) => {
             payload = { profile: "custom", customBills: b, customLiving: l };
           }
           localStorage.setItem(LS_KEY_BILLS_SPLIT_RATIO, JSON.stringify(payload));
+          workerSet_("billsSplitRatio", payload).catch(()=>{});
           applyBillsSplitRatio_();
           // Sync custom inputs to match saved values for display
           const r = loadBillsSplitRatio_();
@@ -7512,6 +7558,13 @@ document.addEventListener("click", async (e) => {
       loadDebtItemsServer_().catch(()=>{}),
       syncDepositStateFromKV_(),
     ]);
+
+    // KV is now synced (server state read into localStorage) — enable writes, then
+    // apply month rollover against the AUTHORITATIVE synced state so it pushes to KV
+    // instead of clobbering it with pre-sync local data. If another device already
+    // rolled over this month, normalizePaidMonth_ sees the current monthKey and no-ops.
+    _kvSyncReady = true;
+    try { normalizePaidMonth_(); } catch(_){}
 
     // 3. Re-render with fresh server data (including synced deposit state)
     renderEngineBillsSplitTable_();
