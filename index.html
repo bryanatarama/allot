@@ -1759,7 +1759,7 @@ body { padding:0; overflow-x: hidden; }
       // ===== Header pills =====
       const whereEl = document.getElementById("where");
       const specEl = document.getElementById("specVersion");
-      const BUILD_STAMP = "v414-pages";
+      const BUILD_STAMP = "v415-pages";
       const SPEC_VERSION = "";
       specEl.textContent = "Spec: " + SPEC_VERSION;
       whereEl.textContent = "Here: " + window.location.href;
@@ -7508,15 +7508,36 @@ document.addEventListener("click", async (e) => {
     // state. The alloc ledger persists across reverses (Reverse doesn't touch
     // LS_KEY_ALLOC_LEDGER), so the most recent entry for this month has the
     // Paid MTD values right before whatever went wrong.
+    // v415: use the shared #doublePostModal instead of confirm() — mobile
+    // Safari silently suppresses native confirm() dialogs after the page has
+    // shown a few, so the restore was running without a visible prompt.
     async function restorePaidStateFromLedger_() {
       const mk = monthKeyLocal_();
       const arr = loadAllocLedger_();
-      // Find the most recent entry for this month
       const entries = (arr || []).filter(e => e && e.monthKey === mk && Array.isArray(e.cats));
       const latest = entries.length ? entries[entries.length - 1] : null;
 
       if (!latest) {
-        alert("No ledger entries found for " + mk + " — nothing to restore.");
+        // No ledger — nothing to restore. Reuse the same modal for a
+        // simple ack (single OK) since alert() has the same mobile problem.
+        const titleEl = document.getElementById('doublePostTitle');
+        const subEl   = document.getElementById('doublePostSub');
+        const detEl   = document.getElementById('doublePostDetail');
+        const btnEl   = document.getElementById('doublePostConfirmBtn');
+        const origTitle = titleEl?.textContent, origSub = subEl?.textContent, origBtn = btnEl?.textContent;
+        if (titleEl) titleEl.textContent = "Nothing to restore";
+        if (subEl)   subEl.textContent   = `No ledger entries found for ${mk}.`;
+        if (detEl)   detEl.innerHTML     = '';
+        if (btnEl)   btnEl.textContent   = 'OK';
+        await new Promise(resolve => {
+          if (window._doublePostResolve) window._doublePostResolve(false);
+          window._doublePostResolve = resolve;
+          document.getElementById('doublePostModal').classList.add('open');
+        });
+        window._doublePostResolve = null;
+        if (titleEl) titleEl.textContent = origTitle;
+        if (subEl)   subEl.textContent   = origSub;
+        if (btnEl)   btnEl.textContent   = origBtn;
         return;
       }
 
@@ -7527,16 +7548,35 @@ document.addEventListener("click", async (e) => {
         if (v > 0) paidByKey[c.key] = round2_(v);
       }
       const total = Object.values(paidByKey).reduce((s,v)=>s+v, 0);
-
       const when = new Date(latest.at).toLocaleString();
-      const ok = confirm(
-        `Restore Paid MTD from ledger entry posted ${when}?\n\n` +
-        `Deposit: ${formatMoney_(latest.deposit || 0)}\n` +
-        `Reason:  ${latest.reason || "(none)"}\n` +
-        `Bills covered: ${Object.keys(paidByKey).length}\n` +
-        `Total paid: ${formatMoney_(total)}\n\n` +
-        `This overwrites current paidByKey but does not touch manualFunded, nextMonthPaid, snapshot, or deposit history.`
-      );
+
+      const titleEl = document.getElementById('doublePostTitle');
+      const subEl   = document.getElementById('doublePostSub');
+      const detEl   = document.getElementById('doublePostDetail');
+      const btnEl   = document.getElementById('doublePostConfirmBtn');
+      const origTitle = titleEl?.textContent, origSub = subEl?.textContent, origBtn = btnEl?.textContent;
+
+      if (titleEl) titleEl.textContent = 'Restore Paid MTD from ledger?';
+      if (subEl)   subEl.textContent   = 'Overwrites current Paid MTD but does not touch manualFunded, nextMonthPaid, snapshot, or deposit history.';
+      if (detEl)   detEl.innerHTML     =
+        `<div>Ledger entry: <strong>${escapeHtml_(when)}</strong></div>` +
+        `<div>Deposit: <strong>${escapeHtml_(formatMoney_(latest.deposit || 0))}</strong></div>` +
+        `<div>Reason: <strong>${escapeHtml_(latest.reason || "(none)")}</strong></div>` +
+        `<div>Bills covered: <strong>${Object.keys(paidByKey).length}</strong></div>` +
+        `<div>Total paid: <strong>${escapeHtml_(formatMoney_(total))}</strong></div>`;
+      if (btnEl)   btnEl.textContent   = 'Restore';
+
+      const ok = await new Promise(resolve => {
+        if (window._doublePostResolve) window._doublePostResolve(false);
+        window._doublePostResolve = resolve;
+        document.getElementById('doublePostModal').classList.add('open');
+      });
+      window._doublePostResolve = null;
+
+      if (titleEl) titleEl.textContent = origTitle;
+      if (subEl)   subEl.textContent   = origSub;
+      if (btnEl)   btnEl.textContent   = origBtn;
+
       if (!ok) return;
 
       const cur = loadPaidState_();
