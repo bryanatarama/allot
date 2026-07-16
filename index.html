@@ -1597,6 +1597,10 @@ body { padding:0; overflow-x: hidden; }
       <button id="reverseDepositBtn" type="button" style="background:var(--accent-bg);border-color:var(--accent-border);color:var(--accent-text);font-size:.9em;padding:8px 16px">↩ Reverse Last Deposit</button>
       <div class="muted" style="margin-top:6px;font-size:.8em">Clears the post snapshot, post guard, bills paid MTD, and manual-funded flags. Does not touch debt, categories, or deposit history.</div>
     </div>
+    <div style="margin-top:14px">
+      <button id="restoreFromLedgerBtn" type="button" style="background:var(--btn2);border:1px solid var(--border);color:var(--text);font-size:.9em;padding:8px 16px">🔧 Restore Paid State from Ledger</button>
+      <div class="muted" style="margin-top:6px;font-size:.8em">Rebuilds this month's Paid MTD from the alloc ledger's most recent entry — recovers Paid values after an accidental Reverse Last Deposit.</div>
+    </div>
   </div>
 
   <div class="panel">
@@ -1755,7 +1759,7 @@ body { padding:0; overflow-x: hidden; }
       // ===== Header pills =====
       const whereEl = document.getElementById("where");
       const specEl = document.getElementById("specVersion");
-      const BUILD_STAMP = "v413-pages";
+      const BUILD_STAMP = "v414-pages";
       const SPEC_VERSION = "";
       specEl.textContent = "Spec: " + SPEC_VERSION;
       whereEl.textContent = "Here: " + window.location.href;
@@ -7498,6 +7502,51 @@ document.addEventListener("click", async (e) => {
     // click silently does nothing.
     window.reverseLastDeposit_ = reverseLastDeposit_;
 
+    // v414: Restore paidByKey from the last ledger event for the current month.
+    // Recovery tool for when the user hits Reverse Last Deposit (which is a
+    // full-month reset, not a single-deposit undo) and loses previously-funded
+    // state. The alloc ledger persists across reverses (Reverse doesn't touch
+    // LS_KEY_ALLOC_LEDGER), so the most recent entry for this month has the
+    // Paid MTD values right before whatever went wrong.
+    async function restorePaidStateFromLedger_() {
+      const mk = monthKeyLocal_();
+      const arr = loadAllocLedger_();
+      // Find the most recent entry for this month
+      const entries = (arr || []).filter(e => e && e.monthKey === mk && Array.isArray(e.cats));
+      const latest = entries.length ? entries[entries.length - 1] : null;
+
+      if (!latest) {
+        alert("No ledger entries found for " + mk + " — nothing to restore.");
+        return;
+      }
+
+      const paidByKey = {};
+      for (const c of latest.cats || []) {
+        if (!c || !c.key) continue;
+        const v = Number(c.paid || 0) || 0;
+        if (v > 0) paidByKey[c.key] = round2_(v);
+      }
+      const total = Object.values(paidByKey).reduce((s,v)=>s+v, 0);
+
+      const when = new Date(latest.at).toLocaleString();
+      const ok = confirm(
+        `Restore Paid MTD from ledger entry posted ${when}?\n\n` +
+        `Deposit: ${formatMoney_(latest.deposit || 0)}\n` +
+        `Reason:  ${latest.reason || "(none)"}\n` +
+        `Bills covered: ${Object.keys(paidByKey).length}\n` +
+        `Total paid: ${formatMoney_(total)}\n\n` +
+        `This overwrites current paidByKey but does not touch manualFunded, nextMonthPaid, snapshot, or deposit history.`
+      );
+      if (!ok) return;
+
+      const cur = loadPaidState_();
+      savePaidState_({ monthKey: mk, paidByKey, cycleStartByBill: cur.cycleStartByBill || {} });
+      try { renderDashboardAppTables_(); } catch(_){}
+      try { renderAppSummaryTable_(); } catch(_){}
+      try { renderAppCategoryTable_(); } catch(_){}
+    }
+    window.restorePaidStateFromLedger_ = restorePaidStateFromLedger_;
+
     // Master Reset wiring (safe)
     try{
       const b = document.getElementById("cfgMasterResetBtn");
@@ -8529,6 +8578,7 @@ document.addEventListener("click", async (e) => {
     wire('starterBannerDismissBtn','click',function() { var b = document.getElementById('starterSuggestionBanner'); if (b) b.style.display = 'none'; });
     wire('adminPreviewToggleBtn', 'click', function() { if (typeof togglePreviewAsUser_ === 'function') togglePreviewAsUser_(); });
     wire('reverseDepositBtn',     'click', function() { if (typeof reverseLastDeposit_ === 'function') reverseLastDeposit_(); });
+    wire('restoreFromLedgerBtn',  'click', function() { if (typeof window.restorePaidStateFromLedger_ === 'function') window.restorePaidStateFromLedger_(); });
     wire('configSignOutBtn',      'click', function() { if (typeof signOut_ === 'function') signOut_(); });
 
     // Coach overlay
