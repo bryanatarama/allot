@@ -1755,7 +1755,7 @@ body { padding:0; overflow-x: hidden; }
       // ===== Header pills =====
       const whereEl = document.getElementById("where");
       const specEl = document.getElementById("specVersion");
-      const BUILD_STAMP = "v411-pages";
+      const BUILD_STAMP = "v413-pages";
       const SPEC_VERSION = "";
       specEl.textContent = "Spec: " + SPEC_VERSION;
       whereEl.textContent = "Here: " + window.location.href;
@@ -3697,7 +3697,49 @@ dashPreviewTbody.appendChild(tr);
               `</div>`;
           }
 
+          // v412: skip-redistribution banner — shown when the last post routed
+          // some Bills money to Debt/Savings/Spending because the user chose
+          // "Skip" for one or more forward-fund prompts. Explains why Funding %
+          // looks low even though the deposit was posted.
+          const _redist = loadSkipRedistribution_();
+          if (_redist && _redist.skipped > 0) {
+            const _bills = Object.keys(_redist.skippedByKey || {})
+              .map(k => (rows.find(r => r.key === k)?.category) || k)
+              .filter(Boolean);
+            const _billsList = _bills.length
+              ? `<div style="color:var(--muted);font-size:.85em;margin-top:4px;">Skipped bills: ${escapeHtml_(_bills.join(", "))}</div>`
+              : "";
+            html +=
+              `<div id="skipRedistBanner" style="margin-top:12px;padding:10px 12px;border-radius:8px;background:rgba(59,130,246,.10);border:1px solid rgba(59,130,246,.35);">` +
+                `<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;">` +
+                  `<div style="font-weight:600;color:var(--text);">Skipped ${escapeHtml_(formatMoney_(_redist.skipped))} redistributed</div>` +
+                  `<button type="button" id="skipRedistDismiss" style="background:transparent;border:0;color:var(--muted);font-size:1.2em;line-height:1;cursor:pointer;padding:0 2px;" aria-label="Dismiss">×</button>` +
+                `</div>` +
+                `<div style="color:var(--muted);font-size:.9em;margin-top:6px;">You skipped forward-funding for one or more bills. Instead of sitting in your Bills account untagged, the excess was routed to your other buckets using ${_redist.ratioSource === "user_splitter" ? "your current splitter percentages" : "the 50/30/20 default (your splitter had Debt/Savings/Spending at 0)"}:</div>` +
+                `<div style="display:flex;justify-content:space-between;font-size:.9em;margin-top:8px;">` +
+                  `<span>→ Debt</span><span class="mono">${escapeHtml_(formatMoney_(_redist.toDebt))}</span>` +
+                `</div>` +
+                `<div style="display:flex;justify-content:space-between;font-size:.9em;">` +
+                  `<span>→ Savings</span><span class="mono">${escapeHtml_(formatMoney_(_redist.toSavings))}</span>` +
+                `</div>` +
+                `<div style="display:flex;justify-content:space-between;font-size:.9em;">` +
+                  `<span>→ Spending</span><span class="mono">${escapeHtml_(formatMoney_(_redist.toSpending))}</span>` +
+                `</div>` +
+                _billsList +
+              `</div>`;
+          }
+
           bodyEl.innerHTML = html;
+
+          // Wire the dismiss button after innerHTML replaces DOM
+          const _dismissBtn = document.getElementById("skipRedistDismiss");
+          if (_dismissBtn) {
+            _dismissBtn.addEventListener("click", () => {
+              saveSkipRedistribution_(null);
+              renderAppSummaryTable_();
+              try { renderDashboardAppTables_(); } catch(_){}
+            });
+          }
         }
 
         // Post meta
@@ -3950,12 +3992,28 @@ function dashTileLiveAmts_(deposit) {
   const bp = round2_(Number(s.base.Bills || 0) || 0);
   const bpay = round2_(bp * BILLS_GROUP_SHARE);
   const lp = round2_(bp * LIVING_GROUP_SHARE);
-  return [
+  const tiles = [
     (s.met && !s.forwardFunding) ? 0 : bpay,
     round2_(Number(s.effective.Debt || 0) || 0),
     round2_(Number(s.effective.Savings || 0) || 0),
     round2_((Number(s.effective.Spending || 0) || 0) + lp),
   ];
+  // v412: if the last post redistributed skipped-bill money, tiles for that
+  // same deposit should reflect it (Bills lower, others higher). Only applies
+  // when this call is for the currently-posted deposit — a live preview of a
+  // different amount shouldn't inherit the last post's redistribution.
+  try {
+    const redist = loadSkipRedistribution_();
+    const snap = loadPostSnapshot_();
+    const isPostedDep = redist && snap && Math.abs((Number(snap.deposit)||0) - (Number(deposit)||0)) < 0.005;
+    if (redist && isPostedDep) {
+      tiles[0] = Math.max(0, round2_(tiles[0] - redist.skipped));
+      tiles[1] = round2_(tiles[1] + redist.toDebt);
+      tiles[2] = round2_(tiles[2] + redist.toSavings);
+      tiles[3] = round2_(tiles[3] + redist.toSpending);
+    }
+  } catch(_){}
+  return tiles;
 }
 
 function renderDashTiles_(profileMode, deposit, acctAmts) {
@@ -4510,6 +4568,35 @@ function resetPaidMTD_(){
       // ============================================================
       const MANUAL_FUNDED_LS_KEY = "BUDGETER_MANUAL_FUNDED";
       const NEXT_MONTH_PAID_LS_KEY = "BUDGETER_NEXT_MONTH_PAID";
+      const SKIP_REDIST_LS_KEY   = "BUDGETER_SKIP_REDIST_V1";
+
+      // When the user chooses "Skip" for a bill in the forward-fund modal, the
+      // money that would have funded that bill was previously dropped on the
+      // floor (allocsByKey=0, no update to paidByKey or nextMonthPaid). The app
+      // now redistributes those skipped amounts to Debt/Savings/Spending using
+      // REALLOC_WHEN_BILLS_MET (50/30/20), and stores a receipt here so the
+      // dashboard can show the user what happened. Auto-expires on month
+      // rollover so July's redistribution doesn't linger into August.
+      function loadSkipRedistribution_() {
+        try {
+          const raw = localStorage.getItem(SKIP_REDIST_LS_KEY);
+          if (!raw) return null;
+          const obj = JSON.parse(raw);
+          if (!obj || typeof obj !== "object") return null;
+          if (obj.monthKey !== monthKeyLocal_()) return null;
+          return obj;
+        } catch(e) { return null; }
+      }
+      function saveSkipRedistribution_(obj) {
+        try {
+          if (obj == null) {
+            localStorage.removeItem(SKIP_REDIST_LS_KEY);
+          } else {
+            localStorage.setItem(SKIP_REDIST_LS_KEY, JSON.stringify(obj));
+          }
+          workerSet_("skipRedistribution", obj || {}).catch(()=>{});
+        } catch(e) {}
+      }
 
       function loadManualFunded_() {
         // Calendar-month reset: when the month rolls over, ALL manual-funded
@@ -5592,6 +5679,12 @@ function resetPaidMTD_(){
   const nextPaidByKey = Object.assign({}, paidState.paidByKey || {});
   const allocsByKey = {};
   const nextMonthPaid = loadNextMonthPaid_();
+  // Track the sum of allocs the user chose to SKIP (in either modal). Previously
+  // dropped on the floor — the money sat in the Bills bucket un-tagged and
+  // the "% Funded" display went weird. Now redistributed to Debt/Savings/
+  // Spending after the loop.
+  let skippedTotal = 0;
+  const skippedByKey = {};
 
   for (let i = 0; i < cats.length; i++){
     const key = cats[i].key;
@@ -5605,6 +5698,7 @@ function resetPaidMTD_(){
         nextMonthPaid[key] = round2_((Number(nextMonthPaid[key] || 0) || 0) + add);
       } else {
         allocsByKey[key] = 0;
+        if (add > 0) { skippedTotal = round2_(skippedTotal + add); skippedByKey[key] = add; }
       }
       // Never add to current-month paidByKey
     } else if (dueDatePassedKeys.has(key)) {
@@ -5615,6 +5709,7 @@ function resetPaidMTD_(){
         nextPaidByKey[key] = round2_((Number(nextPaidByKey[key] || 0) || 0) + add);
       } else {
         allocsByKey[key] = 0;
+        if (add > 0) { skippedTotal = round2_(skippedTotal + add); skippedByKey[key] = add; }
       }
     } else {
       allocsByKey[key] = add;
@@ -5624,6 +5719,43 @@ function resetPaidMTD_(){
 
   saveNextMonthPaid_(nextMonthPaid);
   savePaidState_({ monthKey: paidState.monthKey, paidByKey: nextPaidByKey, cycleStartByBill: paidState.cycleStartByBill || {} });
+
+  // v412: redistribute any skipped forward-fund allocations to Debt / Savings /
+  // Spending using the USER's current splitter percentages (renormalized to
+  // exclude Bills), not a hardcoded default. Saves a receipt so the dashboard
+  // can show the user what happened — otherwise a big deposit with many skips
+  // looked like it only funded 42% of the month, when the excess just wasn't
+  // tagged to a bill.
+  const skipRedist = (skippedTotal > 0) ? (function(){
+    const _rows = EngineState?.state?.splitter?.rows || [];
+    let _debt=0, _sav=0, _spend=0;
+    for (const r of _rows) {
+      const cat = String(r?.category || "").trim();
+      const dec = parsePctToDecimal_(r?.pct);
+      if (cat === "Debt") _debt = dec;
+      else if (cat === "Savings") _sav = dec;
+      else if (cat === "Spending") _spend = dec;
+    }
+    const sum = _debt + _sav + _spend;
+    // If the user has zeroed out Debt/Savings/Spending, fall back to the
+    // 50/30/20 "bills-met" default so we never drop the money on the floor.
+    const useDefault = !(sum > 0);
+    const dR = useDefault ? REALLOC_WHEN_BILLS_MET.Debt     : _debt  / sum;
+    const sR = useDefault ? REALLOC_WHEN_BILLS_MET.Savings  : _sav   / sum;
+    const pR = useDefault ? REALLOC_WHEN_BILLS_MET.Spending : _spend / sum;
+    return {
+      postedAt: new Date().toISOString(),
+      monthKey: paidState.monthKey,
+      deposit:  round2_(deposit),
+      skipped:  skippedTotal,
+      toDebt:     round2_(skippedTotal * dR),
+      toSavings:  round2_(skippedTotal * sR),
+      toSpending: round2_(skippedTotal * pR),
+      ratioSource: useDefault ? "default_50_30_20" : "user_splitter",
+      skippedByKey: Object.assign({}, skippedByKey),
+    };
+  })() : null;
+  saveSkipRedistribution_(skipRedist);
 
   // Save post snapshot for Option A hold (what the table shows)
   savePostSnapshot_({
@@ -5638,7 +5770,16 @@ function resetPaidMTD_(){
   savePostGuard_({ postedAt: new Date().toISOString(), monthKey: paidState.monthKey, deposit });
 
   // ✅ Deposit history (unbounded, resets monthly)
+  // If we redistributed skipped bill money, adjust the tile amounts so the
+  // history entry (and, downstream, dashTileLiveAmts_) reflects the FINAL
+  // distribution the user should actually move in their bank.
   const _histTiles = dashTileLiveAmts_(deposit);
+  if (skipRedist) {
+    _histTiles[0] = Math.max(0, round2_((_histTiles[0] || 0) - skipRedist.skipped));
+    _histTiles[1] = round2_((_histTiles[1] || 0) + skipRedist.toDebt);
+    _histTiles[2] = round2_((_histTiles[2] || 0) + skipRedist.toSavings);
+    _histTiles[3] = round2_((_histTiles[3] || 0) + skipRedist.toSpending);
+  }
   addDepositHistoryEntry_(deposit, { Bills: _histTiles[0], Debt: _histTiles[1], Savings: _histTiles[2], Spending: _histTiles[3] });
 
   // ✅ Log ledger for Post (single entry)
@@ -7344,6 +7485,9 @@ document.addEventListener("click", async (e) => {
       // that pre-funded next month leaves the next-month funding stranded.
       try { localStorage.removeItem(NEXT_MONTH_PAID_LS_KEY); } catch(_) {}
       try { saveNextMonthPaid_({}); } catch(_) {}
+      // v412: clear any skip-redistribution receipt — otherwise the banner
+      // outlives the deposit that produced it.
+      try { saveSkipRedistribution_(null); } catch(_) {}
       // renderDashboardAppTables_ refreshes Home tiles AND the Allot pool tiles.
       try { renderDashboardAppTables_(); } catch(_) {}
       try { if (typeof renderBillsSplitTable_ === 'function') renderBillsSplitTable_(); } catch(_) {}
