@@ -1127,7 +1127,8 @@ body { padding:0; overflow-x: hidden; }
       <button id="tabBtn-budgeter" type="button" data-tab="budgeter"><span class="tab-icon"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M10.5 6H20.25M10.5 6C10.5 6.82843 9.82843 7.5 9 7.5C8.17157 7.5 7.5 6.82843 7.5 6M10.5 6C10.5 5.17157 9.82843 4.5 9 4.5C8.17157 4.5 7.5 5.17157 7.5 6M3.75 6H7.5M10.5 18H20.25M10.5 18C10.5 18.8284 9.82843 19.5 9 19.5C8.17157 19.5 7.5 18.8284 7.5 18M10.5 18C10.5 17.1716 9.82843 16.5 9 16.5C8.17157 16.5 7.5 17.1716 7.5 18M3.75 18H7.5M16.5 12H20.25M16.5 12C16.5 12.8284 15.8284 13.5 15 13.5C14.1716 13.5 13.5 12.8284 13.5 12M16.5 12C16.5 11.1716 15.8284 10.5 15 10.5C14.1716 10.5 13.5 11.1716 13.5 12M3.75 12H13.5"/></svg></span><span class="tab-label">Allot</span></button>
       <button id="tabBtn-expenseCategories" type="button" data-tab="expenseCategories" style="display:none"><span class="tab-icon"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 6.75h12M8.25 12h12m-12 5.25h12M3.75 6.75h.007v.008H3.75V6.75zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zM3.75 12h.007v.008H3.75V12zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm-.375 5.25h.007v.008H3.75v-.008zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0z"/></svg></span><span class="tab-label">Categories</span></button>
       <button id="tabBtn-debt" type="button" data-tab="debt"><span class="tab-icon"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 6L9 12.75l4.286-4.286c2.035 1.553 3.592 3.766 4.306 6.43l.776 2.898m0 0l3.182-5.511m-3.182 5.511l-5.511-3.182"/></svg></span><span class="tab-label">Debt</span></button>
-      <button id="tabBtn-accounts" type="button" data-tab="accounts"><span class="tab-icon"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 21V12.75M15.75 21V12.75M8.25 21V12.75M3 9l9-6 9 6m-1.5 1.333C17.056 9.95 14.553 9.75 12 9.75s-5.056.2-7.5.583V21M3 21h18"/></svg></span><span class="tab-label">Accounts</span></button>
+      <!-- v426b: Accounts tab removed. Rename the 4 pools by long-pressing a
+           tile on Home; opens #renamePoolModal. -->
       <button id="tabBtn-config" type="button" data-tab="config"><span class="tab-icon"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.325.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 0 1 1.37.49l1.296 2.247a1.125 1.125 0 0 1-.26 1.431l-1.003.827c-.293.241-.438.613-.43.992a7.723 7.723 0 0 1 0 .255c-.008.378.137.75.43.991l1.004.827c.424.35.534.955.26 1.43l-1.298 2.247a1.125 1.125 0 0 1-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.47 6.47 0 0 1-.22.128c-.331.183-.581.495-.644.869l-.213 1.281c-.09.543-.56.94-1.11.94h-2.594c-.55 0-1.019-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 0 1-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 0 1-1.369-.49l-1.297-2.247a1.125 1.125 0 0 1 .26-1.431l1.004-.827c.292-.24.437-.613.43-.991a6.932 6.932 0 0 1 0-.255c.007-.38-.138-.751-.43-.992l-1.004-.827a1.125 1.125 0 0 1-.26-1.43l1.297-2.247a1.125 1.125 0 0 1 1.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.086.22-.128.332-.183.582-.495.644-.869l.214-1.28Z"/><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z"/></svg></span><span class="tab-label">Config</span></button>
     </div>
     <main class="main">
@@ -1255,41 +1256,8 @@ body { padding:0; overflow-x: hidden; }
     </section>
 
     <!-- Accounts tab -->
-    <section id="tab-accounts" class="tab-panel" hidden>
-      <div class="panel">
-        <div class="tab-header">
-          <div>
-            <h3 style="margin:0">Accounts</h3>
-          </div>
-          <div class="tab-actions">
-            <span id="acctStatus" class="status-pill">Idle</span>
-            <button id="acctReloadBtn" type="button" class="dev-only">Reload</button>
-            <button id="acctSaveBtn" type="button" disabled style="display:none">Save</button>
-          </div>
-        </div>
-
-        <div id="acctError" class="error" style="display:none"></div>
-
-        <div class="table-wrap">
-          <table id="acctTable" class="grid">
-            <thead>
-              <tr>
-                <th class="col-rownum">#</th>
-                <th>Account</th>
-                <th>Type</th>
-                <th>Notes</th>
-              </tr>
-            </thead>
-            <tbody id="acctTbody"></tbody>
-          </table>
-        </div>
-
-        <div style="margin-top:24px;padding:16px 20px;background:var(--card);border:1px solid var(--border);border-radius:14px;">
-          <div style="font-size:.78em;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-bottom:8px;">About Accounts</div>
-          <div style="font-size:.88em;color:var(--muted);line-height:1.6;">Each account maps to a real bank account. Your deposit is split across them based on your allocation profile — Bills and Spending go to checking accounts, Debt and Savings go to savings accounts.</div>
-        </div>
-      </div>
-    </section>
+    <!-- v426b: <section id="tab-accounts"> removed. Long-press a tile on
+         Home to rename it via #renamePoolModal. -->
 
     <!-- Expense Categories tab -->
     <section id="tab-expenseCategories" class="tab-panel" hidden>
@@ -1787,7 +1755,7 @@ body { padding:0; overflow-x: hidden; }
       // ===== Header pills =====
       const whereEl = document.getElementById("where");
       const specEl = document.getElementById("specVersion");
-      const BUILD_STAMP = "v426a-pages";
+      const BUILD_STAMP = "v426b-pages";
       const SPEC_VERSION = "";
       specEl.textContent = "Spec: " + SPEC_VERSION;
       whereEl.textContent = "Here: " + window.location.href;
@@ -3321,20 +3289,17 @@ const TAB_IDS = ["dashboard", "accounts", "expenseCategories", "budgeter", "debt
       document.querySelectorAll(".nav button[data-tab]").forEach(btn => {
         btn.addEventListener("click", async () => {
           const tab = btn.getAttribute("data-tab");
-          const acctDirty = typeof AccountsState !== "undefined" && AccountsState.dirty;
           const catDirty = typeof CategoriesState !== "undefined" && CategoriesState.dirty;
           const debtDirty = typeof DebtState !== "undefined" && DebtState.dirty;
-          if (acctDirty || catDirty || debtDirty) {
+          if (catDirty || debtDirty) {
             const action = await showUnsavedModal_();
             if (action === "cancel") return;
             if (action === "save") {
-              if (acctDirty) await saveAccountsNow_();
               if (catDirty) await saveCategoriesServer_();
               if (debtDirty) await saveDebtNow_();
             }
           }
           setActiveTab_(tab);
-          if (tab === "accounts") await ensureAccountsLoaded_();
           if (tab === "expenseCategories") {
             await ensureAccountsLoaded_();
             await ensureCategoriesLoaded_();
@@ -3362,10 +3327,9 @@ const TAB_IDS = ["dashboard", "accounts", "expenseCategories", "budgeter", "debt
       // "Leave site?" prompt (the string is ignored) whenever the handler
       // returns a truthy value, so all we do is signal that data would be lost.
       window.addEventListener("beforeunload", (e) => {
-        const acctDirty = typeof AccountsState !== "undefined" && AccountsState.dirty;
         const catDirty  = typeof CategoriesState !== "undefined" && CategoriesState.dirty;
         const debtDirty = typeof DebtState !== "undefined" && DebtState.dirty;
-        if (acctDirty || catDirty || debtDirty) {
+        if (catDirty || debtDirty) {
           e.preventDefault();
           e.returnValue = ""; // required by legacy Chrome/Safari
           return "";
@@ -4164,6 +4128,9 @@ function renderDashTiles_(profileMode, deposit, acctAmts) {
     const label = DASH_TILE_LABELS[i];
     const acctSub = profileAccountSublabel_(i);
     const tile = document.createElement("div");
+    // v426b: long-press handler on #dashAccountTiles reads this to know
+    // which of the 4 pools was pressed and opens #renamePoolModal for it.
+    tile.dataset.poolIdx = String(i);
 
     if (isCustom) {
       tile.className = "split-tile" + (customValid ? " active" : " dash-tile-invalid");
@@ -5089,7 +5056,6 @@ function resetPaidMTD_(){
           AccountsState.lockedNames = AccountsState.rows.map(r => String((r && r[0]) || "").trim());
           AccountsState.dirty = false;
           AccountsState.loadedOnce = true;
-          try { renderAccountsTable_(); } catch(_){}
         }
 
         // Splitter engine — computeEffectiveSplitterAmounts_ looks up rows by
@@ -5164,7 +5130,6 @@ function resetPaidMTD_(){
         try { if (typeof renderDebtLocal_ === "function") renderDebtLocal_(); } catch(_){}
         try { renderDashboardAppTables_(); } catch(_){}
         try { renderAppSummaryTable_(); } catch(_){}
-        try { if (typeof renderAccountsTable_ === "function") renderAccountsTable_(); } catch(_){}
       }
 
       // ============================================================
@@ -7131,6 +7096,12 @@ if (healthCopyBtn && !healthCopyBtn.dataset.wired){
       // ============================================================
 // Accounts Tab (server-backed via named range CFG_ACCOUNTS_PRIMARY)
 // ============================================================
+// v426b: the Accounts tab is gone — rename now happens via long-press on a
+// pool tile on Home. AccountsState + loadAccounts_ survive because the tile
+// labels, categories dropdown, and demo-seed all read from lockedNames.
+// updateAcctUIState_ / renderAccountsTable_ / saveAccountsNow_ / the
+// acctSaveBtn+acctReloadBtn listeners are all removed; saveAccountName_ is
+// the single-cell replacement used by the rename modal.
 const AccountsState = {
   rangeName: "CFG_ACCOUNTS_PRIMARY",
   maxRows: 4,
@@ -7141,124 +7112,6 @@ const AccountsState = {
   saving: false,
   loadedOnce: false,
 };
-
-const acctStatusEl = document.getElementById("acctStatus");
-const acctErrorEl  = document.getElementById("acctError");
-const acctTbody    = document.getElementById("acctTbody");
-const acctSaveBtn  = document.getElementById("acctSaveBtn");
-const acctReloadBtn= document.getElementById("acctReloadBtn");
-
-function setAcctStatus_(text) { acctStatusEl.textContent = text; }
-
-function showAcctError_(msg) {
-  if (!msg) {
-    acctErrorEl.style.display = "none";
-    acctErrorEl.textContent = "";
-    return;
-  }
-  acctErrorEl.style.display = "block";
-  acctErrorEl.textContent = msg;
-}
-
-function updateAcctUIState_() {
-  const invalid = anyInvalidCells_("#acctTable");
-  acctReloadBtn.disabled = AccountsState.saving;
-  if (AccountsState.saving) {
-    acctStatusEl.textContent = "Saving…";
-    acctStatusEl.className = "status-pill";
-    acctStatusEl.style.cursor = "default";
-    acctStatusEl.onclick = null;
-  } else if (invalid) {
-    acctStatusEl.textContent = "Fix errors";
-    acctStatusEl.className = "status-pill status-warn";
-    acctStatusEl.style.cursor = "default";
-    acctStatusEl.onclick = null;
-  } else if (AccountsState.dirty) {
-    acctStatusEl.textContent = "Unsaved · tap to save";
-    acctStatusEl.className = "status-pill status-warn";
-    acctStatusEl.style.cursor = "pointer";
-    acctStatusEl.onclick = () => saveAccountsNow_();
-  } else {
-    acctStatusEl.style.display = "none";
-    acctStatusEl.onclick = null;
-    return;
-  }
-  acctStatusEl.style.display = "";
-}
-
-function renderAccountsTable_() {
-  acctTbody.innerHTML = "";
-
-  for (let i = 0; i < AccountsState.maxRows; i++) {
-    const row = AccountsState.rows[i] || ["", "", "", ""];
-    const tr = document.createElement("tr");
-
-    const tdNum = document.createElement("td");
-    tdNum.className = "col-rownum";
-    tdNum.textContent = String(i + 1);
-    tr.appendChild(tdNum);
-
-    // Account Name (editable)
-    {
-      const td = document.createElement("td");
-      const input = document.createElement("input");
-      input.type = "text";
-      input.className = "cell-input";
-      input.value = row[0] ?? "";
-      input.addEventListener("input", () => {
-        AccountsState.rows[i][0] = input.value;
-        AccountsState.lockedNames[i] = input.value;
-        AccountsState.dirty = true;
-        validateNoFormula_(input, input.value);
-        updateAcctUIState_();
-      });
-      validateNoFormula_(input, input.value);
-      td.appendChild(input);
-      tr.appendChild(td);
-    }
-
-    // Type (dropdown)
-    {
-      const td = document.createElement("td");
-      const sel = document.createElement("select");
-      sel.className = "cell-input";
-      [["", "—"], ["Checking", "Checking"], ["Savings", "Savings"]].forEach(([val, label]) => {
-        const opt = document.createElement("option");
-        opt.value = val;
-        opt.textContent = label;
-        sel.appendChild(opt);
-      });
-      sel.value = row[2] ?? "";
-      sel.addEventListener("change", () => {
-        AccountsState.rows[i][2] = sel.value;
-        AccountsState.dirty = true;
-        updateAcctUIState_();
-      });
-      td.appendChild(sel);
-      tr.appendChild(td);
-    }
-
-    // Notes
-    {
-      const td = document.createElement("td");
-      const input = document.createElement("input");
-      input.type = "text";
-      input.className = "cell-input";
-      input.value = row[3] ?? "";
-      input.addEventListener("input", () => {
-        AccountsState.rows[i][3] = input.value;
-        AccountsState.dirty = true;
-        validateNoFormula_(input, input.value);
-        updateAcctUIState_();
-      });
-      validateNoFormula_(input, input.value);
-      td.appendChild(input);
-      tr.appendChild(td);
-    }
-
-    acctTbody.appendChild(tr);
-  }
-}
 
 function getAccountOptions_() {
   const names = (AccountsState.lockedNames || [])
@@ -7276,32 +7129,8 @@ function getAccountOptions_() {
   return unique;
 }
 
-function buildAccountsWritePayload_() {
-  const rows = normalizeFixedRows_(AccountsState.rows, AccountsState.maxRows, AccountsState.numCols);
-
-  // Force locked names (col A) to remain as loaded
-  for (let i = 0; i < AccountsState.maxRows; i++) {
-    rows[i][0] = String((AccountsState.lockedNames[i] ?? "")).trim();
-  }
-
-  // No formulas
-  for (const r of rows) {
-    for (const cell of r) {
-      if (String(cell || "").trim().startsWith("=")) {
-        throw new Error("Formulas are not allowed in CFG_ACCOUNTS_PRIMARY.");
-      }
-    }
-  }
-  return { rows };
-}
-
 async function loadAccounts_() {
   try {
-    showAcctError_("");
-    AccountsState.saving = true;
-    setAcctStatus_("Loading…");
-    updateAcctUIState_();
-
     const res = await workerGet_("accounts");
     if (!res || !res.ok) throw new Error(res && res.error ? res.error : "Load failed.");
 
@@ -7310,27 +7139,19 @@ async function loadAccounts_() {
     AccountsState.dirty = false;
     AccountsState.loadedOnce = true;
 
-    renderAccountsTable_();
-
-    // Keep other tabs in sync (names/labels only)
+    // Names may have changed vs cache — refresh anywhere that displays them.
     if (EngineState && EngineState.loadedOnce) {
       if (typeof renderEngineSplitterRows_ === "function") renderEngineSplitterRows_();
       if (typeof renderDepositPreviewApp_ === "function") renderDepositPreviewApp_();
     }
-
     if (typeof CategoriesState !== "undefined" && CategoriesState && CategoriesState.loadedOnce) {
       if (typeof renderCategories_ === "function") {
         renderCategories_();
         if (typeof updateCatUIState_ === "function") updateCatUIState_();
       }
     }
-
   } catch (e) {
-    showAcctError_(String(e && e.message ? e.message : e));
-    setAcctStatus_("Error");
-  } finally {
-    AccountsState.saving = false;
-    updateAcctUIState_();
+    console.warn("[accounts] load failed:", e);
   }
 }
 
@@ -7339,27 +7160,31 @@ async function ensureAccountsLoaded_() {
   await loadAccounts_();
 }
 
-acctReloadBtn.addEventListener("click", async () => { await loadAccounts_(); });
+// v426b: single-cell rename (replaces the table-driven saveAccountsNow_).
+// Updates AccountsState in place, re-renders the tiles that display the
+// name, and fires the KV write. Local UI never blocks on the network — a
+// KV failure just logs; state is authoritative locally until next boot,
+// where loadAccounts_ overrides.
+async function saveAccountName_(idx, name) {
+  if (!Number.isInteger(idx) || idx < 0 || idx >= AccountsState.maxRows) return;
+  const trimmed = String(name || "").trim();
+  const rows = normalizeFixedRows_(AccountsState.rows, AccountsState.maxRows, AccountsState.numCols);
+  rows[idx][0] = trimmed;
+  AccountsState.rows = rows;
+  AccountsState.lockedNames = (AccountsState.lockedNames || []).slice();
+  AccountsState.lockedNames[idx] = trimmed;
 
-async function saveAccountsNow_() {
+  try { if (typeof renderDepositPreviewApp_ === "function") renderDepositPreviewApp_(); } catch(_){}
+  try { if (typeof renderEngineSplitterRows_ === "function") renderEngineSplitterRows_(); } catch(_){}
+  try { if (typeof renderCategories_ === "function") renderCategories_(); } catch(_){}
+
   try {
-    showAcctError_("");
-    AccountsState.saving = true;
-    updateAcctUIState_();
-    const payload = buildAccountsWritePayload_();
-    const res = await workerSet_("accounts", { rows: payload.rows });
+    const res = await workerSet_("accounts", { rows });
     if (!res || !res.ok) throw new Error(res && res.error ? res.error : "Save failed.");
-    await loadAccounts_();
-    AccountsState.dirty = false;
   } catch(e) {
-    showAcctError_(String(e && e.message ? e.message : e));
-  } finally {
-    AccountsState.saving = false;
-    updateAcctUIState_();
+    console.warn("[rename-pool] KV write failed (local state kept):", e);
   }
 }
-
-acctSaveBtn.addEventListener("click", async () => { await saveAccountsNow_(); });
 
 // ============================================================
 // Categories: seed localStorage from server if empty
@@ -8679,7 +8504,7 @@ document.addEventListener("click", async (e) => {
       { tab: 'dashboard', tabLabel: '🏠 Home',   target: '#dashDepositCard',  title: '📥 Post a Deposit',
         body: 'Enter a paycheck amount here and tap Post Deposit. Allot instantly splits it across your 4 pools. Try it — nothing here is locked in.' },
       { tab: 'dashboard', tabLabel: '🏠 Home',   target: '#dashAccountTiles', title: '🏦 Your 4 Pools',
-        body: 'Bills, Debt, Savings, Spending. Each tile shows what the last deposit routed to that pool — dollar amount and percentage. Move that much from your paycheck into the matching real bank account and you\'re done.' },
+        body: 'Bills, Debt, Savings, Spending. Each tile shows what the last deposit routed to that pool. Move that much from your paycheck to the matching real bank account. Tip: long-press any tile to rename it to your bank\'s real name — but leave the defaults for now while you\'re learning.' },
       { tab: 'dashboard', tabLabel: '🏠 Home',   target: '#dashProfileCard',  title: '⚖️ The Split Profile',
         body: 'This controls how every deposit gets divided. Leave it on Default while you\'re learning — you can switch to Conservative, Survival, or Custom anytime later.' },
       { tab: 'budgeter',  tabLabel: '⚖️ Allot',  target: '#engBillsTable',    title: '📋 Your Bills',
@@ -9430,6 +9255,21 @@ document.addEventListener("click", async (e) => {
     </div>
   </div>
 
+  <!-- v426b: Pool rename modal (replaces the deleted Accounts tab). Opened by
+       long-pressing a tile on #dashAccountTiles. -->
+  <div id="renamePoolModal" role="dialog" aria-modal="true">
+    <div class="modal-box">
+      <h3 id="renamePoolTitle">Rename Pool</h3>
+      <p class="modal-sub" id="renamePoolSub">Match your real bank account name so the split is easy to act on.</p>
+      <input type="text" id="renamePoolInput" maxlength="40" autocomplete="off" spellcheck="false" placeholder="Bank account name" style="width:100%;box-sizing:border-box;padding:12px 14px;background:var(--card);border:1px solid var(--border);border-radius:10px;color:var(--text);font-size:1em;margin-bottom:14px;">
+      <div class="modal-footer">
+        <button id="renamePoolResetBtn" class="btn btn2" style="margin-right:auto;font-size:.8em;">Reset to default</button>
+        <button id="renamePoolCancelBtn" class="btn btn2">Cancel</button>
+        <button id="renamePoolSaveBtn" class="btn-confirm-reset">Save</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Debt zeroed-out: keep or delete? -->
   <div id="debtZeroModal" role="dialog" aria-modal="true">
     <div class="modal-box">
@@ -9659,6 +9499,106 @@ document.addEventListener("click", async (e) => {
     wire('clearPctModal',     'click', function(e) { if (e.target === document.getElementById('clearPctModal')) document.getElementById('clearPctModal').classList.remove('open'); });
     wire('clearPctCancelBtn', 'click', function() { document.getElementById('clearPctModal').classList.remove('open'); });
     wire('clearPctConfirmBtn','click', clearCustomPcts_);
+
+    // ────────────────────────────────────────────────────────────────────
+    // v426b: Long-press to rename a pool tile.
+    // Delegated on #dashAccountTiles because renderDashTiles_ blows away and
+    // rebuilds the tile children on every render — a per-tile handler would
+    // detach. Move-cancel avoids firing during scroll gestures on mobile.
+    // ────────────────────────────────────────────────────────────────────
+    (function wirePoolTileLongPress_() {
+      var container = document.getElementById('dashAccountTiles');
+      if (!container) return;
+      var HOLD_MS = 550;
+      var MOVE_TOL = 10;
+      var pressTimer = null;
+      var pressStartXY = null;
+      var pressTile = null;
+      function cancel() {
+        if (pressTimer) { clearTimeout(pressTimer); pressTimer = null; }
+        if (pressTile) { pressTile.style.transform = ''; pressTile.style.transition = ''; }
+        pressTile = null;
+        pressStartXY = null;
+      }
+      function onStart(e) {
+        var tile = e.target.closest('.split-tile');
+        if (!tile || tile.dataset.poolIdx == null) return;
+        // Don't hijack a press that started inside an input (custom % editing).
+        if (e.target.tagName === 'INPUT' || e.target.tagName === 'BUTTON' || e.target.tagName === 'SELECT') return;
+        var t = e.touches ? e.touches[0] : e;
+        pressStartXY = { x: t.clientX, y: t.clientY };
+        pressTile = tile;
+        // Subtle press-down feedback so the user knows the long-press is engaging.
+        tile.style.transition = 'transform 500ms ease';
+        tile.style.transform = 'scale(0.97)';
+        if (pressTimer) clearTimeout(pressTimer);
+        pressTimer = setTimeout(function() {
+          pressTimer = null;
+          if (pressTile) { pressTile.style.transform = ''; pressTile.style.transition = ''; }
+          try { if (window.navigator && navigator.vibrate) navigator.vibrate(15); } catch(_){}
+          var idx = Number(tile.dataset.poolIdx);
+          openRenamePoolModal_(idx);
+        }, HOLD_MS);
+      }
+      function onMove(e) {
+        if (!pressStartXY || !pressTimer) return;
+        var t = e.touches ? e.touches[0] : e;
+        if (Math.abs(t.clientX - pressStartXY.x) > MOVE_TOL || Math.abs(t.clientY - pressStartXY.y) > MOVE_TOL) cancel();
+      }
+      container.addEventListener('touchstart', onStart, { passive: true });
+      container.addEventListener('touchmove',  onMove,  { passive: true });
+      container.addEventListener('touchend',   cancel);
+      container.addEventListener('touchcancel',cancel);
+      container.addEventListener('mousedown',  onStart);
+      container.addEventListener('mousemove',  onMove);
+      container.addEventListener('mouseup',    cancel);
+      container.addEventListener('mouseleave', cancel);
+    })();
+
+    // Rename-pool modal wiring.
+    function openRenamePoolModal_(idx) {
+      var modal = document.getElementById('renamePoolModal');
+      var input = document.getElementById('renamePoolInput');
+      var title = document.getElementById('renamePoolTitle');
+      if (!modal || !input) return;
+      var defaultLabel = (typeof DASH_TILE_LABELS !== 'undefined' && DASH_TILE_LABELS[idx]) || 'Pool';
+      var currentName = (typeof AccountsState !== 'undefined' && AccountsState.lockedNames && AccountsState.lockedNames[idx]) || defaultLabel;
+      title.textContent = 'Rename "' + defaultLabel + '" pool';
+      input.value = currentName;
+      input.dataset.defaultLabel = defaultLabel;
+      modal.dataset.poolIdx = String(idx);
+      modal.classList.add('open');
+      setTimeout(function() { input.focus(); input.select(); }, 40);
+    }
+    function closeRenamePoolModal_() {
+      var modal = document.getElementById('renamePoolModal');
+      if (modal) modal.classList.remove('open');
+    }
+    async function saveRenamePoolFromModal_() {
+      var modal = document.getElementById('renamePoolModal');
+      var input = document.getElementById('renamePoolInput');
+      if (!modal || !input) return;
+      var idx = Number(modal.dataset.poolIdx);
+      if (!Number.isInteger(idx)) { closeRenamePoolModal_(); return; }
+      var name = (input.value || '').trim() || (input.dataset.defaultLabel || '');
+      closeRenamePoolModal_();
+      if (typeof saveAccountName_ === 'function') await saveAccountName_(idx, name);
+    }
+    wire('renamePoolModal',     'click', function(e) { if (e.target === document.getElementById('renamePoolModal')) closeRenamePoolModal_(); });
+    wire('renamePoolCancelBtn', 'click', closeRenamePoolModal_);
+    wire('renamePoolSaveBtn',   'click', saveRenamePoolFromModal_);
+    wire('renamePoolResetBtn',  'click', function() {
+      var input = document.getElementById('renamePoolInput');
+      if (input) { input.value = input.dataset.defaultLabel || ''; input.focus(); input.select(); }
+    });
+    (function _wireRenameInputKeys_() {
+      var input = document.getElementById('renamePoolInput');
+      if (!input) return;
+      input.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter') { e.preventDefault(); saveRenamePoolFromModal_(); }
+        else if (e.key === 'Escape') { e.preventDefault(); closeRenamePoolModal_(); }
+      });
+    })();
   })();
   </script>
   </body>
