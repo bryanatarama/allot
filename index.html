@@ -1755,7 +1755,7 @@ body { padding:0; overflow-x: hidden; }
       // ===== Header pills =====
       const whereEl = document.getElementById("where");
       const specEl = document.getElementById("specVersion");
-      const BUILD_STAMP = "v426b-pages";
+      const BUILD_STAMP = "v426c-pages";
       const SPEC_VERSION = "";
       specEl.textContent = "Spec: " + SPEC_VERSION;
       whereEl.textContent = "Here: " + window.location.href;
@@ -5149,7 +5149,7 @@ function resetPaidMTD_(){
       ];
       const MIM_STARTER_SPENDING_CATS = ["Groceries", "Gas", "Restaurants", "Fun"];
 
-      function mimAddBillRow_(name = "", target = "") {
+      function mimAddBillRow_(name = "", target = "", dueDay = "") {
         const container = document.getElementById("mimBillsRows");
         if (!container) return;
         const row = document.createElement("div");
@@ -5157,16 +5157,20 @@ function resetPaidMTD_(){
         row.style.cssText = "display:flex;gap:6px;align-items:center;";
         // Compact reorder controls stacked vertically to save width. Up = move
         // toward top of list (higher priority in v425k allocator).
+        // v426c: optional Day-of-month input right of Target. Left blank by
+        // default; users who know their bill's actual due date can enter it
+        // now instead of digging into the Bill Due Dates section later.
         row.innerHTML = `
           <div style="display:flex;flex-direction:column;flex-shrink:0;">
             <button type="button" class="mim-up" title="Move up (higher priority)" style="background:transparent;border:none;color:var(--muted);cursor:pointer;font-size:.8em;line-height:1;padding:1px 4px;">▲</button>
             <button type="button" class="mim-down" title="Move down (lower priority)" style="background:transparent;border:none;color:var(--muted);cursor:pointer;font-size:.8em;line-height:1;padding:1px 4px;">▼</button>
           </div>
           <input type="text" class="mim-bill-name" placeholder="Bill name (Rent)" value="${escapeHtml_(name)}" style="flex:2;min-width:0;padding:9px 10px;background:var(--card);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:.9em;">
-          <div style="display:flex;align-items:center;flex:1;min-width:0;background:var(--card);border:1px solid var(--border);border-radius:8px;padding:0 8px;">
+          <div style="display:flex;align-items:center;flex:1.2;min-width:0;background:var(--card);border:1px solid var(--border);border-radius:8px;padding:0 8px;">
             <span style="color:var(--muted);font-size:.9em;">$</span>
             <input type="text" class="mim-bill-target" inputmode="decimal" placeholder="0" value="${escapeHtml_(String(target))}" style="flex:1;min-width:0;padding:9px 6px;background:transparent;border:none;color:var(--text);font-size:.9em;outline:none;">
           </div>
+          <input type="text" class="mim-bill-due" inputmode="numeric" maxlength="2" title="Day of month (optional)" placeholder="Day" value="${escapeHtml_(String(dueDay))}" style="width:48px;flex-shrink:0;padding:9px 4px;text-align:center;background:var(--card);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:.85em;">
           <button type="button" class="mim-remove" title="Remove" style="flex-shrink:0;background:transparent;border:none;color:var(--muted);cursor:pointer;font-size:1.2em;padding:4px 8px;">×</button>
         `;
         row.querySelector(".mim-remove").addEventListener("click", () => row.remove());
@@ -5222,11 +5226,16 @@ function resetPaidMTD_(){
         const showErr = (msg) => { errEl.textContent = msg; errEl.style.display = "block"; };
         errEl.style.display = "none";
 
-        // Collect + validate bills
-        const billRows = Array.from(document.querySelectorAll(".mim-bill-row")).map(r => ({
-          name: r.querySelector(".mim-bill-name").value.trim(),
-          target: Number(r.querySelector(".mim-bill-target").value.replace(/[^0-9.]/g, "")) || 0,
-        })).filter(b => b.name.length > 0);
+        // Collect + validate bills (v426c: optional dueDay per bill).
+        const billRows = Array.from(document.querySelectorAll(".mim-bill-row")).map(r => {
+          const dueRaw = r.querySelector(".mim-bill-due")?.value.replace(/[^0-9]/g, "") || "";
+          const dueNum = dueRaw === "" ? null : Math.min(31, Math.max(1, Number(dueRaw) || 0));
+          return {
+            name: r.querySelector(".mim-bill-name").value.trim(),
+            target: Number(r.querySelector(".mim-bill-target").value.replace(/[^0-9.]/g, "")) || 0,
+            dueDay: dueNum,
+          };
+        }).filter(b => b.name.length > 0);
         if (!billRows.length) { showErr("Add at least one bill so Allot knows how to split your money."); return; }
         for (const b of billRows) {
           if (!(b.target > 0)) { showErr(`"${b.name}" needs a monthly target above $0.`); return; }
@@ -5311,6 +5320,21 @@ function resetPaidMTD_(){
           }
           appState.billsSplit = newBillsSplit;
           saveBillsSplitToStorage_();
+
+          // v426c: bill due dates from the modal's optional "Day" column.
+          // Preserve any dates the user set on non-demo bills if merging;
+          // otherwise start with an empty map so demo entries don't leak.
+          const existingDueDates = loadBillDueDates_() || {};
+          const newDueDates = {};
+          if (keepUserAdded) {
+            for (const [k, v] of Object.entries(existingDueDates)) {
+              if (!demoCatKeys.has(k)) newDueDates[k] = v;
+            }
+          }
+          for (const b of billRows) {
+            if (b.dueDay != null) newDueDates[b.name.toLowerCase()] = b.dueDay;
+          }
+          saveBillDueDates_(newDueDates);
 
           // debtItems: user's Q2 debts. Preserve user-added if merging.
           const newDebts = {};
@@ -8511,6 +8535,8 @@ document.addEventListener("click", async (e) => {
         body: 'Bills fund top-down. The bill at the top gets covered first out of every deposit\'s Bills pool. Put your most critical expenses on top so rent lands before Netflix.' },
       { tab: 'budgeter',  tabLabel: '⚖️ Allot',  target: '#engBillsTable',    title: '✅ The Paid Checkbox',
         body: 'Already paid a bill this month? Check its box. Allot skips it for this deposit and starts pre-funding it toward next month instead — so nothing gets double-counted.' },
+      { tab: 'budgeter',  tabLabel: '⚖️ Allot',  target: '#engBillsEditBar',  title: '✏️ Add & Edit Bills',
+        body: 'Tap Edit whenever your bills change — add new ones, rename, reorder priority (top = funded first), or delete rows. Targets and paid checkboxes lock while editing so you don\'t tap them by accident. Save commits; Cancel discards.' },
       { tab: 'debt',      tabLabel: '📉 Debt',    target: '#debtTable',        title: '📝 Enter Your Debts',
         body: 'Each row is one debt — credit card, car loan, student loan, whatever. Fill in Name, Balance, APR (the interest rate), and Min Payment. These four numbers are what Allot uses to route your Debt pool. Tap Edit to add or remove rows.' },
       { tab: 'debt',      tabLabel: '📉 Debt',    target: '#debtKpis',         title: '📉 How Debt Splits Work',
@@ -9165,7 +9191,7 @@ document.addEventListener("click", async (e) => {
       <!-- Q1: Bills -->
       <div style="margin-bottom:18px;">
         <div style="font-weight:700;color:var(--text);margin-bottom:4px;">What do you have to pay every month?</div>
-        <div style="font-size:.85em;color:var(--muted);margin-bottom:8px;">Rent, phone, insurance — anything that's due every month like clockwork. Pre-filled with common ones; edit or delete freely.</div>
+        <div style="font-size:.85em;color:var(--muted);margin-bottom:8px;">Rent, phone, insurance — anything that's due every month like clockwork. Pre-filled with common ones; edit or delete freely. <strong style="color:var(--text);">Day</strong> is optional — the day of the month the bill actually hits (leave blank if you're not sure).</div>
         <div style="font-size:.8em;color:var(--accent-text);background:rgba(245,158,11,.06);border:1px solid rgba(245,158,11,.20);border-radius:6px;padding:8px 10px;margin-bottom:10px;line-height:1.45;">
           <strong>Priority is top-down.</strong> Bills higher in the list get funded first from each deposit. Use the ▲▼ arrows to put your most important bills on top. You can also reorder later from the Allot tab (Edit mode).
         </div>
@@ -9253,6 +9279,17 @@ document.addEventListener("click", async (e) => {
         <button id="doublePostConfirmBtn" class="btn-confirm-reset">Post Anyway</button>
       </div>
     </div>
+  </div>
+
+  <!-- v426c: Just-in-time coach tip. Small floating card that fires the first
+       time a user opens a feature that warrants a one-liner (currently: Bill
+       Due Dates). Dismissed by "Got it" and gated by localStorage so it never
+       re-fires. Unlike the tour, this is not a modal takeover — the page
+       stays interactive underneath. -->
+  <div id="coachTip" role="dialog" aria-live="polite" style="display:none;position:fixed;z-index:10003;max-width:288px;background:rgba(18,24,36,0.98);border:1px solid rgba(56,189,248,0.42);border-radius:14px;padding:14px 18px 14px;box-shadow:0 8px 32px rgba(0,0,0,0.6);">
+    <h4 id="coachTipTitle" style="margin:0 0 8px;font-size:.9em;font-weight:800;color:#38bdf8;"></h4>
+    <p id="coachTipBody" style="margin:0 0 12px;font-size:.82em;color:rgba(255,255,255,0.75);line-height:1.55;"></p>
+    <button id="coachTipDismiss" type="button" style="width:100%;padding:8px 14px;border:none;border-radius:8px;background:#38bdf8;color:#0c1e2c;font-weight:700;cursor:pointer;font-size:.85em;">Got it</button>
   </div>
 
   <!-- v426b: Pool rename modal (replaces the deleted Accounts tab). Opened by
@@ -9597,6 +9634,73 @@ document.addEventListener("click", async (e) => {
       input.addEventListener('keydown', function(e) {
         if (e.key === 'Enter') { e.preventDefault(); saveRenamePoolFromModal_(); }
         else if (e.key === 'Escape') { e.preventDefault(); closeRenamePoolModal_(); }
+      });
+    })();
+
+    // ────────────────────────────────────────────────────────────────────
+    // v426c: Just-in-time coach tips. Lightweight — no page dim, no forced
+    // modal. One-shot per key: BUDGETER_COACH_<KEY> in localStorage.
+    // ────────────────────────────────────────────────────────────────────
+    function _coachSeen_(key) {
+      try { return localStorage.getItem('BUDGETER_COACH_' + key) === '1'; } catch(_) { return false; }
+    }
+    function _markCoachSeen_(key) {
+      try { localStorage.setItem('BUDGETER_COACH_' + key, '1'); } catch(_){}
+    }
+    function showCoachTip_(opts) {
+      if (!opts || !opts.key || _coachSeen_(opts.key)) return;
+      var tip = document.getElementById('coachTip');
+      var target = opts.target ? document.querySelector(opts.target) : null;
+      if (!tip) return;
+      document.getElementById('coachTipTitle').textContent = opts.title || '';
+      document.getElementById('coachTipBody').textContent = opts.body || '';
+      tip._coachKey = opts.key;
+      // Show first (with visibility hidden) so we can measure. Position, then reveal.
+      tip.style.visibility = 'hidden';
+      tip.style.display = 'block';
+      var tRect = tip.getBoundingClientRect();
+      var top, left;
+      if (target) {
+        var rect = target.getBoundingClientRect();
+        var gap = 12;
+        if (rect.bottom + gap + tRect.height < window.innerHeight - 12) top = rect.bottom + gap;
+        else if (rect.top - tRect.height - gap > 12) top = rect.top - tRect.height - gap;
+        else top = Math.max(12, (window.innerHeight - tRect.height) / 2);
+        var targetCenterX = rect.left + rect.width / 2;
+        var leftIdeal = targetCenterX - tRect.width / 2;
+        left = Math.max(8, Math.min(leftIdeal, window.innerWidth - tRect.width - 8));
+      } else {
+        top = Math.max(12, (window.innerHeight - tRect.height) / 2);
+        left = Math.max(8, (window.innerWidth - tRect.width) / 2);
+      }
+      tip.style.top = top + 'px';
+      tip.style.left = left + 'px';
+      tip.style.visibility = '';
+    }
+    function dismissCoachTip_() {
+      var tip = document.getElementById('coachTip');
+      if (!tip) return;
+      var key = tip._coachKey;
+      tip.style.display = 'none';
+      if (key) _markCoachSeen_(key);
+    }
+    wire('coachTipDismiss', 'click', dismissCoachTip_);
+
+    // Fire the Due Dates coach the first time the user expands that section.
+    (function _wireDueDatesCoach_() {
+      var section = document.getElementById('billDueDatesSection');
+      if (!section) return;
+      section.addEventListener('toggle', function() {
+        if (!section.open) return;
+        // Small delay so the section has expanded before we anchor the tip.
+        setTimeout(function() {
+          showCoachTip_({
+            key: 'DUE_DATES_V1',
+            target: '#billDueDatesSection',
+            title: '🗓 Bill Due Dates',
+            body: 'Set the day of the month each bill actually hits — rent on the 5th, credit card on the 15th, etc. That bill\'s monthly cycle resets on its due date instead of the 1st. Leave blank or 1 for the default; most people never need to touch this.'
+          });
+        }, 220);
       });
     })();
   })();
