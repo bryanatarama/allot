@@ -808,7 +808,7 @@ body { padding:0; overflow-x: hidden; }
 .ob-skip { background:none; border:none; color:var(--border); font-family:inherit; font-size:.8em; cursor:pointer; padding:4px 8px; align-self:center; }
 .ob-skip:active { color:var(--muted); }
 /* ── Tour Spotlight ── */
-#tourSpotlight { display:none; position:fixed; border-radius:14px; border:2px solid rgba(245,158,11,0.65); box-shadow:0 0 0 9999px rgba(8,12,19,0.82); z-index:10000; pointer-events:none; transition:top .25s,left .25s,width .25s,height .25s; }
+#tourSpotlight { display:none; position:fixed; border-radius:14px; border:2px solid rgba(245,158,11,0.75); box-shadow:0 0 0 9999px rgba(8,12,19,0.88), 0 0 24px 6px rgba(245,158,11,0.25); z-index:10000; pointer-events:none; transition:top .25s,left .25s,width .25s,height .25s; }
 #tourCallout { display:none; position:fixed; z-index:10002; width:290px; background:rgba(18,24,36,0.98); border:1px solid rgba(245,158,11,0.35); border-radius:16px; padding:14px 20px 16px; box-shadow:0 8px 32px rgba(0,0,0,0.7); }
 #tourTabLabel { font-size:.7em; font-weight:700; letter-spacing:.08em; text-transform:uppercase; color:rgba(245,158,11,0.55); margin-bottom:8px; display:block; }
 #tourCallout h3 { margin:0 0 8px; font-size:.9em; font-weight:800; color:#f59e0b; }
@@ -1787,7 +1787,7 @@ body { padding:0; overflow-x: hidden; }
       // ===== Header pills =====
       const whereEl = document.getElementById("where");
       const specEl = document.getElementById("specVersion");
-      const BUILD_STAMP = "v426-pages";
+      const BUILD_STAMP = "v426a-pages";
       const SPEC_VERSION = "";
       specEl.textContent = "Spec: " + SPEC_VERSION;
       whereEl.textContent = "Here: " + window.location.href;
@@ -8686,6 +8686,8 @@ document.addEventListener("click", async (e) => {
         body: 'Bills fund top-down. The bill at the top gets covered first out of every deposit\'s Bills pool. Put your most critical expenses on top so rent lands before Netflix.' },
       { tab: 'budgeter',  tabLabel: '⚖️ Allot',  target: '#engBillsTable',    title: '✅ The Paid Checkbox',
         body: 'Already paid a bill this month? Check its box. Allot skips it for this deposit and starts pre-funding it toward next month instead — so nothing gets double-counted.' },
+      { tab: 'debt',      tabLabel: '📉 Debt',    target: '#debtTable',        title: '📝 Enter Your Debts',
+        body: 'Each row is one debt — credit card, car loan, student loan, whatever. Fill in Name, Balance, APR (the interest rate), and Min Payment. These four numbers are what Allot uses to route your Debt pool. Tap Edit to add or remove rows.' },
       { tab: 'debt',      tabLabel: '📉 Debt',    target: '#debtKpis',         title: '📉 How Debt Splits Work',
         body: 'Minimums cover first — every debt gets its minimum before extras move. Whatever\'s left is weighted toward high-APR balances hardest, so payoff happens without the guesswork.' },
       { tab: 'dashboard', tabLabel: '🏠 Home',   target: '#headerLeftBtns',   title: '💡 Two Handy Buttons',
@@ -8804,13 +8806,23 @@ document.addEventListener("click", async (e) => {
       document.getElementById("tourBack").disabled = _obIdx === 0;
       callout.style.display = "block";
       const cRect = callout.getBoundingClientRect();
-      const margin = 14;
-      let top = (rect.bottom + margin + cRect.height < window.innerHeight - 20)
-        ? rect.bottom + margin
-        : (rect.top - cRect.height - margin > 20)
-          ? rect.top - cRect.height - margin
-          : Math.max(20, (window.innerHeight - cRect.height) / 2);
-      const left = Math.max(8, Math.min(rect.left, window.innerWidth - cRect.width - 8));
+      // v426a: hug the spotlight. Vertical prefers below → above → centered
+      // fallback; horizontal centers on the target's midpoint so the callout
+      // visually points AT the feature instead of left-aligning to a wide
+      // element and drifting out to sea. Clamped to 8px viewport margin so
+      // mobile never clips.
+      const gap = 12;
+      let top;
+      if (rect.bottom + gap + cRect.height < window.innerHeight - 12) {
+        top = rect.bottom + gap;
+      } else if (rect.top - cRect.height - gap > 12) {
+        top = rect.top - cRect.height - gap;
+      } else {
+        top = Math.max(12, (window.innerHeight - cRect.height) / 2);
+      }
+      const targetCenterX = rect.left + rect.width / 2;
+      const leftIdeal = targetCenterX - cRect.width / 2;
+      const left = Math.max(8, Math.min(leftIdeal, window.innerWidth - cRect.width - 8));
       callout.style.top  = top + "px";
       callout.style.left = left + "px";
     }
