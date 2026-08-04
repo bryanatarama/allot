@@ -634,6 +634,24 @@
 #unsavedModal .modal-sub { color:var(--muted); font-size:.88em; margin:0 0 20px; }
 #unsavedModal .modal-footer { display:flex; gap:10px; justify-content:flex-end; flex-wrap:wrap; }
 
+/* v426d: rename-pool modal — mirrors #unsavedModal shape. Fixed overlay,
+   centered .modal-box, hidden until .open. Prior version shipped WITHOUT
+   any CSS for #renamePoolModal, so the div rendered as normal block
+   content at the bottom of the page. */
+#renamePoolModal {
+  display:none; position:fixed; inset:0; z-index:9999;
+  background:rgba(8,12,19,0.85); align-items:center; justify-content:center;
+  padding:20px;
+}
+#renamePoolModal.open { display:flex; }
+#renamePoolModal .modal-box {
+  background:var(--card); border:1px solid var(--border); border-radius:14px;
+  padding:22px 24px; max-width:400px; width:100%; box-sizing:border-box;
+}
+#renamePoolModal h3 { margin:0 0 6px; font-size:1.05em; }
+#renamePoolModal .modal-sub { color:var(--muted); font-size:.85em; margin:0 0 14px; line-height:1.5; }
+#renamePoolModal .modal-footer { display:flex; gap:8px; justify-content:flex-end; flex-wrap:wrap; align-items:center; }
+
 #manualFundedModal {
   display:none; position:fixed; inset:0; z-index:9999;
   background:rgba(8,12,19,0.75); align-items:center; justify-content:center;
@@ -664,6 +682,15 @@
   padding:14px 10px 12px;
   background:var(--card); border:1px solid var(--border); border-top:2px solid rgba(245,158,11,0.4); border-radius:8px;
   text-align:center; transition:border-color .15s;
+  /* v426d: long-press to rename shouldn't trigger the mobile text-selection
+     handles or the iOS callout menu. .split-tile-pct (custom-% input) still
+     overrides these so users can edit percentages normally. */
+  -webkit-user-select:none; user-select:none;
+  -webkit-touch-callout:none; -webkit-tap-highlight-color:transparent;
+}
+.split-tile input, .split-tile .split-tile-pct.editable {
+  -webkit-user-select:text; user-select:text;
+  -webkit-touch-callout:default;
 }
 .split-tile.active { border-color:rgba(245,158,11,.5); background:rgba(245,158,11,.07); }
 .split-tile-label { font-size:.72em; font-weight:700; letter-spacing:.08em; text-transform:uppercase; color:var(--muted); }
@@ -1755,7 +1782,7 @@ body { padding:0; overflow-x: hidden; }
       // ===== Header pills =====
       const whereEl = document.getElementById("where");
       const specEl = document.getElementById("specVersion");
-      const BUILD_STAMP = "v426c-pages";
+      const BUILD_STAMP = "v426d-pages";
       const SPEC_VERSION = "";
       specEl.textContent = "Spec: " + SPEC_VERSION;
       whereEl.textContent = "Here: " + window.location.href;
@@ -9590,6 +9617,17 @@ document.addEventListener("click", async (e) => {
       container.addEventListener('mousemove',  onMove);
       container.addEventListener('mouseup',    cancel);
       container.addEventListener('mouseleave', cancel);
+      // v426d: iOS/Android long-press pops up the OS text-selection callout
+      // menu when it fires on a tile. Swallow contextmenu on tiles so the
+      // rename modal is the only thing the gesture triggers. Inputs inside
+      // the tile (custom-% edit) fall through because .split-tile input
+      // resets user-select above and they receive their own contextmenu.
+      container.addEventListener('contextmenu', function(e) {
+        var tile = e.target.closest('.split-tile');
+        if (!tile) return;
+        if (e.target.tagName === 'INPUT' || e.target.tagName === 'BUTTON' || e.target.tagName === 'SELECT') return;
+        e.preventDefault();
+      });
     })();
 
     // Rename-pool modal wiring.
