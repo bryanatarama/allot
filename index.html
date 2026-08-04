@@ -1144,6 +1144,15 @@ body { padding:0; overflow-x: hidden; }
 
         <div id="dashError" class="error" style="display:none"></div>
 
+        <!-- v424: Demo Mode banner. Shown when localStorage BUDGETER_DEMO_MODE_V1 === "true". Visibility is toggled by updateDemoBanner_(). -->
+        <div id="demoModeBanner" style="display:none;margin:8px 0 12px;padding:12px 14px;background:linear-gradient(135deg,rgba(245,158,11,.18),rgba(245,158,11,.10));border:1.5px solid #78350f;border-radius:12px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;">
+          <div style="flex:1;min-width:220px;">
+            <div style="font-size:.72em;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--accent-text);margin-bottom:3px;">Demo mode</div>
+            <div style="font-size:.88em;color:var(--muted);line-height:1.5;">This is example data. Play around, then click <strong style="color:var(--accent-text);">Make it mine</strong> to set up your real accounts.</div>
+          </div>
+          <button id="demoMakeItMineBtn" type="button" style="padding:10px 18px;font-size:.9em;font-weight:700;border-radius:10px;background:#f59e0b;color:#0c0700;border:none;cursor:pointer;letter-spacing:.02em;white-space:nowrap;flex-shrink:0;">Make it mine →</button>
+        </div>
+
         <!-- Deposit hero card (mirrors Budgeter tab input) -->
         <div id="dashDepositCard" style="display:flex;flex-direction:column;align-items:center;text-align:center;padding:28px 20px 24px;margin:8px 0 20px;background:linear-gradient(135deg,rgba(245,158,11,.10),rgba(245,158,11,.06));border:1px solid #78350f;border-radius:20px;box-shadow:0 0 0 1px #78350f,0 0 20px rgba(245,158,11,0.08);">
           <div style="font-size:.75em;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:10px;">Deposit Amount</div>
@@ -1574,6 +1583,25 @@ body { padding:0; overflow-x: hidden; }
       </table>
     </div>
 
+    <!-- v425e2: quick-add a new debt directly from the Debt tab so the user doesn't
+         have to detour to Categories to spawn a Debt-typed row. Submits inline via
+         addDebtInline_() → writes cfgCategories + debtItems + KV, then re-renders. -->
+    <button id="debtAddBtn" type="button" style="margin-top:10px;background:transparent;border:1px dashed var(--border);color:var(--muted);border-radius:8px;padding:10px 12px;font-size:.9em;cursor:pointer;width:100%;">+ Add a debt</button>
+    <div id="debtAddForm" style="display:none;margin-top:10px;padding:14px;background:var(--card);border:1px solid var(--border);border-radius:10px;">
+      <div style="font-weight:700;color:var(--text);margin-bottom:10px;font-size:.95em;">Add a debt</div>
+      <div style="display:grid;grid-template-columns:2fr 1.2fr 1fr 1fr;gap:8px;margin-bottom:10px;">
+        <input type="text" id="debtAddName" placeholder="Card / loan name" style="min-width:0;padding:9px 10px;background:var(--card);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:.85em;">
+        <input type="text" id="debtAddBalance" inputmode="decimal" placeholder="$ balance" style="min-width:0;padding:9px 8px;background:var(--card);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:.85em;">
+        <input type="text" id="debtAddMin" inputmode="decimal" placeholder="$ min pmt" style="min-width:0;padding:9px 8px;background:var(--card);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:.85em;">
+        <input type="text" id="debtAddApr" inputmode="decimal" placeholder="APR %" style="min-width:0;padding:9px 8px;background:var(--card);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:.85em;">
+      </div>
+      <div id="debtAddError" style="display:none;color:#f87171;font-size:.85em;margin-bottom:8px;"></div>
+      <div style="display:flex;justify-content:flex-end;gap:8px;">
+        <button id="debtAddCancelBtn" type="button" class="btn btn2">Cancel</button>
+        <button id="debtAddSubmitBtn" type="button" style="padding:8px 16px;background:#f59e0b;color:#0c0700;border:none;border-radius:8px;font-weight:700;cursor:pointer;">Add debt</button>
+      </div>
+    </div>
+
     <div class="dev-only" style="margin-top:12px">
       <div class="muted dev-only">Raw response (debug):</div>
       <pre id="debtRaw" class="dev-only">(not loaded)</pre>
@@ -1759,7 +1787,7 @@ body { padding:0; overflow-x: hidden; }
       // ===== Header pills =====
       const whereEl = document.getElementById("where");
       const specEl = document.getElementById("specVersion");
-      const BUILD_STAMP = "v415-pages";
+      const BUILD_STAMP = "v426-pages";
       const SPEC_VERSION = "";
       specEl.textContent = "Spec: " + SPEC_VERSION;
       whereEl.textContent = "Here: " + window.location.href;
@@ -1843,7 +1871,7 @@ function bootMark_(label){
       const LS_KEY_POST_GUARD = "BUDGETER_APP_POST_GUARD_V1";
       const LS_KEY_DEPOSIT_HISTORY = "BUDGETER_DEPOSIT_HISTORY_V1";
       const LS_KEY_BILL_DUE_DATES  = "BUDGETER_BILL_DUE_DATES_V1";
-      const LS_KEY_ONBOARDING_DONE = "BUDGETER_ONBOARDING_DONE_V5";
+      const LS_KEY_ONBOARDING_DONE = "BUDGETER_ONBOARDING_DONE_V6";
       const LS_KEY_SESSION = "BUDGETER_SESSION_V1";
       const WORKER_URL = "https://lingering-truth-5f8b.bryanatarama.workers.dev";
 
@@ -2405,6 +2433,7 @@ function saveDebtItemsToStorage_(){
         // (loadManualFunded_ already drops stale-month flags on read, but never wrote
         // the cleared state back, so the clear never synced).
         saveManualFunded_({});
+        try { saveFFAskedSet_(new Set()); } catch(_){}
         savePostSnapshot_(null);
       }
 
@@ -2756,6 +2785,16 @@ function renderDebtLocal_(){
         }
       }
     });
+    // v419: Enter commits the edit (formats + triggers zero-balance modal) same
+    // as clicking off. Blur runs every registered blur handler (money formatter,
+    // apr formatter, positive→zero detection). preventDefault stops any implicit
+    // form submission on the surrounding page.
+    inp.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        inp.blur();
+      }
+    });
     validateNoFormula_(inp, inp.value);
   });
 
@@ -2796,10 +2835,21 @@ function renderDebtLocal_(){
   if (debtKpisEl){
     const warn = m.needsBalance.some(Boolean);
     const mtdSum = round2_((m.mtdPaid || []).reduce((s,x) => s + (Number(x)||0), 0));
-    const paidPct = m.totalMins > 0 ? Math.round((mtdSum / m.totalMins) * 100) : 0;
+    // v422: Minimums Paid split into two numbers — coverage (capped at 100%)
+    // and supplement (% over mins). Prevents nonsensical "4959% paid" when the
+    // user is paying way more than the minimum requirement.
+    const coveragePct = m.totalMins > 0 ? Math.min(100, Math.round((mtdSum / m.totalMins) * 100)) : 0;
+    const supplementPct = m.totalMins > 0 ? Math.max(0, Math.round(((mtdSum - m.totalMins) / m.totalMins) * 100)) : 0;
+    const supplementSub = supplementPct > 0 ? `+${supplementPct}% supplement` : null;
+    // v421: total debt owed (sum of raw balances) as a full-width hero tile
+    // above the 2x2 KPI grid — the single most important number on this tab.
+    const totalOwed = round2_((m.rows || []).reduce((s,r) => s + (Number(r?.balance || 0) || 0), 0));
     debtKpisEl.innerHTML = "";
+    const totalOwedCard = debtKpiCard_("Total Debt Owed", formatMoney_(totalOwed));
+    totalOwedCard.style.gridColumn = "1 / -1";
+    debtKpisEl.appendChild(totalOwedCard);
     debtKpisEl.appendChild(debtKpiCard_("Total Paid This Month", formatMoney_(mtdSum)));
-    debtKpisEl.appendChild(debtKpiCard_("Minimums Paid", paidPct + "%"));
+    debtKpisEl.appendChild(debtKpiCard_("Minimums Paid", coveragePct + "%", false, supplementSub));
     debtKpisEl.appendChild(debtKpiCard_("Total Minimums", formatMoney_(m.totalMins)));
     debtKpisEl.appendChild(debtKpiCard_("Extra Available", formatMoney_(m.extraAfterMins)));
     if (debtPoolLineEl) debtPoolLineEl.textContent = "Debt pool this deposit: " + formatMoney_(m.debtPool);
@@ -3306,6 +3356,22 @@ const TAB_IDS = ["dashboard", "accounts", "expenseCategories", "budgeter", "debt
         });
       });
 
+      // v420: Browser-level guard for close/refresh/back-nav. In-app tab
+      // switches are handled by showUnsavedModal_ above; this catches the case
+      // where the user leaves the whole page. Modern browsers show a generic
+      // "Leave site?" prompt (the string is ignored) whenever the handler
+      // returns a truthy value, so all we do is signal that data would be lost.
+      window.addEventListener("beforeunload", (e) => {
+        const acctDirty = typeof AccountsState !== "undefined" && AccountsState.dirty;
+        const catDirty  = typeof CategoriesState !== "undefined" && CategoriesState.dirty;
+        const debtDirty = typeof DebtState !== "undefined" && DebtState.dirty;
+        if (acctDirty || catDirty || debtDirty) {
+          e.preventDefault();
+          e.returnValue = ""; // required by legacy Chrome/Safari
+          return "";
+        }
+      });
+
       // ============================================================
       // Dashboard (sheet snapshot fetch retained, but Summary+Category are app-driven)
       // ============================================================
@@ -3497,35 +3563,36 @@ dashPreviewTbody.appendChild(tr);
           const manualFunded = loadManualFunded_();
           const nextMonthPaid = loadNextMonthPaid_();
 
-          // build targets/paid arrays for allocator
+          // Build parallel arrays. isForward marks which rows are
+          // manualFunded (forward-fund toward next month) vs current-month.
           const t = [];
           const p = [];
           const need = [];
+          const isForward = [];
           for (let i = 0; i < n; i++){
             const c = groupCats[i];
             const key = c.key;
             const mt = Number(appState.billsSplit?.[key]?.monthlyTarget || 0) || 0;
             t.push(mt);
             if (manualFunded[key]) {
-              // Already paid this month — allocate toward next month instead
+              // Forward-fund row: "paid" is what's already earmarked for next month
               const nmPaid = Number(nextMonthPaid[key] || 0) || 0;
               p.push(nmPaid);
-              const nd = (mt > 0) ? Math.max(0, round2_(mt - nmPaid)) : 0;
-              need.push(nd);
+              need.push((mt > 0) ? Math.max(0, round2_(mt - nmPaid)) : 0);
+              isForward.push(true);
             } else {
               const paidAmt = Number(paidByKey[key] || 0) || 0;
               p.push(paidAmt);
-              const nd = (mt > 0) ? Math.max(0, round2_(mt - paidAmt)) : 0;
-              need.push(nd);
+              need.push((mt > 0) ? Math.max(0, round2_(mt - paidAmt)) : 0);
+              isForward.push(false);
             }
           }
 
-          // effective % across active within this group
+          // effective % across active within this group (unchanged — informational only)
           const activeIdx = [];
           for (let i = 0; i < n; i++){
             if ((weights[i] > 0) && (need[i] > 0)) activeIdx.push(i);
           }
-
           if (activeIdx.length){
             let aw = 0;
             for (const i of activeIdx) aw += weights[i];
@@ -3539,13 +3606,32 @@ dashPreviewTbody.appendChild(tr);
             }
           }
 
-          // allocate dollars for this group only
-          const groupAllocs = DYN_ALLOC_JS_(groupPool, weights, t, p);
+          // v425k: 2-pass allocator — current-month underfunded bills always
+          // consume the pool first; only whatever's LEFT flows to forward-fund
+          // (manualFunded) bills. Prior single-pass behavior mixed both and
+          // could pre-fund next month while a current-month bill still had
+          // remaining need, which is never what the user wants.
+          const cmWeights = weights.map((w, i) => isForward[i] ? 0 : w);
+          const cmTargets = t.map((tv, i)      => isForward[i] ? 0 : tv);
+          const cmPaid    = p.map((pv, i)      => isForward[i] ? 0 : pv);
+          const cmAllocs  = DYN_ALLOC_JS_(groupPool, cmWeights, cmTargets, cmPaid);
+          const cmSum     = round2_(cmAllocs.reduce((s, x) => s + (Number(x) || 0), 0));
+
+          const leftover  = round2_(Math.max(0, groupPool - cmSum));
+          let ffAllocs    = new Array(n).fill(0);
+          if (leftover > 0.005) {
+            const ffWeights = weights.map((w, i) => isForward[i] ? w : 0);
+            const ffTargets = t.map((tv, i)      => isForward[i] ? tv : 0);
+            const ffPaid    = p.map((pv, i)      => isForward[i] ? pv : 0);
+            ffAllocs = DYN_ALLOC_JS_(leftover, ffWeights, ffTargets, ffPaid);
+          }
+
           for (let i = 0; i < n; i++){
-            allocs[groupStartIndex + i] = Number(groupAllocs[i] || 0) || 0;
+            const finalAlloc = isForward[i] ? Number(ffAllocs[i] || 0) : Number(cmAllocs[i] || 0);
+            allocs[groupStartIndex + i]  = finalAlloc || 0;
             targets[groupStartIndex + i] = t[i];
-            paid[groupStartIndex + i] = p[i];
-            needs[groupStartIndex + i] = need[i];
+            paid[groupStartIndex + i]    = p[i];
+            needs[groupStartIndex + i]   = need[i];
           }
         }
 
@@ -3665,15 +3751,26 @@ dashPreviewTbody.appendChild(tr);
         const targetCount = rows.filter(r => (Number(r.monthlyTarget)||0) > 0).length;
 
         const nextMonthPaid = loadNextMonthPaid_();
-        const nextMonthRows = rows.filter(r => r.alreadyPaid && (Number(r.monthlyTarget)||0) > 0);
-        const nextMonthTarget = nextMonthRows.reduce((s,r) => s + (Number(r.monthlyTarget)||0), 0);
-        const nextMonthTotal = nextMonthRows.reduce((s,r) => s + (Number(nextMonthPaid[r.key]||0)||0), 0);
+        // v418: next-month figures are computed over ALL bills with a monthly
+        // target (bills recur), not just the ones currently manualFunded — so
+        // the mirror progress bar reads as a real preview of August rather
+        // than "how much of my pre-flagged subset is covered".
+        const allBillsWithTargets = rows.filter(r => (Number(r.monthlyTarget)||0) > 0);
+        const nextMonthTarget = allBillsWithTargets.reduce((s,r) => s + (Number(r.monthlyTarget)||0), 0);
+        const nextMonthTotal = allBillsWithTargets.reduce((s,r) => s + (Number(nextMonthPaid[r.key]||0)||0), 0);
         const nextMonthPct = (nextMonthTarget > 0 && isFinite(nextMonthTarget) && isFinite(nextMonthTotal)) ? (nextMonthTotal / nextMonthTarget) : 0;
+        const nextMonthCoveredCount = allBillsWithTargets.filter(r => (Number(nextMonthPaid[r.key]||0)||0) + 0.005 >= (Number(r.monthlyTarget)||0)).length;
+        const nextMonthTotalCount = allBillsWithTargets.length;
 
         const pctFmt = (fundingPct * 100).toFixed(1) + "%";
         const barW = Math.min(100, Math.round(fundingPct * 100));
         const barColor = barW >= 100 ? "rgba(34,197,94,.7)" : "rgba(245,158,11,.6)";
-        const curMonthLabel = new Date().toLocaleString("default", { month: "long" });
+        // v424: in demo mode, show a fixed "DEMO MONTH" label instead of the
+        // real month name so the header can't be confused with the user's
+        // actual current month.
+        const curMonthLabel = loadDemoMode_()
+          ? DEMO_MONTH_LABEL
+          : new Date().toLocaleString("default", { month: "long" });
 
         const bodyEl = document.getElementById("dashSummaryBody");
         if (bodyEl) {
@@ -3693,11 +3790,30 @@ dashPreviewTbody.appendChild(tr);
               `<span>Fully funded</span><span class="mono">${fullyFundedCount} / ${targetCount}</span>` +
             `</div>`;
 
-          if (nextMonthRows.length > 0) {
+          // v418: mirror progress bar for next month — same shape as July's
+          // Funding block, blue instead of amber/green, so the user can see at
+          // a glance how much of August is already handled by forward-funding.
+          if (nextMonthTotalCount > 0) {
+            const nextPctFmt = (nextMonthPct * 100).toFixed(1) + "%";
+            const nextBarW = Math.min(100, Math.round(nextMonthPct * 100));
+            const nextBarColor = nextBarW >= 100 ? "rgba(59,130,246,.7)" : "rgba(59,130,246,.5)";
+            const nextMonthUpperLabel = getNextMonthLabel_().toUpperCase();
             html +=
-              `<div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border);display:flex;justify-content:space-between;color:var(--muted);">` +
-                `<span>${escapeHtml_(getNextMonthLabel_())} pre-funded</span>` +
-                `<span class="mono">${escapeHtml_(formatMoney_(nextMonthTotal))} (${(nextMonthPct * 100).toFixed(1)}%)</span>` +
+              `<div style="margin-top:14px;padding-top:12px;border-top:1px solid var(--border);">` +
+                `<div style="font-size:.78em;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-bottom:10px;text-align:center;">${escapeHtml_(nextMonthUpperLabel)}</div>` +
+                `<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">` +
+                  `<span style="color:var(--muted);">Pre-funded</span>` +
+                  `<span class="mono" style="font-weight:700;font-size:1.1em;">${escapeHtml_(nextPctFmt)}</span>` +
+                `</div>` +
+                `<div style="height:6px;border-radius:4px;background:var(--border);overflow:hidden;margin-bottom:10px;">` +
+                  `<div style="height:100%;width:${nextBarW}%;background:${nextBarColor};border-radius:4px;transition:width .4s;"></div>` +
+                `</div>` +
+                `<div style="display:flex;justify-content:space-between;color:var(--muted);margin-bottom:4px;">` +
+                  `<span>Amount</span><span class="mono">${escapeHtml_(formatMoney_(nextMonthTotal))} / ${escapeHtml_(formatMoney_(nextMonthTarget))}</span>` +
+                `</div>` +
+                `<div style="display:flex;justify-content:space-between;color:var(--muted);">` +
+                  `<span>Bills covered</span><span class="mono">${nextMonthCoveredCount} / ${nextMonthTotalCount}</span>` +
+                `</div>` +
               `</div>`;
           }
 
@@ -3887,7 +4003,7 @@ function showDebtError_(msg){
 }
 
 
-function debtKpiCard_(label, value, danger){
+function debtKpiCard_(label, value, danger, subValue){
   const card = document.createElement("div");
   card.className = "split-tile" + (danger ? " dash-tile-invalid" : " active");
   const lbl = document.createElement("div");
@@ -3898,6 +4014,13 @@ function debtKpiCard_(label, value, danger){
   amt.textContent = value || "—";
   card.appendChild(lbl);
   card.appendChild(amt);
+  if (subValue) {
+    const sub = document.createElement("div");
+    sub.className = "mono";
+    sub.style.cssText = "font-size:1em;color:var(--muted);margin-top:4px;letter-spacing:.02em;";
+    sub.textContent = subValue;
+    card.appendChild(sub);
+  }
   return card;
 }
 function normalizeDebtPaidMonth_(){
@@ -4241,20 +4364,32 @@ if (usePostedIfAny && snap && snap.allocsByKey && typeof snap.allocsByKey === "o
   }
 }
 
-        // Update only the amount + effective % cells in place
+        // Update only the amount + effective % cells in place.
+        // Pair DOM rows with the cats array by key, NOT by index — the
+        // compute step reorders categories (Bills first, then Living
+        // expenses), so DOM order and cats order drift once Living-exp
+        // bills exist above Bills-descriptor ones in the user's list.
         const rows = Array.from(engOutTbody.children || []);
+        const catIdxByKey = new Map();
+        for (let ci = 0; ci < cats.length; ci++) {
+          const ck = cats[ci]?.key;
+          if (ck) catIdxByKey.set(ck, ci);
+        }
         for (let i = 0; i < rows.length; i++) {
           const tr = rows[i];
-          const catObj = cats[i];
+          const rowKey = tr?.dataset?.key || "";
+          const ci = catIdxByKey.has(rowKey) ? catIdxByKey.get(rowKey) : -1;
+          if (ci < 0) continue;
+          const catObj = cats[ci];
 
           const amtTd = tr ? tr.querySelector('td[data-role="amt"]') : null;
 if (amtTd) {
-  const key = cats[i]?.key || "";
-  const amt = Number(displayAllocs[i] || 0) || 0;
+  const key = cats[ci]?.key || "";
+  const amt = Number(displayAllocs[ci] || 0) || 0;
 
   // Paid-after + target come from the current computed arrays
-  const paidAfter = Number(paid[i] || 0) || 0;       // this is “paid state” (after post, if posted)
-  const target = Number(targets[i] || 0) || 0;
+  const paidAfter = Number(paid[ci] || 0) || 0;       // this is “paid state” (after post, if posted)
+  const target = Number(targets[ci] || 0) || 0;
 
   const showBadge = !!(usePostedIfAny && snap && snap.allocsByKey && metThisDeposit_(key, target, paidAfter, amt));
 
@@ -4300,12 +4435,12 @@ if (pctEl) {
       (desc === "Living expenses") ? Number(livingPool || 0) :
       0;
 
-    const a = Number(displayAllocs[i] || 0) || 0;
+    const a = Number(displayAllocs[ci] || 0) || 0;
     const pct = (pool > 0) ? (a / pool) * 100 : 0;
 
     pctEl.value = (pct > 0) ? formatPct1_(pct) : "—";
   } else {
-    const v = Number(basePct[i] || 0);
+    const v = Number(basePct[ci] || 0);
     pctEl.value = (v > 0) ? formatPct1_(v) : "—";
   }
 }
@@ -4313,7 +4448,7 @@ if (pctEl) {
           // Adjusted % (effpct) — write actual value
           const effTd = tr ? tr.querySelector('td[data-role="effpct"]') : null;
           if (effTd) {
-            const v = Number(effPcts[i] || 0);
+            const v = Number(effPcts[ci] || 0);
             effTd.textContent = (v > 0) ? formatPct1_(v) : "—";
           }
 
@@ -4482,6 +4617,7 @@ async function resetAllMTD_(){
   // =========================
   try { localStorage.removeItem(MANUAL_FUNDED_LS_KEY); } catch(e){}
   try { localStorage.removeItem(NEXT_MONTH_PAID_LS_KEY); } catch(e){}
+  try { localStorage.removeItem(FF_ASKED_LS_KEY); } catch(e){}
   try { localStorage.removeItem(LS_KEY_DEPOSIT_HISTORY); } catch(e){}
 
   // =========================
@@ -4649,7 +4785,647 @@ function resetPaidMTD_(){
         workerSet_("nextMonthPaid", obj || {}).catch(()=>{});
       }
 
+      // v417: track bills the user was already asked about in the "Bills Fully
+      // Funded" pre-post modal and chose "skip" for. Prevents the same modal
+      // from re-firing on every subsequent post this month for the same bills.
+      // Calendar-month reset like manualFunded — the new-month rollover in
+      // normalizePaidMonth_ clears it via saveFFAsked_({monthKey: cur, keys: []}).
+      const FF_ASKED_LS_KEY = "BUDGETER_FF_ASKED_V1";
+      function loadFFAskedSet_() {
+        try {
+          const raw = localStorage.getItem(FF_ASKED_LS_KEY);
+          if (!raw) return new Set();
+          const obj = JSON.parse(raw);
+          if (obj.monthKey !== monthKeyLocal_()) return new Set();
+          return new Set(Array.isArray(obj.keys) ? obj.keys : []);
+        } catch(e) { return new Set(); }
+      }
+      function saveFFAskedSet_(set) {
+        try {
+          const obj = { monthKey: monthKeyLocal_(), keys: Array.from(set || []) };
+          localStorage.setItem(FF_ASKED_LS_KEY, JSON.stringify(obj));
+          workerSet_("ffAsked", obj).catch(()=>{});
+        } catch(e) {}
+      }
+
+      // v425e2: add a new debt directly from the Debt tab. Writes both the
+      // cfgCategories row (targetAccount="Debt") AND the debtItems entry
+      // (balance/apr/minPayment), then persists to KV in parallel and
+      // re-renders. Prevents the "go to Categories tab, add row, set type
+      // to Debt, come back" detour.
+      async function addDebtInline_() {
+        const errEl = document.getElementById("debtAddError");
+        const showErr = (m) => { errEl.textContent = m; errEl.style.display = "block"; };
+        errEl.style.display = "none";
+
+        const nameEl = document.getElementById("debtAddName");
+        const balEl  = document.getElementById("debtAddBalance");
+        const minEl  = document.getElementById("debtAddMin");
+        const aprEl  = document.getElementById("debtAddApr");
+
+        const name = (nameEl?.value || "").trim();
+        if (!name) { showErr("Debt needs a name."); return; }
+        const key = name.toLowerCase();
+        if (appState.debtItems && appState.debtItems[key]) { showErr(`"${name}" already exists.`); return; }
+        // Also block duplicate cfgCategories rows regardless of targetAccount
+        const catRows = Array.isArray(appState.cfgCategories) ? appState.cfgCategories : [];
+        if (catRows.some(r => String((r && r[0]) || "").trim().toLowerCase() === key)) {
+          showErr(`"${name}" already exists as a category.`); return;
+        }
+
+        const balance = Number(String(balEl?.value || "").replace(/[^0-9.]/g, "")) || 0;
+        const minPmt  = Number(String(minEl?.value || "").replace(/[^0-9.]/g, "")) || 0;
+        const apr     = Number(String(aprEl?.value || "").replace(/[^0-9.%]/g, "")) || 0;
+
+        // Append to cfgCategories at first empty slot (or push new row)
+        const newRow = [name, "Debt", ""];
+        let placed = false;
+        for (let i = 0; i < catRows.length; i++) {
+          const cn = String((catRows[i] && catRows[i][0]) || "").trim();
+          if (!cn) { catRows[i] = newRow; placed = true; break; }
+        }
+        if (!placed) catRows.push(newRow);
+        appState.cfgCategories = normalizeFixedRows_(catRows, CategoriesState.maxRows, 3);
+        saveCategoriesToStorage_(appState.cfgCategories);
+        try { setCfgCategories_(appState.cfgCategories); } catch(_){}
+        if (typeof CategoriesState !== "undefined") {
+          CategoriesState.rows = appState.cfgCategories;
+          CategoriesState.displayCount = computeBaselineCatDisplayCount_();
+          CategoriesState.dirty = false;
+        }
+
+        // Debt item
+        appState.debtItems = appState.debtItems || {};
+        appState.debtItems[key] = { name, balance, apr, minPayment: minPmt };
+        saveDebtItemsToStorage_();
+
+        // Persist to KV (await so any subsequent tab-load KV read gets the new state)
+        const debtItemsForKV = Object.values(appState.debtItems).map(d => ({
+          name: d.name, balance: Number(d.balance)||0, apr: Number(d.apr)||0, min: Number(d.minPayment)||0,
+        }));
+        await Promise.allSettled([
+          workerSet_("categories", { rows: appState.cfgCategories }),
+          workerSet_("debtItems", { items: debtItemsForKV }),
+        ]);
+
+        // Reset form
+        if (nameEl) nameEl.value = "";
+        if (balEl)  balEl.value  = "";
+        if (minEl)  minEl.value  = "";
+        if (aprEl)  aprEl.value  = "";
+        document.getElementById("debtAddForm").style.display = "none";
+        document.getElementById("debtAddBtn").style.display  = "block";
+
+        // Refresh renders
+        try { renderCategories_(); } catch(_){}
+        try { if (typeof renderDebtLocal_ === "function") renderDebtLocal_(); } catch(_){}
+        try { renderEngineBillsSplitTable_(); } catch(_){}
+      }
+
+      // v425l: mark any bill with paidByKey >= monthlyTarget as manualFunded.
+      // Runs after postDeposit_ so bills that just filled visually check
+      // themselves and behave as done. Idempotent — only sets true, doesn't
+      // touch already-flagged bills. Re-renders the tables so the UI reflects
+      // the new state without a manual reload.
+      function autoFlipFullyFundedBills_() {
+        try {
+          const paidState = loadPaidState_();
+          const paidByKey = paidState.paidByKey || {};
+          const mf = loadManualFunded_();
+          const cats = getCfgCategoryRows_();
+          let changed = false;
+          for (const c of cats) {
+            const key = c.key;
+            if (!key || mf[key]) continue;
+            const target = Number(appState.billsSplit?.[key]?.monthlyTarget || 0) || 0;
+            if (!(target > 0)) continue;
+            const paid = Number(paidByKey[key] || 0) || 0;
+            if (paid + 0.005 >= target) {
+              mf[key] = true;
+              changed = true;
+            }
+          }
+          if (changed) {
+            saveManualFunded_(mf);
+            try { renderEngineBillsSplitTable_(); } catch(_){}
+            try { renderDashboardAppTables_(); } catch(_){}
+            try { renderAppSummaryTable_(); } catch(_){}
+          }
+        } catch(_){}
+      }
+
+      // ============================================================
+      // v424: Demo Mode + Onboarding rework (phase 1)
+      // ------------------------------------------------------------
+      // First-time users land in a demo-populated app instead of an
+      // empty setup wall. On first boot (or on any fresh device when
+      // KV says demoMode=true), seedDemoData_() stamps a canonical set
+      // of bills, debts, deposits, and paid state so the UI has real
+      // shapes to interact with. An amber banner across Home advertises
+      // that this is example data. Clicking "Make it mine" (wired in
+      // v425) opens a 2-question modal that replaces the demo state
+      // with the user's actual answers.
+      //
+      // demoMode is the 11th synced KV key. demoSeed tracks which item
+      // keys were seeded, so the v425 wipe/merge choice can distinguish
+      // "delete demo items" from "delete everything." Both keys clear
+      // on Master Reset and on Make-it-mine submit.
+      // ============================================================
+      const DEMO_MODE_LS_KEY = "BUDGETER_DEMO_MODE_V1";
+      const DEMO_SEED_LS_KEY = "BUDGETER_DEMO_SEED_V1";
+      // Fixed demo month — used as the label on the funding meter AND as the
+      // month/year on all seeded deposit timestamps so the two agree.
+      const DEMO_MONTH_LABEL = "OCTOBER 2025 · DEMO";
+      const DEMO_MONTH_YEAR  = 2025;
+      const DEMO_MONTH_MONTH = 9; // 0-indexed → October
+
+      function loadDemoMode_() {
+        try { return localStorage.getItem(DEMO_MODE_LS_KEY) === "true"; }
+        catch(_) { return false; }
+      }
+      function saveDemoMode_(on) {
+        try { localStorage.setItem(DEMO_MODE_LS_KEY, on ? "true" : "false"); } catch(_){}
+        workerSet_("demoMode", { on: !!on }).catch(()=>{});
+      }
+      function loadDemoSeed_() {
+        try {
+          const raw = localStorage.getItem(DEMO_SEED_LS_KEY);
+          return raw ? JSON.parse(raw) : null;
+        } catch(_) { return null; }
+      }
+      function saveDemoSeed_(seed) {
+        try {
+          if (!seed) localStorage.removeItem(DEMO_SEED_LS_KEY);
+          else localStorage.setItem(DEMO_SEED_LS_KEY, JSON.stringify(seed));
+        } catch(_){}
+        workerSet_("demoSeed", seed || null).catch(()=>{});
+      }
+
+      // Returns true when the user has no categories AND no debts.
+      // v425c: intentionally does NOT check billsSplit or depositHistory —
+      // those can be orphaned leftovers from abandoned test accounts, and
+      // without categories the app has no functional state to preserve
+      // anyway. Categories are what the user actually interacts with; if
+      // they have none, treat the account as empty regardless of leftover
+      // KV state (which seedDemoData_ will overwrite cleanly).
+      function isEmptyUserAccount_() {
+        try {
+          const cats = Array.isArray(appState.cfgCategories) ? appState.cfgCategories : [];
+          const anyCat = cats.some(r => String((r && r[0]) || "").trim().length > 0);
+          if (anyCat) return false;
+          const debts = appState.debtItems || {};
+          if (Object.keys(debts).length > 0) return false;
+          return true;
+        } catch(_) { return false; }
+      }
+
+      // Idempotent: stamps a canonical demo dataset into localStorage AND
+      // KV. AWAITS the KV writes so no subsequent tab-switch KV read can
+      // pull stale/empty data and wipe our seed. Safe to call more than
+      // once — always overwrites with the same fixed data.
+      // v425d: fixed KV payload shapes for debtItems and billsSplit —
+      // previous writes were malformed, so loadDebtItemsServer_ /
+      // loadBillsSplitTargetsServer_ parsed them as empty and wiped state.
+      async function seedDemoData_() {
+        const mk = monthKeyLocal_();
+
+        // Categories: 5 Bills + 2 Debt rows. cfgCategories shape is [name, targetAccount, cfgDescriptor].
+        const demoCategoryRows = [
+          ["Rent",          "Bills", "Bills"],
+          ["Phone",         "Bills", "Bills"],
+          ["Internet",      "Bills", "Bills"],
+          ["Car insurance", "Bills", "Bills"],
+          ["Streaming",     "Bills", "Bills"],
+          ["Credit card",   "Debt",  ""],
+          ["Auto loan",     "Debt",  ""],
+        ];
+        appState.cfgCategories = normalizeFixedRows_(demoCategoryRows, CategoriesState.maxRows, 3);
+        saveCategoriesToStorage_(appState.cfgCategories);
+        try { setCfgCategories_(appState.cfgCategories); } catch(_){}
+        try {
+          if (typeof CategoriesState !== "undefined") {
+            CategoriesState.rows = appState.cfgCategories;
+            CategoriesState.displayCount = computeBaselineCatDisplayCount_();
+            CategoriesState.dirty = false;
+            try { renderCategories_(); } catch(_){}
+          }
+        } catch(_){}
+
+        // billsSplit KV shape per loadBillsSplitTargetsServer_ (index.html:2178-2184):
+        // `{ rows: [ [key, monthlyTarget], ... ] }` — 2D tuple array, NOT array of objects.
+        appState.billsSplit = {
+          "rent":          { monthlyTarget: "1400" },
+          "phone":         { monthlyTarget: "65" },
+          "internet":      { monthlyTarget: "80" },
+          "car insurance": { monthlyTarget: "180" },
+          "streaming":     { monthlyTarget: "22" },
+        };
+        saveBillsSplitToStorage_();
+
+        // debtItems KV shape per loadDebtItemsServer_ (index.html:2130-2143):
+        // `{ items: [ {name, balance, apr, min}, ... ] }` — array of objects with
+        // `min` (NOT minPayment). The local map format uses `minPayment`.
+        appState.debtItems = {
+          "credit card": { name: "Credit card", balance: 2400, apr: 22,  minPayment: 75 },
+          "auto loan":   { name: "Auto loan",   balance: 8200, apr: 6,   minPayment: 260 },
+        };
+        saveDebtItemsToStorage_();
+
+        // Deposit history — 4 deposits at days [3, 7, 21, 27] of the FIXED
+        // demo month (DEMO_MONTH_YEAR / DEMO_MONTH_MONTH — October 2025). The
+        // wrapper still needs monthKey === monthKeyLocal_() because that's
+        // what loadDepositHistory_'s filter compares (its concept of "this
+        // month's activity"). The postedAt dates are display-only per entry
+        // and use the demo month so the deposit history reads "Oct 3, Oct 7,
+        // …" matching the "OCTOBER 2025 · DEMO" funding meter header.
+        const mkDate = (day) => new Date(DEMO_MONTH_YEAR, DEMO_MONTH_MONTH, day, 12, 0, 0).toISOString();
+        const demoHist = {
+          monthKey: mk,
+          entries: [
+            { postedAt: mkDate(3),  deposit: 850,  breakdown: { Bills: 722.50, Debt: 85.00, Savings: 21.25, Spending: 21.25 } },
+            { postedAt: mkDate(7),  deposit: 1200, breakdown: { Bills: 1020.00, Debt: 120.00, Savings: 30.00, Spending: 30.00 } },
+            { postedAt: mkDate(21), deposit: 2100, breakdown: { Bills: 1785.00, Debt: 210.00, Savings: 52.50, Spending: 52.50 } },
+            { postedAt: mkDate(27), deposit: 675,  breakdown: { Bills: 573.75, Debt: 67.50, Savings: 16.88, Spending: 16.87 } },
+          ]
+        };
+        saveDepositHistory_(demoHist);
+
+        // paidState — MUST use current monthKey so normalizePaidMonth_ leaves it alone.
+        savePaidState_({
+          monthKey: mk,
+          paidByKey: {
+            "rent":          1400,
+            "phone":         65,
+            "internet":      80,
+            "car insurance": 110,
+            "streaming":     8,
+          },
+          cycleStartByBill: {},
+        });
+
+        // Debt paid MTD
+        saveDebtPaidState_({
+          monthKey: mk,
+          paidByKey: {
+            "credit card": 400,
+            "auto loan":   260,
+          },
+        });
+
+        // Accounts (v425e/f): row order matches the splitter pools 1:1 —
+        // row 1 = Bills bucket, row 2 = Debt, row 3 = Savings, row 4 = Spending.
+        // Names default to the pool labels so the mapping is obvious;
+        // real users rename each row to their actual bank account. Type
+        // defaults follow common shape (Bills/Spending → Checking, Debt/
+        // Savings → Savings) per the "About accounts" note on the tab.
+        const demoAccountRows = [
+          ["Bills",    "", "Checking", "Rent, phone, internet, insurance"],
+          ["Debt",     "", "Savings",  "Debt paydown transfer"],
+          ["Savings",  "", "Savings",  "Rainy day / long-term"],
+          ["Spending", "", "Checking", "Day-to-day spending"],
+        ];
+        if (typeof AccountsState !== "undefined") {
+          AccountsState.rows = normalizeFixedRows_(demoAccountRows, AccountsState.maxRows, AccountsState.numCols);
+          AccountsState.lockedNames = AccountsState.rows.map(r => String((r && r[0]) || "").trim());
+          AccountsState.dirty = false;
+          AccountsState.loadedOnce = true;
+          try { renderAccountsTable_(); } catch(_){}
+        }
+
+        // Splitter engine — computeEffectiveSplitterAmounts_ looks up rows by
+        // r.category. An empty account has no engineState in KV → rows are
+        // uninitialized → the deposit preview shows all zeros because
+        // billsDec/debtDec/etc. never match. Seed with the default profile
+        // (85/10/2.5/2.5) explicitly labeled so the preview works out of the
+        // box. Also resets any leftover splitterProfile: "custom" from an
+        // earlier abandoned-test-account state.
+        const demoSplitterRows = [
+          { category: "Bills",    pct: "85%"  },
+          { category: "Debt",     pct: "10%"  },
+          { category: "Savings",  pct: "2.5%" },
+          { category: "Spending", pct: "2.5%" },
+        ];
+        if (typeof EngineState !== "undefined") {
+          if (!EngineState.state) EngineState.state = {};
+          if (!EngineState.state.splitter) EngineState.state.splitter = { deposit: 0, rows: [] };
+          EngineState.state.splitter.deposit = 0;
+          EngineState.state.splitter.rows = demoSplitterRows.map(r => ({ ...r }));
+          EngineState.loadedOnce = true;
+        }
+        saveSplitterProfile_("default");
+        // v425 fix: DON'T save an empty customPcts array here — syncDepositStateFromKV_
+        // patches EngineState.state.splitter.rows[k].pct from customPcts on every load,
+        // and an empty string zeroes out the pct → deposit preview shows $0 on cross-
+        // device sync (e.g. mobile). Just clear the KV key entirely; on read,
+        // loadSplitterCustomPcts_ falls back to the default profile.
+        try {
+          localStorage.removeItem(LS_KEY_SPLITTER_CUSTOM_PCTS);
+          workerSet_("splitterCustomPcts", null).catch(()=>{});
+        } catch(_){}
+
+        // Clear any lingering non-demo state
+        savePostSnapshot_(null);
+        savePostGuard_(null);
+        saveManualFunded_({});
+        saveNextMonthPaid_({});
+        try { saveFFAskedSet_(new Set()); } catch(_){}
+        try { saveSkipRedistribution_(null); } catch(_){}
+
+        // Track what was seeded (v425 wipe/merge uses this)
+        saveDemoSeed_({
+          seededAt: new Date().toISOString(),
+          categoryKeys: ["rent","phone","internet","car insurance","streaming","credit card","auto loan"],
+          debtKeys:     ["credit card","auto loan"],
+          accountNames: demoAccountRows.map(r => r[0]),
+          depositTimestamps: demoHist.entries.map(e => e.postedAt),
+        });
+        saveDemoMode_(true);
+
+        // AWAIT all KV writes in parallel so any subsequent tab-load KV read
+        // sees the demo data instead of an empty/stale payload.
+        await Promise.allSettled([
+          workerSet_("categories", { rows: appState.cfgCategories }),
+          workerSet_("billsSplit", { rows: [
+            ["rent", 1400], ["phone", 65], ["internet", 80],
+            ["car insurance", 180], ["streaming", 22],
+          ]}),
+          workerSet_("debtItems", { items: [
+            { name: "Credit card", balance: 2400, apr: 22, min: 75 },
+            { name: "Auto loan",   balance: 8200, apr: 6,  min: 260 },
+          ]}),
+          workerSet_("depositHistory", demoHist),
+          workerSet_("accounts", { rows: (typeof AccountsState !== "undefined") ? AccountsState.rows : demoAccountRows }),
+          workerSet_("engineState", (typeof EngineState !== "undefined" && EngineState.state) ? EngineState.state : { splitter: { deposit: 0, rows: demoSplitterRows } }),
+        ]);
+
+        // Force a fresh render across the tabs affected by the seed so the
+        // user doesn't need to click around to see the state populate.
+        try { renderEngineBillsSplitTable_(); } catch(_){}
+        try { if (typeof renderDebtLocal_ === "function") renderDebtLocal_(); } catch(_){}
+        try { renderDashboardAppTables_(); } catch(_){}
+        try { renderAppSummaryTable_(); } catch(_){}
+        try { if (typeof renderAccountsTable_ === "function") renderAccountsTable_(); } catch(_){}
+      }
+
+      // ============================================================
+      // v425: Make it mine — real 2-question setup form
+      // ------------------------------------------------------------
+      // Opens with 4 pre-filled starter bills. User can edit/delete/add,
+      // add debts optionally, choose whether to seed starter spending
+      // categories, and whether to keep any items they added during demo
+      // playtime. On submit, writes the user's answers as their real
+      // starting state, clears demoMode + demoSeed, and refreshes the UI.
+      // ============================================================
+      const MIM_STARTER_BILLS = [
+        { name: "Rent",         target: "" },
+        { name: "Phone",        target: "" },
+        { name: "Internet",     target: "" },
+        { name: "Insurance",    target: "" },
+      ];
+      const MIM_STARTER_SPENDING_CATS = ["Groceries", "Gas", "Restaurants", "Fun"];
+
+      function mimAddBillRow_(name = "", target = "") {
+        const container = document.getElementById("mimBillsRows");
+        if (!container) return;
+        const row = document.createElement("div");
+        row.className = "mim-bill-row";
+        row.style.cssText = "display:flex;gap:6px;align-items:center;";
+        // Compact reorder controls stacked vertically to save width. Up = move
+        // toward top of list (higher priority in v425k allocator).
+        row.innerHTML = `
+          <div style="display:flex;flex-direction:column;flex-shrink:0;">
+            <button type="button" class="mim-up" title="Move up (higher priority)" style="background:transparent;border:none;color:var(--muted);cursor:pointer;font-size:.8em;line-height:1;padding:1px 4px;">▲</button>
+            <button type="button" class="mim-down" title="Move down (lower priority)" style="background:transparent;border:none;color:var(--muted);cursor:pointer;font-size:.8em;line-height:1;padding:1px 4px;">▼</button>
+          </div>
+          <input type="text" class="mim-bill-name" placeholder="Bill name (Rent)" value="${escapeHtml_(name)}" style="flex:2;min-width:0;padding:9px 10px;background:var(--card);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:.9em;">
+          <div style="display:flex;align-items:center;flex:1;min-width:0;background:var(--card);border:1px solid var(--border);border-radius:8px;padding:0 8px;">
+            <span style="color:var(--muted);font-size:.9em;">$</span>
+            <input type="text" class="mim-bill-target" inputmode="decimal" placeholder="0" value="${escapeHtml_(String(target))}" style="flex:1;min-width:0;padding:9px 6px;background:transparent;border:none;color:var(--text);font-size:.9em;outline:none;">
+          </div>
+          <button type="button" class="mim-remove" title="Remove" style="flex-shrink:0;background:transparent;border:none;color:var(--muted);cursor:pointer;font-size:1.2em;padding:4px 8px;">×</button>
+        `;
+        row.querySelector(".mim-remove").addEventListener("click", () => row.remove());
+        row.querySelector(".mim-up").addEventListener("click", () => {
+          const prev = row.previousElementSibling;
+          if (prev) container.insertBefore(row, prev);
+        });
+        row.querySelector(".mim-down").addEventListener("click", () => {
+          const next = row.nextElementSibling;
+          if (next) container.insertBefore(next, row);
+        });
+        container.appendChild(row);
+      }
+
+      function mimAddDebtRow_(name = "", balance = "", minPmt = "", apr = "") {
+        const container = document.getElementById("mimDebtRows");
+        if (!container) return;
+        const row = document.createElement("div");
+        row.className = "mim-debt-row";
+        row.style.cssText = "display:grid;grid-template-columns:2fr 1.2fr 1fr 1fr auto;gap:6px;align-items:center;";
+        row.innerHTML = `
+          <input type="text" class="mim-debt-name" placeholder="Card / loan name" value="${escapeHtml_(name)}" style="min-width:0;padding:9px 10px;background:var(--card);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:.85em;">
+          <input type="text" class="mim-debt-balance" inputmode="decimal" placeholder="$ balance" value="${escapeHtml_(String(balance))}" style="min-width:0;padding:9px 8px;background:var(--card);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:.85em;">
+          <input type="text" class="mim-debt-min" inputmode="decimal" placeholder="$ min pmt" value="${escapeHtml_(String(minPmt))}" style="min-width:0;padding:9px 8px;background:var(--card);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:.85em;">
+          <input type="text" class="mim-debt-apr" inputmode="decimal" placeholder="APR %" value="${escapeHtml_(String(apr))}" style="min-width:0;padding:9px 8px;background:var(--card);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:.85em;">
+          <button type="button" class="mim-remove" title="Remove" style="flex-shrink:0;background:transparent;border:none;color:var(--muted);cursor:pointer;font-size:1.2em;padding:4px 8px;">×</button>
+        `;
+        row.querySelector(".mim-remove").addEventListener("click", () => row.remove());
+        container.appendChild(row);
+      }
+
+      function openMakeItMineModal_() {
+        const modal = document.getElementById("makeItMineModal");
+        if (!modal) return;
+        document.getElementById("mimBillsRows").innerHTML = "";
+        document.getElementById("mimDebtRows").innerHTML = "";
+        document.getElementById("mimError").style.display = "none";
+        document.getElementById("mimError").textContent = "";
+        MIM_STARTER_BILLS.forEach(b => mimAddBillRow_(b.name, b.target));
+        document.getElementById("mimStarterCatsChk").checked = true;
+        document.getElementById("mimKeepUserAddedChk").checked = false;
+        modal.style.display = "flex";
+      }
+
+      function closeMakeItMineModal_() {
+        const modal = document.getElementById("makeItMineModal");
+        if (modal) modal.style.display = "none";
+      }
+
+      async function submitMakeItMine_() {
+        const submitBtn = document.getElementById("mimSubmitBtn");
+        const errEl = document.getElementById("mimError");
+        const showErr = (msg) => { errEl.textContent = msg; errEl.style.display = "block"; };
+        errEl.style.display = "none";
+
+        // Collect + validate bills
+        const billRows = Array.from(document.querySelectorAll(".mim-bill-row")).map(r => ({
+          name: r.querySelector(".mim-bill-name").value.trim(),
+          target: Number(r.querySelector(".mim-bill-target").value.replace(/[^0-9.]/g, "")) || 0,
+        })).filter(b => b.name.length > 0);
+        if (!billRows.length) { showErr("Add at least one bill so Allot knows how to split your money."); return; }
+        for (const b of billRows) {
+          if (!(b.target > 0)) { showErr(`"${b.name}" needs a monthly target above $0.`); return; }
+        }
+
+        // Collect debts (optional; skip rows without a name)
+        const debtRows = Array.from(document.querySelectorAll(".mim-debt-row")).map(r => ({
+          name: r.querySelector(".mim-debt-name").value.trim(),
+          balance: Number(r.querySelector(".mim-debt-balance").value.replace(/[^0-9.]/g, "")) || 0,
+          minPmt: Number(r.querySelector(".mim-debt-min").value.replace(/[^0-9.]/g, "")) || 0,
+          apr: Number(r.querySelector(".mim-debt-apr").value.replace(/[^0-9.%]/g, "")) || 0,
+        })).filter(d => d.name.length > 0);
+
+        const includeStarterCats = document.getElementById("mimStarterCatsChk").checked;
+        const keepUserAdded = document.getElementById("mimKeepUserAddedChk").checked;
+
+        submitBtn.disabled = true;
+        submitBtn.textContent = "Saving…";
+        try {
+          const demoSeed = loadDemoSeed_() || { categoryKeys: [], debtKeys: [] };
+          const demoCatKeys = new Set((demoSeed.categoryKeys || []).map(k => String(k).toLowerCase()));
+          const demoDebtKeys = new Set((demoSeed.debtKeys || []).map(k => String(k).toLowerCase()));
+
+          // Build the new category rows
+          // Rule: user-added items during demo were anything with a key NOT in demoSeed.
+          // With keepUserAdded=false, we take ONLY the user's Q1/Q2 answers.
+          // With keepUserAdded=true, we merge: preserve non-demo cfgCategories, then
+          // add the user's answers (dedup by lowercased name), then add starter cats.
+          const existingCats = Array.isArray(appState.cfgCategories) ? appState.cfgCategories : [];
+          const preservedRows = keepUserAdded
+            ? existingCats.filter(r => {
+                const k = String((r && r[0]) || "").trim().toLowerCase();
+                return k && !demoCatKeys.has(k);
+              })
+            : [];
+          const preservedKeys = new Set(preservedRows.map(r => String(r[0]).trim().toLowerCase()));
+
+          const newCatRows = [...preservedRows];
+          // Add user's bills (skip if already preserved to avoid duplicates)
+          for (const b of billRows) {
+            const k = b.name.toLowerCase();
+            if (preservedKeys.has(k)) continue;
+            newCatRows.push([b.name, "Bills", "Bills"]);
+            preservedKeys.add(k);
+          }
+          // Add user's debts (skip duplicates)
+          for (const d of debtRows) {
+            const k = d.name.toLowerCase();
+            if (preservedKeys.has(k)) continue;
+            newCatRows.push([d.name, "Debt", ""]);
+            preservedKeys.add(k);
+          }
+          // Starter spending cats (opt-in, skip duplicates)
+          if (includeStarterCats) {
+            for (const name of MIM_STARTER_SPENDING_CATS) {
+              const k = name.toLowerCase();
+              if (preservedKeys.has(k)) continue;
+              newCatRows.push([name, "Spending", ""]);
+              preservedKeys.add(k);
+            }
+          }
+
+          appState.cfgCategories = normalizeFixedRows_(newCatRows, CategoriesState.maxRows, 3);
+          saveCategoriesToStorage_(appState.cfgCategories);
+          try { setCfgCategories_(appState.cfgCategories); } catch(_){}
+          if (typeof CategoriesState !== "undefined") {
+            CategoriesState.rows = appState.cfgCategories;
+            CategoriesState.displayCount = computeBaselineCatDisplayCount_();
+            CategoriesState.dirty = false;
+          }
+
+          // billsSplit: user's Q1 targets. Preserve user-added Bills targets if merging.
+          const newBillsSplit = {};
+          if (keepUserAdded) {
+            const existingBs = appState.billsSplit || {};
+            for (const [k, v] of Object.entries(existingBs)) {
+              if (!demoCatKeys.has(k)) newBillsSplit[k] = { ...v };
+            }
+          }
+          for (const b of billRows) {
+            newBillsSplit[b.name.toLowerCase()] = { monthlyTarget: String(b.target) };
+          }
+          appState.billsSplit = newBillsSplit;
+          saveBillsSplitToStorage_();
+
+          // debtItems: user's Q2 debts. Preserve user-added if merging.
+          const newDebts = {};
+          if (keepUserAdded) {
+            const existingDebts = appState.debtItems || {};
+            for (const [k, v] of Object.entries(existingDebts)) {
+              if (!demoDebtKeys.has(k)) newDebts[k] = { ...v };
+            }
+          }
+          for (const d of debtRows) {
+            newDebts[d.name.toLowerCase()] = { name: d.name, balance: d.balance, apr: d.apr, minPayment: d.minPmt };
+          }
+          appState.debtItems = newDebts;
+          saveDebtItemsToStorage_();
+
+          // Wipe demo-scoped runtime state so the user starts clean
+          savePaidState_({ monthKey: monthKeyLocal_(), paidByKey: {}, cycleStartByBill: {} });
+          saveDebtPaidState_({ monthKey: monthKeyLocal_(), paidByKey: {} });
+          saveManualFunded_({});
+          saveNextMonthPaid_({});
+          savePostSnapshot_(null);
+          savePostGuard_(null);
+          try { saveFFAskedSet_(new Set()); } catch(_){}
+          try { saveSkipRedistribution_(null); } catch(_){}
+          saveDepositHistory_({ monthKey: monthKeyLocal_(), entries: [] });
+
+          // Clear demo flags
+          saveDemoMode_(false);
+          saveDemoSeed_(null);
+
+          // Await KV writes so subsequent renders/loads see the new state
+          const debtItemsForKV = Object.values(newDebts).map(d => ({
+            name: d.name, balance: Number(d.balance)||0, apr: Number(d.apr)||0, min: Number(d.minPayment)||0,
+          }));
+          const billsSplitForKV = Object.entries(newBillsSplit).map(([k, v]) => [k, Number(v.monthlyTarget)||0]);
+          await Promise.allSettled([
+            workerSet_("categories", { rows: appState.cfgCategories }),
+            workerSet_("billsSplit", { rows: billsSplitForKV }),
+            workerSet_("debtItems", { items: debtItemsForKV }),
+            workerSet_("depositHistory", { monthKey: monthKeyLocal_(), entries: [] }),
+            workerSet_("paidState", { monthKey: monthKeyLocal_(), paidByKey: {}, cycleStartByBill: {} }),
+          ]);
+
+          // Refresh everything
+          closeMakeItMineModal_();
+          try { updateDemoBanner_(); } catch(_){}
+          try { renderCategories_(); } catch(_){}
+          try { renderEngineBillsSplitTable_(); } catch(_){}
+          try { if (typeof renderDebtLocal_ === "function") renderDebtLocal_(); } catch(_){}
+          try { renderDashboardAppTables_(); } catch(_){}
+          try { renderAppSummaryTable_(); } catch(_){}
+          setActiveTab_("dashboard");
+        } catch(e) {
+          try { console.error("[make-it-mine] submit failed:", e); } catch(_){}
+          showErr("Something went wrong. Reload and try again.");
+        } finally {
+          submitBtn.disabled = false;
+          submitBtn.textContent = "Save & make it mine";
+        }
+      }
+
+      // Show/hide the amber banner + swap month label on Home based on demoMode.
+      function updateDemoBanner_() {
+        const banner = document.getElementById("demoModeBanner");
+        if (banner) banner.style.display = loadDemoMode_() ? "" : "none";
+        // Hide the old empty-state setup prompt when demo is active — the
+        // banner has taken over that role.
+        const oldPrompt = document.getElementById("setupPromptCard");
+        if (oldPrompt && loadDemoMode_()) oldPrompt.style.display = "none";
+      }
+
       function getNextMonthLabel_() {
+        // In demo mode, the "current month" is the fixed DEMO_MONTH_* — so
+        // the next-month label needs to advance from THAT, not real Date.now(),
+        // otherwise the mirror progress bar says "August 2026" when the funding
+        // meter above it says "OCTOBER 2025 · DEMO".
+        if (loadDemoMode_()) {
+          return new Date(DEMO_MONTH_YEAR, DEMO_MONTH_MONTH + 1, 1)
+            .toLocaleString("default", { month: "long", year: "numeric" });
+        }
         const d = new Date();
         return new Date(d.getFullYear(), d.getMonth() + 1, 1)
           .toLocaleString("default", { month: "long", year: "numeric" });
@@ -4685,10 +5461,13 @@ function resetPaidMTD_(){
             const div = document.createElement("div");
             div.className = "modal-row";
             div.dataset.key = r.key;
+            const amtLabel = (Number(r.alloc || 0) > 0)
+              ? `${escapeHtml_(formatMoney_(r.alloc))} → <strong>${escapeHtml_(nextLabel)}</strong>`
+              : `Fully funded → <strong>${escapeHtml_(nextLabel)}</strong>`;
             div.innerHTML = `
               <div class="modal-cat">
                 <div>${escapeHtml_(r.name)}</div>
-                <div class="modal-amt">${escapeHtml_(formatMoney_(r.alloc))} → <strong>${escapeHtml_(nextLabel)}</strong></div>
+                <div class="modal-amt">${amtLabel}</div>
               </div>
               <div class="modal-actions">
                 <button class="btn-fund" data-action="fund" title="Fund toward ${escapeHtml_(nextLabel)}">Fund ${escapeHtml_(nextLabel)}</button>
@@ -5602,31 +6381,47 @@ function resetPaidMTD_(){
   // the same bills again, and so they're funded automatically.
   const justForwardFundedKeys = new Set();
 
-  // Ask about bills fully funded by the LAST deposit (before new post runs)
-  const _snap = loadPostSnapshot_();
-  if (_snap && _snap.allocsByKey && _snap.monthKey === monthKeyLocal_()) {
+  // Ask about bills that are fully funded but NOT yet flagged as manualFunded.
+  // Two cases feed this: (a) the bill crossed target on the LAST deposit
+  // (metThisDeposit_ against the current snapshot), or (b) the bill was
+  // already fully funded from prior activity — the case that previously
+  // caused only manualFunded bills to get a forward-fund prompt while
+  // naturally-100%-funded bills silently got $0 alloc and the Bills bucket
+  // skip-redistributed to Debt/Savings/Spending. v417 broadens the check.
+  // Bills already declined this month (loadFFAskedSet_) are suppressed so
+  // subsequent posts don't re-prompt for the same bill.
+  {
+    const _snap = loadPostSnapshot_();
+    const _snapIsThisMonth = !!(_snap && _snap.allocsByKey && _snap.monthKey === monthKeyLocal_());
     const _mf = loadManualFunded_();
     const _paidState = loadPaidState_();
     const _paidByKey = _paidState?.paidByKey || {};
+    const _asked = loadFFAskedSet_();
     const _catsRaw = getCfgCategoryRows_();
     const _metRows = [];
     for (const c of _catsRaw) {
       const k = c.key;
-      if (!k || _mf[k]) continue;
+      if (!k || _mf[k] || _asked.has(k)) continue;
       const tgt  = Number(appState.billsSplit?.[k]?.monthlyTarget || 0) || 0;
+      if (!(tgt > 0)) continue;
       const after = Number(_paidByKey[k] || 0) || 0;
-      const alloc = Number(_snap.allocsByKey[k] || 0) || 0;
-      if (metThisDeposit_(k, tgt, after, alloc)) {
-        _metRows.push({ key: k, name: c.name, alloc });
+      const alloc = _snapIsThisMonth ? (Number(_snap.allocsByKey[k] || 0) || 0) : 0;
+      const metLast = _snapIsThisMonth && metThisDeposit_(k, tgt, after, alloc);
+      const alreadyFullyFunded = (after + 0.005) >= tgt;
+      if (metLast || alreadyFullyFunded) {
+        _metRows.push({ key: k, name: c.name, alloc: metLast ? alloc : 0 });
       }
     }
     if (_metRows.length) {
       const _choices = await showMetDepositModal_(_metRows);
       const _mf2 = loadManualFunded_();
+      const _asked2 = loadFFAskedSet_();
       for (const { key: k } of _metRows) {
-        if (_choices[k] === "fund") { _mf2[k] = true; justForwardFundedKeys.add(k); }
+        if (_choices[k] === "fund") { _mf2[k] = true; justForwardFundedKeys.add(k); _asked2.delete(k); }
+        else { _asked2.add(k); }
       }
       saveManualFunded_(_mf2);
+      saveFFAskedSet_(_asked2);
       recomputeBillsAllocations_(true, { log: false });
     }
   }
@@ -5723,6 +6518,12 @@ function resetPaidMTD_(){
 
   saveNextMonthPaid_(nextMonthPaid);
   savePaidState_({ monthKey: paidState.monthKey, paidByKey: nextPaidByKey, cycleStartByBill: paidState.cycleStartByBill || {} });
+
+  // v425l QOL: auto-mark any bill that just hit 100% funded as manualFunded so
+  // the "Paid?" checkbox reflects reality and future deposits can forward-fund
+  // this bill (via the v425k pass-2 leftover flow). Skips bills whose paid amount
+  // hasn't reached target. User can still un-check to opt out.
+  autoFlipFullyFundedBills_();
 
   // v412: redistribute any skipped forward-fund allocations to Debt / Savings /
   // Spending using the USER's current splitter percentages (renormalized to
@@ -7382,7 +8183,7 @@ document.addEventListener("click", async (e) => {
 
       async function syncDepositStateFromKV_() {
         const _s = (p) => p.catch(() => ({ ok: false, state: null }));
-        const [ps, snap, guard, hist, profile, customPcts, manualFunded, nextMonthPaid, billDueDates, billsSplitRatio] = await Promise.all([
+        const [ps, snap, guard, hist, profile, customPcts, manualFunded, nextMonthPaid, billDueDates, billsSplitRatio, demoMode, demoSeed] = await Promise.all([
           _s(workerGet_("paidState")),
           _s(workerGet_("postSnapshot")),
           _s(workerGet_("postGuard")),
@@ -7393,6 +8194,8 @@ document.addEventListener("click", async (e) => {
           _s(workerGet_("nextMonthPaid")),
           _s(workerGet_("billDueDates")),
           _s(workerGet_("billsSplitRatio")),
+          _s(workerGet_("demoMode")),
+          _s(workerGet_("demoSeed")),
         ]);
         let synced = 0;
         if (ps?.ok && ps.state)     { try { localStorage.setItem(LS_KEY_BILLS_PAID,      JSON.stringify(ps.state));   synced++; } catch(_){} }
@@ -7403,11 +8206,14 @@ document.addEventListener("click", async (e) => {
         if (customPcts?.ok && customPcts.state) {
           try {
             localStorage.setItem(LS_KEY_SPLITTER_CUSTOM_PCTS, JSON.stringify(customPcts.state));
-            // Also patch in-memory EngineState rows so computeEffectiveSplitterAmounts_ picks up the new pcts
+            // Also patch in-memory EngineState rows so computeEffectiveSplitterAmounts_ picks up the new pcts.
+            // v425 fix: skip empty-string pcts — those would zero out the row and break the deposit
+            // preview. An empty entry in customPcts means "no custom value here", not "set pct to 0".
             if (EngineState?.state?.splitter?.rows && Array.isArray(EngineState.state.splitter.rows)) {
               const arr = customPcts.state;
               for (let k = 0; k < Math.min(arr.length, EngineState.state.splitter.rows.length); k++) {
-                if (EngineState.state.splitter.rows[k]) EngineState.state.splitter.rows[k].pct = arr[k];
+                const v = String(arr[k] ?? "").trim();
+                if (v && EngineState.state.splitter.rows[k]) EngineState.state.splitter.rows[k].pct = arr[k];
               }
             }
             synced++;
@@ -7417,6 +8223,18 @@ document.addEventListener("click", async (e) => {
         if (nextMonthPaid?.ok && nextMonthPaid.state) { try { localStorage.setItem(NEXT_MONTH_PAID_LS_KEY, JSON.stringify(nextMonthPaid.state)); synced++; } catch(_){} }
         if (billDueDates?.ok && billDueDates.state) { try { localStorage.setItem(LS_KEY_BILL_DUE_DATES, JSON.stringify(billDueDates.state)); synced++; } catch(_){} }
         if (billsSplitRatio?.ok && billsSplitRatio.state) { try { localStorage.setItem(LS_KEY_BILLS_SPLIT_RATIO, JSON.stringify(billsSplitRatio.state)); applyBillsSplitRatio_(); synced++; } catch(_){} }
+        // v424: demoMode is the 11th synced key. demoSeed persists the seed
+        // manifest so cross-device Make-it-mine wipes know what's demo-tagged.
+        if (demoMode?.ok && demoMode.state) {
+          try {
+            const on = !!(demoMode.state?.on ?? demoMode.state === true);
+            localStorage.setItem(DEMO_MODE_LS_KEY, on ? "true" : "false");
+            synced++;
+          } catch(_){}
+        }
+        if (demoSeed?.ok && demoSeed.state) {
+          try { localStorage.setItem(DEMO_SEED_LS_KEY, JSON.stringify(demoSeed.state)); synced++; } catch(_){}
+        }
         return synced;
       }
 
@@ -7492,6 +8310,10 @@ document.addEventListener("click", async (e) => {
       // v412: clear any skip-redistribution receipt — otherwise the banner
       // outlives the deposit that produced it.
       try { saveSkipRedistribution_(null); } catch(_) {}
+      // v417: also clear the forward-fund "asked" suppression set so the user
+      // gets a fresh chance to fund/skip on the next post.
+      try { localStorage.removeItem(FF_ASKED_LS_KEY); } catch(_) {}
+      try { saveFFAskedSet_(new Set()); } catch(_) {}
       // renderDashboardAppTables_ refreshes Home tiles AND the Allot pool tiles.
       try { renderDashboardAppTables_(); } catch(_) {}
       try { if (typeof renderBillsSplitTable_ === 'function') renderBillsSplitTable_(); } catch(_) {}
@@ -7515,7 +8337,9 @@ document.addEventListener("click", async (e) => {
       const mk = monthKeyLocal_();
       const arr = loadAllocLedger_();
       const entries = (arr || []).filter(e => e && e.monthKey === mk && Array.isArray(e.cats));
-      const latest = entries.length ? entries[entries.length - 1] : null;
+      // addAllocLedgerEntry_ uses arr.unshift, so newest is at index 0.
+      // Filtering by monthKey preserves order → newest surviving entry stays first.
+      const latest = entries.length ? entries[0] : null;
 
       if (!latest) {
         // No ledger — nothing to restore. Reuse the same modal for a
@@ -7798,6 +8622,22 @@ document.addEventListener("click", async (e) => {
     // rolled over this month, normalizePaidMonth_ sees the current monthKey and no-ops.
     _kvSyncReady = true;
     try { normalizePaidMonth_(); } catch(_){}
+    // v425l: after month rollover, retroactively flag any fully-funded bill.
+    // Covers accounts that had 100%-funded bills before the auto-flip existed.
+    try { autoFlipFullyFundedBills_(); } catch(_){}
+
+    // v424 demo mode: after KV sync, decide whether to seed. Two triggers:
+    //   1. loadDemoMode_() is true AND local state has no categories (fresh device,
+    //      demoMode synced in from KV but this device never saw the seed data).
+    //   2. loadDemoMode_() is false AND isEmptyUserAccount_() is true (first-time
+    //      user, never signed in before — auto-enroll them in demo mode).
+    // In either case, seedDemoData_() writes canonical data + flips demoMode true.
+    try {
+      const demoOn = loadDemoMode_();
+      const empty = isEmptyUserAccount_();
+      if (empty) await seedDemoData_();
+    } catch(e) { try { console.warn("[demo] seed check failed:", e); } catch(_){} }
+    try { updateDemoBanner_(); } catch(_){}
 
     // 3. Re-render with fresh server data (including synced deposit state)
     renderEngineBillsSplitTable_();
@@ -7830,35 +8670,29 @@ document.addEventListener("click", async (e) => {
 })();
 
     // ── Onboarding Slideshow ─────────────────────────────────
-    const OB_TOTAL = 19;
-    let _obIdx = 0;
-
+    // v426: linear spotlight tour on top of seedDemoData_'s populated demo
+    // state. Copy is intentionally data-agnostic — no "your bills"/"sample
+    // bills" split — so returning users (LS_KEY bumped V5→V6) get the same
+    // tour on their real data. Slides removed; the demo banner + amber
+    // "DEMO MONTH" label give context that used to require intro slides.
     const TOUR_STEPS = [
-      { type: 'slide', slideIdx: 0 },
-      { type: 'slide', slideIdx: 1 },
-      { type: 'slide', slideIdx: 2 },
-      { type: 'slide', slideIdx: 3 },
-      { type: 'slide', slideIdx: 4 },
-      { type: 'slide', slideIdx: 5 },
-      // ── Home tab ──────────────────────────────────────────────
-      { type: 'spotlight', tab: 'dashboard', tabLabel: '🏠 Home',     target: '#dashDepositCard',  title: '📥 Post a Deposit',      body: 'Enter your paycheck here and tap Post Deposit. Allot instantly splits it across all 4 pools — Bills, Debt, Savings, and Spending.' },
-      { type: 'spotlight', tab: 'dashboard', tabLabel: '🏠 Home',     target: '#dashProfileCard',  title: '⚖️ The Split Profile',   body: 'Choose how your deposit gets divided. Pick Default, Conservative, Survival — or go Custom to set your own percentages. You can change this anytime.' },
-      { type: 'spotlight', tab: 'dashboard', tabLabel: '🏠 Home',     target: '#dashAccountTiles', title: '🏦 Your 4 Pools',        body: 'These tiles show how your last deposit was calculated — the dollar amount and percentage for each pool. Allot is the calculator. Use these numbers to physically move your money where it belongs.' },
-      // ── Allot tab ─────────────────────────────────────────────
-      { type: 'spotlight', tab: 'budgeter',  tabLabel: '⚖️ Allot',   target: '#editCatSection',   title: '⚠️ Set This Up First',   body: 'This table is where you tell Allot what you pay for every month. Your bills, living expenses, debt — all of it goes here. Nothing else in the app works until this is filled in.', scrollBlock: 'start', openDetails: '#editCatSection' },
-      { type: 'spotlight', tab: 'budgeter',  tabLabel: '⚖️ Allot',   target: '#catFirstRow',      title: '📝 How to Fill It In',   body: 'Each row is one expense. Name — what the bill is. Target Account — which of your 4 pools pays it (Bills, Debt, Savings, or Spending). Type — Bills for fixed monthly bills, Living Expenses for flexible spending like groceries or gas.', openDetails: '#editCatSection' },
-      { type: 'spotlight', tab: 'budgeter',  tabLabel: '⚖️ Allot',   target: '#engBillsTable',    title: '📋 Your Bills',          body: 'Bills are funded top-to-bottom in priority order. Put your most critical expenses at the top so they always get covered first.' },
-      { type: 'spotlight', tab: 'budgeter',  tabLabel: '⚖️ Allot',   target: '#engBillsEditBar',  title: '✏️ Edit Mode',           body: 'Tap Edit to rename a category, change its type (Bills / Living / Debt), reorder priority, or add and delete categories. Target $ and Paid? lock while you edit so you don\'t change them by accident. Save commits your changes; Cancel discards them.' },
-      { type: 'spotlight', tab: 'budgeter',  tabLabel: '⚖️ Allot',   target: '#engBillsTable',    title: '✅ The Paid Checkbox',    body: 'Already paid a bill this month? Check the box. Allot will skip it for this deposit and fund it toward next month instead — so you\'re never double-counting.' },
-      // ── Debt tab ──────────────────────────────────────────────
-      { type: 'spotlight', tab: 'debt',      tabLabel: '📉 Debt',     target: '#debtTable',        title: '📝 Add Your Debts',      body: 'Enter each debt here — name, current balance, APR, and minimum payment. Allot uses these to calculate exactly how to split your debt pool each deposit.' },
-      { type: 'spotlight', tab: 'debt',      tabLabel: '📉 Debt',     target: '#debtKpis',         title: '📉 How the Math Works',  body: 'Total Minimums are covered first. Coverage Gap shows how much your debt pool is short. Any Extra Available after minimums gets targeted at your highest-cost balances hardest.' },
-      // ── Accounts tab ──────────────────────────────────────────
-      { type: 'spotlight', tab: 'accounts',  tabLabel: '🏛️ Accounts', target: '#acctTable',        title: '🏷️ Name Your Accounts',  body: 'Rename each of the 4 pools to match your real bank accounts and set the account type. This makes it easy to know exactly where each pool\'s money should physically go.' },
-      // ── Header buttons ────────────────────────────────────────
-      { type: 'spotlight', tab: 'dashboard', tabLabel: '🏠 Home',     target: '#headerLeftBtns',   title: '💡 Two Handy Buttons',    body: 'The 🚩 flag sends us feedback anytime. The ? replays this tour whenever you want a refresher.' },
-      { type: 'slide', slideIdx: 6 },
+      { tab: 'dashboard', tabLabel: '🏠 Home',   target: '#dashDepositCard',  title: '📥 Post a Deposit',
+        body: 'Enter a paycheck amount here and tap Post Deposit. Allot instantly splits it across your 4 pools. Try it — nothing here is locked in.' },
+      { tab: 'dashboard', tabLabel: '🏠 Home',   target: '#dashAccountTiles', title: '🏦 Your 4 Pools',
+        body: 'Bills, Debt, Savings, Spending. Each tile shows what the last deposit routed to that pool — dollar amount and percentage. Move that much from your paycheck into the matching real bank account and you\'re done.' },
+      { tab: 'dashboard', tabLabel: '🏠 Home',   target: '#dashProfileCard',  title: '⚖️ The Split Profile',
+        body: 'This controls how every deposit gets divided. Leave it on Default while you\'re learning — you can switch to Conservative, Survival, or Custom anytime later.' },
+      { tab: 'budgeter',  tabLabel: '⚖️ Allot',  target: '#engBillsTable',    title: '📋 Your Bills',
+        body: 'Bills fund top-down. The bill at the top gets covered first out of every deposit\'s Bills pool. Put your most critical expenses on top so rent lands before Netflix.' },
+      { tab: 'budgeter',  tabLabel: '⚖️ Allot',  target: '#engBillsTable',    title: '✅ The Paid Checkbox',
+        body: 'Already paid a bill this month? Check its box. Allot skips it for this deposit and starts pre-funding it toward next month instead — so nothing gets double-counted.' },
+      { tab: 'debt',      tabLabel: '📉 Debt',    target: '#debtKpis',         title: '📉 How Debt Splits Work',
+        body: 'Minimums cover first — every debt gets its minimum before extras move. Whatever\'s left is weighted toward high-APR balances hardest, so payoff happens without the guesswork.' },
+      { tab: 'dashboard', tabLabel: '🏠 Home',   target: '#headerLeftBtns',   title: '💡 Two Handy Buttons',
+        body: 'The 🚩 sends feedback anytime. The ? replays this tour. When you\'re ready to swap sample data for your real numbers, tap Make it mine at the top of Home.' },
     ];
+    const OB_TOTAL = TOUR_STEPS.length;
+    let _obIdx = 0;
 
     function obShow_() {
       _obIdx = 0;
@@ -7919,38 +8753,25 @@ document.addEventListener("click", async (e) => {
       const spotlight = document.getElementById("tourSpotlight");
       const callout = document.getElementById("tourCallout");
 
-      if (step.type === 'slide') {
-        spotlight.style.display = "none";
-        callout.style.display = "none";
-        overlay.classList.add("open");
-        document.querySelectorAll(".ob-slide").forEach((s, i) => s.classList.toggle("active", i === step.slideIdx));
-        document.querySelectorAll(".ob-dot").forEach((d, i) => d.classList.toggle("active", i === step.slideIdx));
-        document.getElementById("obBack").disabled = _obIdx === 0;
-        document.getElementById("obNext").textContent = _obIdx === OB_TOTAL - 1 ? "Get Started →" : "Next →";
-        document.querySelectorAll(".ob-detail").forEach(d => { d.style.display = "none"; });
-        document.querySelectorAll(".ob-toggle").forEach(t => { t.textContent = "Learn more ↓"; });
-      } else {
-        overlay.classList.remove("open");
-        spotlight.style.display = "none";
-        callout.style.display = "none";
-        const tabBtn = document.getElementById("tabBtn-" + step.tab);
-        if (tabBtn) tabBtn.click();
-        // Detect tab change from previous spotlight step
-        const prevStep = _obIdx > 0 ? TOUR_STEPS[_obIdx - 1] : null;
-        const tabChanged = !prevStep || prevStep.type !== 'spotlight' || prevStep.tab !== step.tab;
-        const delay = tabChanged ? 1500 : 150;
-        if (tabChanged && step.tabLabel) _obShowTabAnnounce(step.tabLabel);
-        setTimeout(() => {
-          if (step.openDetails) {
-            const det = document.querySelector(step.openDetails);
-            if (det && !det.open) det.open = true;
-          }
-          const target = document.querySelector(step.target);
-          if (!target) return;
-          target.scrollIntoView({ behavior: "smooth", block: step.scrollBlock || "center" });
-          setTimeout(() => _obPositionSpotlight(target, step), 350);
-        }, delay);
-      }
+      overlay.classList.remove("open");
+      spotlight.style.display = "none";
+      callout.style.display = "none";
+      const tabBtn = document.getElementById("tabBtn-" + step.tab);
+      if (tabBtn) tabBtn.click();
+      const prevStep = _obIdx > 0 ? TOUR_STEPS[_obIdx - 1] : null;
+      const tabChanged = !prevStep || prevStep.tab !== step.tab;
+      const delay = tabChanged ? 1500 : 150;
+      if (tabChanged && step.tabLabel) _obShowTabAnnounce(step.tabLabel);
+      setTimeout(() => {
+        if (step.openDetails) {
+          const det = document.querySelector(step.openDetails);
+          if (det && !det.open) det.open = true;
+        }
+        const target = document.querySelector(step.target);
+        if (!target) return;
+        target.scrollIntoView({ behavior: "smooth", block: step.scrollBlock || "center" });
+        setTimeout(() => _obPositionSpotlight(target, step), 350);
+      }, delay);
     }
 
     function _obShowTabAnnounce(label) {
@@ -7979,7 +8800,7 @@ document.addEventListener("click", async (e) => {
       document.getElementById("tourCalloutTitle").textContent = step.title;
       document.getElementById("tourCalloutBody").textContent  = step.body;
       document.getElementById("tourCalloutStep").textContent  = (_obIdx + 1) + " / " + OB_TOTAL;
-      document.getElementById("tourNext").textContent = _obIdx === OB_TOTAL - 1 ? "Get Started →" : "Next →";
+      document.getElementById("tourNext").textContent = _obIdx === OB_TOTAL - 1 ? "Done ✓" : "Next →";
       document.getElementById("tourBack").disabled = _obIdx === 0;
       callout.style.display = "block";
       const cRect = callout.getBoundingClientRect();
@@ -7995,7 +8816,7 @@ document.addEventListener("click", async (e) => {
     }
 
     function obNext_() {
-      if (_obIdx === OB_TOTAL - 1) { obGoSetup_(); return; }
+      if (_obIdx === OB_TOTAL - 1) { obFinish_(); return; }
       _obIdx++;
       obRender_();
     }
@@ -8004,15 +8825,6 @@ document.addEventListener("click", async (e) => {
       if (_obIdx === 0) return;
       _obIdx--;
       obRender_();
-    }
-
-    function obDot_(n) { _obIdx = n; obRender_(); }
-
-    function obToggle_(btn) {
-      const detail = btn.previousElementSibling;
-      const open = detail.style.display === "block";
-      detail.style.display = open ? "none" : "block";
-      btn.textContent = open ? "Learn more ↓" : "Show less ↑";
     }
 
     // ── Auth ─────────────────────────────────────────────────
@@ -8154,6 +8966,133 @@ document.addEventListener("click", async (e) => {
       }
     }
 
+    // ── v425 Password reset flow ──────────────────────────────
+    // The auth screen has a "Forgot password?" link that opens forgotModal.
+    // On submit we POST /forgotPassword — worker fires a Discord ping to
+    // Bryan with a reset URL. Bryan DMs the URL to the user. The URL is
+    // https://myallot.money/?resetToken=XXXX; when the page loads with that
+    // param, resetPwModal auto-opens for the user to set a new password.
+    async function submitForgotPassword_() {
+      const btn = document.getElementById('forgotSubmitBtn');
+      const status = document.getElementById('forgotStatus');
+      const username = (document.getElementById('forgotUsername').value || '').trim().toLowerCase();
+      if (!username || username.length < 3) { status.textContent = 'Enter your username.'; status.style.color = '#f87171'; return; }
+      btn.disabled = true;
+      status.style.color = 'var(--muted)';
+      status.textContent = 'Sending request…';
+      try {
+        const res = await fetch(WORKER_URL + '?api=forgotPassword', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username }),
+        });
+        const data = await res.json();
+        if (data.ok) {
+          status.style.color = '#4ade80';
+          status.textContent = 'Request sent. Bryan will DM you a reset link (usually within a few minutes).';
+          setTimeout(() => { document.getElementById('forgotModal').style.display = 'none'; }, 3200);
+        } else {
+          status.style.color = '#f87171';
+          status.textContent = data.error || 'Something went wrong. Try again.';
+        }
+      } catch(e) {
+        status.style.color = '#f87171';
+        status.textContent = 'Network error. Try again.';
+      } finally {
+        btn.disabled = false;
+      }
+    }
+
+    async function submitResetPassword_(token) {
+      const btn = document.getElementById('resetPwSubmitBtn');
+      const status = document.getElementById('resetPwStatus');
+      const pw1 = document.getElementById('resetPwNew').value || '';
+      const pw2 = document.getElementById('resetPwConfirm').value || '';
+      if (pw1.length < 10) { status.textContent = 'Password must be at least 10 characters.'; status.style.color = '#f87171'; return; }
+      if (pw1 !== pw2)     { status.textContent = 'Passwords don’t match.'; status.style.color = '#f87171'; return; }
+      btn.disabled = true;
+      status.style.color = 'var(--muted)';
+      status.textContent = 'Setting new password…';
+      try {
+        const pwHash = await hashPassword_(pw1);
+        const res = await fetch(WORKER_URL + '?api=resetPassword', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ token, pwHash }),
+        });
+        const data = await res.json();
+        if (data.ok) {
+          status.style.color = '#4ade80';
+          status.textContent = 'Password updated. Redirecting to sign in…';
+          // Strip token from URL and reload to a clean sign-in screen
+          setTimeout(() => { window.location.replace(window.location.origin + window.location.pathname); }, 1400);
+        } else {
+          status.style.color = '#f87171';
+          status.textContent = data.error || 'Reset failed. Request a new link.';
+        }
+      } catch(e) {
+        status.style.color = '#f87171';
+        status.textContent = 'Network error. Try again.';
+      } finally {
+        btn.disabled = false;
+      }
+    }
+
+    // Detect reset link on page load — opens the set-new-password modal.
+    (function _checkResetTokenInUrl_(){
+      try {
+        const params = new URLSearchParams(window.location.search);
+        const token = params.get('resetToken');
+        if (!token) return;
+        // Ensure auth overlay is closed and reset modal open — do this after
+        // the DOM is ready and after checkAuth_ has run so we're on top.
+        const openReset = () => {
+          document.getElementById('authOverlay').classList.remove('open');
+          document.getElementById('resetPwModal').style.display = 'flex';
+          document.getElementById('resetPwNew').focus();
+          const submitBtn = document.getElementById('resetPwSubmitBtn');
+          if (submitBtn) submitBtn.onclick = () => submitResetPassword_(token);
+          const cancelBtn = document.getElementById('resetPwCancelBtn');
+          if (cancelBtn) cancelBtn.onclick = () => {
+            window.location.replace(window.location.origin + window.location.pathname);
+          };
+        };
+        if (document.readyState === 'loading') {
+          document.addEventListener('DOMContentLoaded', () => setTimeout(openReset, 100));
+        } else {
+          setTimeout(openReset, 100);
+        }
+      } catch(_){}
+    })();
+
+    // Wire the Forgot password link + modal buttons.
+    document.addEventListener('DOMContentLoaded', () => {
+      // v425 gate: only reveal the "Forgot password?" link if the URL has
+      // ?forgot=1. This is an admin-only escape hatch until the production
+      // email flow replaces the current Discord-mediated interim.
+      try {
+        if (new URLSearchParams(window.location.search).get('forgot') === '1') {
+          const btn = document.getElementById('authForgotBtn');
+          if (btn) btn.style.display = '';
+        }
+      } catch(_){}
+      const forgotBtn = document.getElementById('authForgotBtn');
+      if (forgotBtn) forgotBtn.addEventListener('click', () => {
+        document.getElementById('forgotStatus').textContent = '';
+        document.getElementById('forgotUsername').value = (document.getElementById('authUsername').value || '').trim();
+        document.getElementById('forgotModal').style.display = 'flex';
+        document.getElementById('forgotUsername').focus();
+      });
+      const cancelBtn = document.getElementById('forgotCancelBtn');
+      if (cancelBtn) cancelBtn.addEventListener('click', () => { document.getElementById('forgotModal').style.display = 'none'; });
+      const submitBtn = document.getElementById('forgotSubmitBtn');
+      if (submitBtn) submitBtn.addEventListener('click', submitForgotPassword_);
+      const modal = document.getElementById('forgotModal');
+      if (modal) modal.addEventListener('click', (e) => { if (e.target === modal) modal.style.display = 'none'; });
+      const resetModal = document.getElementById('resetPwModal');
+      if (resetModal) resetModal.addEventListener('click', (e) => { if (e.target === resetModal) resetModal.style.display = 'none'; });
+    });
+
     if (document.readyState === 'loading') {
       document.addEventListener('DOMContentLoaded', checkAuth_);
     } else {
@@ -8291,6 +9230,39 @@ document.addEventListener("click", async (e) => {
         <input type="text" id="authUsername" class="auth-input" placeholder="Username or email" autocomplete="username" maxlength="100" inputmode="email">
         <input type="password" id="authPassword" class="auth-input" placeholder="Password" autocomplete="current-password">
         <button id="authSubmitBtn" class="auth-submit">Sign In</button>
+        <!-- v425 Discord-mediated forgot-password link (interim, admin-only until email replaces).
+             Hidden by default; revealed only when the URL has ?forgot=1 (see wiring below).
+             This prevents beta users from pinging Bryan's DMs while the flow is still admin-mediated. -->
+        <button id="authForgotBtn" type="button" style="display:none;margin-top:10px;background:none;border:none;color:var(--muted);font-size:.85em;cursor:pointer;text-decoration:underline;padding:6px;">Forgot password?</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- v425 Forgot Password modal — collects username, hits ?api=forgotPassword, tells user to check with admin -->
+  <div id="forgotModal" role="dialog" aria-modal="true" style="display:none;position:fixed;inset:0;z-index:10003;align-items:center;justify-content:center;background:rgba(0,0,0,.75);padding:20px;">
+    <div class="modal-box" style="max-width:400px;background:var(--card);border:1px solid var(--border);border-radius:14px;padding:24px;">
+      <h3 style="margin:0 0 8px;font-size:1.1em;">Reset your password</h3>
+      <p class="modal-sub" style="color:var(--muted);font-size:.88em;margin:0 0 14px;line-height:1.55;">Enter your username. We'll notify the admin, who will DM you a one-time reset link (this beta doesn't have automated email yet).</p>
+      <input type="text" id="forgotUsername" class="auth-input" placeholder="Username or email" autocomplete="username" style="width:100%;box-sizing:border-box;padding:10px 12px;margin-bottom:12px;background:var(--card);border:1px solid var(--border);border-radius:8px;color:var(--text);">
+      <div id="forgotStatus" style="font-size:.85em;color:var(--muted);margin-bottom:12px;min-height:1em;"></div>
+      <div style="display:flex;justify-content:flex-end;gap:10px;">
+        <button id="forgotCancelBtn" type="button" class="btn btn2">Cancel</button>
+        <button id="forgotSubmitBtn" type="button" class="btn" style="background:#f59e0b;color:#0c0700;border-color:#f59e0b;">Send request</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- v425 Reset Password modal — opened when app loads with ?resetToken=xxx in URL; collects new password -->
+  <div id="resetPwModal" role="dialog" aria-modal="true" style="display:none;position:fixed;inset:0;z-index:10003;align-items:center;justify-content:center;background:rgba(0,0,0,.75);padding:20px;">
+    <div class="modal-box" style="max-width:400px;background:var(--card);border:1px solid var(--border);border-radius:14px;padding:24px;">
+      <h3 style="margin:0 0 8px;font-size:1.1em;">Set a new password</h3>
+      <p class="modal-sub" style="color:var(--muted);font-size:.88em;margin:0 0 14px;line-height:1.55;">This reset link is one-time and expires 30 minutes after it was issued.</p>
+      <input type="password" id="resetPwNew" class="auth-input" placeholder="New password (10+ chars)" autocomplete="new-password" minlength="10" style="width:100%;box-sizing:border-box;padding:10px 12px;margin-bottom:8px;background:var(--card);border:1px solid var(--border);border-radius:8px;color:var(--text);">
+      <input type="password" id="resetPwConfirm" class="auth-input" placeholder="Confirm new password" autocomplete="new-password" minlength="10" style="width:100%;box-sizing:border-box;padding:10px 12px;margin-bottom:12px;background:var(--card);border:1px solid var(--border);border-radius:8px;color:var(--text);">
+      <div id="resetPwStatus" style="font-size:.85em;color:var(--muted);margin-bottom:12px;min-height:1em;"></div>
+      <div style="display:flex;justify-content:flex-end;gap:10px;">
+        <button id="resetPwCancelBtn" type="button" class="btn btn2">Cancel</button>
+        <button id="resetPwSubmitBtn" type="button" class="btn" style="background:#f59e0b;color:#0c0700;border-color:#f59e0b;">Set password</button>
       </div>
     </div>
   </div>
@@ -8336,106 +9308,65 @@ document.addEventListener("click", async (e) => {
     </div>
   </div>
 
-  <div id="obOverlay">
-    <div class="ob-card">
-      <div class="ob-slides-wrap">
+  <!-- v426: intro slides removed. Tour is spotlight-only, driven by TOUR_STEPS.
+       #obOverlay is kept as an empty container purely so obRender_/obFinish_
+       can toggle .open without null-checks; spotlight + callout live in their
+       own fixed elements below (#tourSpotlight, #tourCallout). -->
+  <div id="obOverlay"><div class="ob-card"></div></div>
 
-        <!-- Slide 0: Welcome -->
-        <div class="ob-slide active">
-          <span class="ob-icon">💸</span>
-          <h2 class="ob-title">Welcome to Allot</h2>
-          <p class="ob-simple">Allot splits every deposit you make across your bills, debt, savings, and spending — automatically. Set it up once, then just enter your deposit and post.</p>
+  <!-- v425: Make it mine — 2-question setup form. Replaces the v424 placeholder. -->
+  <!-- Scroll strategy: flex-start on cross axis + overflow-y:auto on the overlay
+       so tall content can scroll naturally from the top. align-items:center would
+       push the top off-screen once the modal exceeds viewport height.
+       z-index must beat .nav (z-index:1100). Bottom padding clears the fixed
+       bottom nav (~80px) so the Save/Cancel row is reachable via scroll. -->
+  <div id="makeItMineModal" role="dialog" aria-modal="true" style="display:none;position:fixed;inset:0;z-index:1200;align-items:flex-start;justify-content:center;background:rgba(0,0,0,.7);padding:24px 24px 120px;overflow-y:auto;-webkit-overflow-scrolling:touch;">
+    <div class="modal-box" style="max-width:560px;width:100%;background:var(--card);border:1px solid var(--border);border-radius:14px;padding:22px;margin:0 auto;flex-shrink:0;">
+      <h3 style="margin:0 0 6px;font-size:1.25em;">Make it mine</h3>
+      <p class="modal-sub" style="color:var(--muted);font-size:.88em;margin:0 0 20px;line-height:1.55;">A minute of setup and Allot is yours. Skip anything you don't need yet — you can add more later.</p>
+
+      <!-- Q1: Bills -->
+      <div style="margin-bottom:18px;">
+        <div style="font-weight:700;color:var(--text);margin-bottom:4px;">What do you have to pay every month?</div>
+        <div style="font-size:.85em;color:var(--muted);margin-bottom:8px;">Rent, phone, insurance — anything that's due every month like clockwork. Pre-filled with common ones; edit or delete freely.</div>
+        <div style="font-size:.8em;color:var(--accent-text);background:rgba(245,158,11,.06);border:1px solid rgba(245,158,11,.20);border-radius:6px;padding:8px 10px;margin-bottom:10px;line-height:1.45;">
+          <strong>Priority is top-down.</strong> Bills higher in the list get funded first from each deposit. Use the ▲▼ arrows to put your most important bills on top. You can also reorder later from the Allot tab (Edit mode).
         </div>
-
-        <!-- Slide 1: The 4 Accounts -->
-        <div class="ob-slide">
-          <span class="ob-icon">🏦</span>
-          <h2 class="ob-title">Your 4 Accounts</h2>
-          <p class="ob-simple">Every deposit is divided into 4 buckets — Bills, Debt, Savings, and Spending. Each gets a percentage of what you bring in, every time.</p>
-          <div class="ob-detail">
-            <div><strong>Bills</strong> — Fixed monthly expenses: rent, car, insurance, phone. Funded in priority order so your most important bills are always covered first.</div>
-            <div style="margin-top:10px;"><strong>Debt</strong> — Minimum payments first, then extra money attacks your highest-cost balances hardest.</div>
-            <div style="margin-top:10px;"><strong>Savings</strong> — Builds your financial cushion automatically, deposit after deposit.</div>
-            <div style="margin-top:10px;"><strong>Spending</strong> — What's left for you to use freely, guilt-free. No tracking required.</div>
-          </div>
-          <button class="ob-toggle">Learn more ↓</button>
-        </div>
-
-        <!-- Slide 2: The Split -->
-        <div class="ob-slide">
-          <span class="ob-icon">⚖️</span>
-          <h2 class="ob-title">The Split</h2>
-          <p class="ob-simple">Pick a profile that fits your situation. Your deposit is divided by these percentages every time you post — no manual math needed.</p>
-          <div class="ob-detail">
-            <div><strong>Default</strong> — 85% Bills / 5% Debt / 5% Savings / 5% Spending. A solid starting point for most people.</div>
-            <div style="margin-top:10px;"><strong>Conservative</strong> — 80% Bills / 10% Debt / 5% Savings / 5% Spending. Pushes harder on debt payoff.</div>
-            <div style="margin-top:10px;"><strong>Survival</strong> — 95% Bills / 2% Debt / 2% Savings / 1% Spending. For tight months when bills have to come first.</div>
-            <div style="margin-top:10px;"><strong>Custom</strong> — Set your own percentages. Must add up to 100%. Use the Allot tab to configure.</div>
-          </div>
-          <button class="ob-toggle">Learn more ↓</button>
-        </div>
-
-        <!-- Slide 3: Bills Formula -->
-        <div class="ob-slide">
-          <span class="ob-icon">📋</span>
-          <h2 class="ob-title">How Bills Are Funded</h2>
-          <p class="ob-simple">Your Bills pool funds bills from top to bottom. The bills at the top of your list get funded first — put your most critical bills there.</p>
-          <div class="ob-detail">
-            <div>Your Bills allocation is split into two sub-pools:</div>
-            <div style="margin-top:10px;"><strong>Fixed Bills (80%)</strong> — Rent, car, insurance. Funded in row order until the pool runs out.</div>
-            <div style="margin-top:8px;"><strong>Living Expenses (20%)</strong> — Food, gas, groceries. Funded after fixed bills.</div>
-            <div class="ob-ex">Each deposit picks up where the last left off. If rent wasn't fully covered last time, it gets priority again this deposit. Bills you've already paid this month are automatically skipped — their allocation targets next month instead.</div>
-          </div>
-          <button class="ob-toggle">Learn more ↓</button>
-        </div>
-
-        <!-- Slide 4: Debt Formula -->
-        <div class="ob-slide">
-          <span class="ob-icon">📉</span>
-          <h2 class="ob-title">How Debt Gets Paid</h2>
-          <p class="ob-simple">Minimum payments are always covered first. Any extra money then targets your most expensive, largest debts hardest.</p>
-          <div class="ob-detail">
-            <div><strong>Pass 1 — Minimums:</strong> Every debt gets its minimum payment before a single dollar of extra money moves. If the pool can't cover all minimums, it distributes proportionally — no debt gets skipped entirely.</div>
-            <div style="margin-top:10px;"><strong>Pass 2 — Extra:</strong> Leftover funds are weighted by <strong>APR × √balance</strong>. High-interest AND high-balance debts get the most — without letting smaller debts be completely ignored.</div>
-            <div class="ob-ex">Example: A card at 29% APR with a $3,300 balance scores much higher than one at 14% APR with a $1,400 balance — so it receives a larger share of the extra pool each deposit.</div>
-          </div>
-          <button class="ob-toggle">Learn more ↓</button>
-        </div>
-
-        <!-- Slide 5: Live Tour Intro -->
-        <div class="ob-slide">
-          <span class="ob-icon">🗺️</span>
-          <h2 class="ob-title">Let's Tour the App</h2>
-          <p class="ob-simple">We'll walk through each tab with a live spotlight. At the end, we'll drop you right into the <strong>most important step</strong> — adding your bills and monthly targets. Allot doesn't work until that's done.</p>
-          <p class="ob-simple" style="font-size:.85em;color:var(--muted);margin-top:4px;">Tap <strong>Next</strong> to start the interactive tour, or <strong>Skip</strong> to jump straight in.</p>
-        </div>
-
-        <!-- Slide 6: You're Ready -->
-        <div class="ob-slide">
-          <span class="ob-icon">✏️</span>
-          <h2 class="ob-title">One thing left</h2>
-          <p class="ob-simple">Add your bills and monthly targets. This is what makes Allot work — it takes about a minute and you only do it once.</p>
-          <p class="ob-simple" style="background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.3);border-radius:10px;padding:12px;font-size:.88em;color:var(--accent-text);margin-bottom:14px;">Tap <strong>Get Started</strong> and we'll open the setup form right now.</p>
-          <p class="ob-simple" style="font-size:.8em;margin:0;color:var(--muted);">Want to explore first? Tap <strong>Skip</strong> — come back anytime via the <strong>?</strong> button.</p>
-        </div>
-
+        <div id="mimBillsRows" style="display:flex;flex-direction:column;gap:8px;"></div>
+        <button type="button" id="mimAddBillBtn" style="margin-top:8px;background:transparent;border:1px dashed var(--border);color:var(--muted);border-radius:8px;padding:8px 12px;font-size:.85em;cursor:pointer;width:100%;">+ Add another bill</button>
       </div>
 
-      <div class="ob-footer">
-        <div class="ob-dots">
-          <button class="ob-dot active" data-step="0"></button>
-          <button class="ob-dot" data-step="1"></button>
-          <button class="ob-dot" data-step="2"></button>
-          <button class="ob-dot" data-step="3"></button>
-          <button class="ob-dot" data-step="4"></button>
-          <button class="ob-dot" data-step="5"></button>
-          <button class="ob-dot" data-step="13"></button>
-        </div>
-        <div class="ob-nav">
-          <button id="obBack" class="ob-back" disabled>← Back</button>
-          <button id="obNext" class="ob-next">Next →</button>
-        </div>
-        <button id="obSkipBtn" class="ob-skip">Skip for now</button>
+      <!-- Q2: Debts (optional) -->
+      <div style="margin-bottom:18px;">
+        <div style="font-weight:700;color:var(--text);margin-bottom:4px;">Anything you're chipping away at? <span style="font-weight:400;color:var(--muted);font-size:.88em;">(optional)</span></div>
+        <div style="font-size:.85em;color:var(--muted);margin-bottom:10px;">Credit cards, loans, that student loan you forgot about. Skip if none apply — you can add later.</div>
+        <div id="mimDebtRows" style="display:flex;flex-direction:column;gap:8px;"></div>
+        <button type="button" id="mimAddDebtBtn" style="margin-top:8px;background:transparent;border:1px dashed var(--border);color:var(--muted);border-radius:8px;padding:8px 12px;font-size:.85em;cursor:pointer;width:100%;">+ Add a debt</button>
+      </div>
+
+      <!-- Starter categories toggle -->
+      <label style="display:flex;align-items:flex-start;gap:10px;margin-bottom:14px;padding:10px 12px;background:rgba(245,158,11,.06);border:1px solid rgba(245,158,11,.20);border-radius:8px;cursor:pointer;">
+        <input type="checkbox" id="mimStarterCatsChk" checked style="margin-top:3px;width:16px;height:16px;accent-color:#f59e0b;flex-shrink:0;">
+        <span style="font-size:.9em;line-height:1.4;">
+          <strong style="color:var(--text);">Add starter spending categories</strong>
+          <span style="color:var(--muted);display:block;margin-top:2px;">Groceries, Gas, Restaurants, Fun. Uncheck if you want a blank slate.</span>
+        </span>
+      </label>
+
+      <!-- Merge choice -->
+      <label style="display:flex;align-items:flex-start;gap:10px;margin-bottom:16px;padding:10px 12px;background:rgba(59,130,246,.06);border:1px solid rgba(59,130,246,.20);border-radius:8px;cursor:pointer;">
+        <input type="checkbox" id="mimKeepUserAddedChk" style="margin-top:3px;width:16px;height:16px;accent-color:#3b82f6;flex-shrink:0;">
+        <span style="font-size:.9em;line-height:1.4;">
+          <strong style="color:var(--text);">Keep anything I added during demo</strong>
+          <span style="color:var(--muted);display:block;margin-top:2px;">If you added your own bills or debts while playing, keep them alongside what you enter above. Default: fresh start.</span>
+        </span>
+      </label>
+
+      <div id="mimError" style="display:none;color:#f87171;font-size:.85em;margin-bottom:10px;"></div>
+
+      <div class="modal-footer" style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;">
+        <button id="mimCancelBtn" type="button" class="btn btn2" style="padding:10px 16px;">Cancel</button>
+        <button id="mimSubmitBtn" type="button" style="padding:10px 22px;background:#f59e0b;color:#0c0700;border:none;border-radius:10px;font-weight:700;cursor:pointer;font-size:.95em;">Save &amp; make it mine</button>
       </div>
     </div>
   </div>
@@ -8642,28 +9573,50 @@ document.addEventListener("click", async (e) => {
     wire('tourBack', 'click', function() { if (typeof obBack_ === 'function') obBack_(); });
     wire('tourNext', 'click', function() { if (typeof obNext_ === 'function') obNext_(); });
 
-    // Onboarding overlay nav
-    wire('obBack',    'click', function() { if (typeof obBack_ === 'function') obBack_(); });
-    wire('obNext',    'click', function() { if (typeof obNext_ === 'function') obNext_(); });
-    wire('obSkipBtn', 'click', function() { if (typeof obFinish_ === 'function') obFinish_(); });
+    // v426: intro-slide overlay wires (obBack/obNext/obSkipBtn/.ob-toggle/.ob-dot)
+    // removed — the slides they controlled are gone. Callout Back/Next buttons
+    // above (tourBack/tourNext) are the only tour nav now.
 
-    // ob-toggle (learn more) buttons — delegate on container
-    var obSlidesWrap = document.querySelector('.ob-slides-wrap');
-    if (obSlidesWrap) {
-      obSlidesWrap.addEventListener('click', function(e) {
-        if (e.target.classList.contains('ob-toggle') && typeof obToggle_ === 'function') obToggle_(e.target);
-      });
-    }
+    // v425: Demo mode banner button opens the Make-it-mine setup form.
+    wire('demoMakeItMineBtn', 'click', function() {
+      if (typeof openMakeItMineModal_ === 'function') openMakeItMineModal_();
+    });
 
-    // ob-dot buttons — delegate on container
-    var obDots = document.querySelector('.ob-dots');
-    if (obDots) {
-      obDots.addEventListener('click', function(e) {
-        if (e.target.classList.contains('ob-dot') && typeof obDot_ === 'function') {
-          obDot_(Number(e.target.dataset.step));
-        }
-      });
-    }
+    // v425e2: Debt tab inline "+ Add a debt" form
+    wire('debtAddBtn', 'click', function() {
+      var form = document.getElementById('debtAddForm');
+      var btn  = document.getElementById('debtAddBtn');
+      if (form && btn) { form.style.display = 'block'; btn.style.display = 'none'; document.getElementById('debtAddName')?.focus(); }
+    });
+    wire('debtAddCancelBtn', 'click', function() {
+      var form = document.getElementById('debtAddForm');
+      var btn  = document.getElementById('debtAddBtn');
+      var err  = document.getElementById('debtAddError');
+      if (form && btn) { form.style.display = 'none'; btn.style.display = 'block'; }
+      if (err) { err.style.display = 'none'; err.textContent = ''; }
+      ['debtAddName','debtAddBalance','debtAddMin','debtAddApr'].forEach(id => { var el = document.getElementById(id); if (el) el.value = ''; });
+    });
+    wire('debtAddSubmitBtn', 'click', function() {
+      if (typeof addDebtInline_ === 'function') addDebtInline_();
+    });
+    wire('mimCancelBtn', 'click', function() {
+      if (typeof closeMakeItMineModal_ === 'function') closeMakeItMineModal_();
+    });
+    wire('mimSubmitBtn', 'click', function() {
+      if (typeof submitMakeItMine_ === 'function') submitMakeItMine_();
+    });
+    wire('mimAddBillBtn', 'click', function() {
+      if (typeof mimAddBillRow_ === 'function') mimAddBillRow_();
+    });
+    wire('mimAddDebtBtn', 'click', function() {
+      if (typeof mimAddDebtRow_ === 'function') mimAddDebtRow_();
+    });
+    wire('makeItMineModal', 'click', function(e) {
+      // Click on the overlay backdrop closes the modal; clicks inside the modal-box don't
+      if (e.target === document.getElementById('makeItMineModal')) {
+        if (typeof closeMakeItMineModal_ === 'function') closeMakeItMineModal_();
+      }
+    });
 
     // Unsaved modal
     wire('unsavedModal',   'click', function(e) {
