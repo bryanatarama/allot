@@ -1782,7 +1782,7 @@ body { padding:0; overflow-x: hidden; }
       // ===== Header pills =====
       const whereEl = document.getElementById("where");
       const specEl = document.getElementById("specVersion");
-      const BUILD_STAMP = "v426d-pages";
+      const BUILD_STAMP = "v426e-pages";
       const SPEC_VERSION = "";
       specEl.textContent = "Spec: " + SPEC_VERSION;
       whereEl.textContent = "Here: " + window.location.href;
@@ -8569,7 +8569,17 @@ document.addEventListener("click", async (e) => {
       { tab: 'debt',      tabLabel: '📉 Debt',    target: '#debtKpis',         title: '📉 How Debt Splits Work',
         body: 'Minimums cover first — every debt gets its minimum before extras move. Whatever\'s left is weighted toward high-APR balances hardest, so payoff happens without the guesswork.' },
       { tab: 'dashboard', tabLabel: '🏠 Home',   target: '#headerLeftBtns',   title: '💡 Two Handy Buttons',
-        body: 'The 🚩 sends feedback anytime. The ? replays this tour. When you\'re ready to swap sample data for your real numbers, tap Make it mine at the top of Home.' },
+        // v426e: body is a function so we can adapt copy to demo state. The
+        // Make-it-mine banner is only rendered when loadDemoMode_() is true,
+        // so referencing it for existing users on real data was a lie.
+        body: function() {
+          try {
+            if (typeof loadDemoMode_ === 'function' && loadDemoMode_()) {
+              return 'The 🚩 sends feedback anytime. The ? replays this tour. When you\'re ready to swap sample data for your real numbers, tap Make it mine at the top of Home.';
+            }
+          } catch(_){}
+          return 'The 🚩 sends feedback anytime. The ? replays this tour whenever you want a refresher. That\'s the loop — post deposits, mark bills paid, and Allot handles the rest.';
+        } },
     ];
     const OB_TOTAL = TOUR_STEPS.length;
     let _obIdx = 0;
@@ -8678,7 +8688,8 @@ document.addEventListener("click", async (e) => {
       const tabLabelEl = document.getElementById("tourTabLabel");
       if (tabLabelEl) tabLabelEl.textContent = step.tabLabel || "";
       document.getElementById("tourCalloutTitle").textContent = step.title;
-      document.getElementById("tourCalloutBody").textContent  = step.body;
+      // v426e: step.body may be a string or a () => string (adapts to app state)
+      document.getElementById("tourCalloutBody").textContent  = (typeof step.body === 'function') ? step.body() : step.body;
       document.getElementById("tourCalloutStep").textContent  = (_obIdx + 1) + " / " + OB_TOTAL;
       document.getElementById("tourNext").textContent = _obIdx === OB_TOTAL - 1 ? "Done ✓" : "Next →";
       document.getElementById("tourBack").disabled = _obIdx === 0;
