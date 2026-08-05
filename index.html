@@ -1788,7 +1788,7 @@ body { padding:0; overflow-x: hidden; }
       // ===== Header pills =====
       const whereEl = document.getElementById("where");
       const specEl = document.getElementById("specVersion");
-      const BUILD_STAMP = "v427a-pages";
+      const BUILD_STAMP = "v428-pages";
       const SPEC_VERSION = "";
       specEl.textContent = "Spec: " + SPEC_VERSION;
       whereEl.textContent = "Here: " + window.location.href;
@@ -8808,6 +8808,9 @@ document.addEventListener("click", async (e) => {
       document.getElementById('authTabCreate').classList.toggle('active', mode === 'create');
       document.getElementById('authSubmitBtn').textContent = mode === 'signin' ? 'Sign In' : 'Get Started';
       document.getElementById('authPassword').autocomplete = mode === 'signin' ? 'current-password' : 'new-password';
+      // v428: reveal email input only in Get Started mode.
+      const emailInp = document.getElementById('authEmail');
+      if (emailInp) emailInp.style.display = mode === 'create' ? '' : 'none';
       document.getElementById('authError').style.display = 'none';
     }
 
@@ -8819,6 +8822,7 @@ document.addEventListener("click", async (e) => {
     async function authSubmit_() {
       const username = (document.getElementById('authUsername').value || '').trim().toLowerCase();
       const password = (document.getElementById('authPassword').value || '');
+      const email = (document.getElementById('authEmail').value || '').trim().toLowerCase();
       const errEl = document.getElementById('authError');
       const btn = document.getElementById('authSubmitBtn');
 
@@ -8830,6 +8834,8 @@ document.addEventListener("click", async (e) => {
         if (username.length < 3 || username.length > 100) { showErr('Username must be 3–100 characters.'); return; }
         if (username.includes(':')) { showErr('Username may not contain a colon (:).'); return; }
         if (password.length < 6) { showErr('Password must be at least 6 characters.'); return; }
+        // v428: email required for new signups
+        if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { showErr('Please enter a valid email address.'); return; }
       }
 
       btn.disabled = true;
@@ -8837,10 +8843,12 @@ document.addEventListener("click", async (e) => {
       try {
         const pwHash = await hashPassword_(password);
         const endpoint = _authMode === 'signin' ? 'login' : 'register';
+        const payload = { username, pwHash };
+        if (_authMode === 'create') payload.email = email;
         const res = await fetch(WORKER_URL + '?api=' + endpoint, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ username, pwHash }),
+          body: JSON.stringify(payload),
         });
         const data = await res.json();
         if (!data.ok) { showErr(data.error || 'Something went wrong. Try again.'); return; }
@@ -8927,20 +8935,80 @@ document.addEventListener("click", async (e) => {
         setUserDisplay_(session.username || '');
         maybeShowOnboarding_();
         if (localStorage.getItem(LS_KEY_ONBOARDING_DONE)) maybeShowCoach_();
+        // v428: check if this user is grandfathered (no email on file).
+        checkGrandfatheredEmail_();
       }
     }
 
-    // ── v425 Password reset flow ──────────────────────────────
+    // v428: fire a lightweight validateSession call to learn whether the
+    // signed-in user has an email on file. If not, show the blocking modal
+    // that requires them to add one before continuing (the *only* way to
+    // add an email — never via the forgot-password flow — so an attacker
+    // can't hijack an account by knowing its username).
+    async function checkGrandfatheredEmail_() {
+      const session = getSession_();
+      if (!session?.token) return;
+      try {
+        const res = await fetch(WORKER_URL + '?api=validateSession', {
+          headers: { 'Authorization': 'Bearer ' + session.token },
+        });
+        const data = await res.json();
+        if (data.ok && data.hasEmail === false) {
+          // Open blocking modal (defined below in HTML). No dismiss button —
+          // must add email or sign out.
+          const modal = document.getElementById('addEmailBlockingModal');
+          if (modal) modal.style.display = 'flex';
+        }
+      } catch(_) {
+        // Silent — worst case user isn't nagged this session; next boot retries.
+      }
+    }
+
+    async function submitAddEmail_() {
+      const btn = document.getElementById('addEmailSubmitBtn');
+      const status = document.getElementById('addEmailStatus');
+      const email = (document.getElementById('addEmailInput').value || '').trim().toLowerCase();
+      if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { status.textContent = 'Enter a valid email address.'; status.style.color = '#f87171'; return; }
+      const session = getSession_();
+      if (!session?.token) return;
+      btn.disabled = true;
+      status.style.color = 'var(--muted)';
+      status.textContent = 'Saving…';
+      try {
+        const res = await fetch(WORKER_URL + '?api=setEmail', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + session.token },
+          body: JSON.stringify({ email }),
+        });
+        const data = await res.json();
+        if (data.ok) {
+          status.style.color = '#4ade80';
+          status.textContent = 'Saved. Password recovery is now enabled.';
+          setTimeout(() => { document.getElementById('addEmailBlockingModal').style.display = 'none'; }, 900);
+        } else {
+          status.style.color = '#f87171';
+          status.textContent = data.error || 'Something went wrong. Try again.';
+        }
+      } catch(e) {
+        status.style.color = '#f87171';
+        status.textContent = 'Network error. Try again.';
+      } finally {
+        btn.disabled = false;
+      }
+    }
+
+    // ── v428 Password reset (Resend email delivery) ───────────
     // The auth screen has a "Forgot password?" link that opens forgotModal.
-    // On submit we POST /forgotPassword — worker fires a Discord ping to
-    // Bryan with a reset URL. Bryan DMs the URL to the user. The URL is
-    // https://myallot.money/?resetToken=XXXX; when the page loads with that
-    // param, resetPwModal auto-opens for the user to set a new password.
+    // User enters their email. Worker looks up account by email index; if
+    // found, sends a reset link via Resend. Response is always generic
+    // ("if that email is on file, we sent a reset link") so we can't leak
+    // which emails exist. Grandfathered users (no email on file) can't
+    // self-serve — they sign in and add email via #addEmailBlockingModal.
     async function submitForgotPassword_() {
       const btn = document.getElementById('forgotSubmitBtn');
       const status = document.getElementById('forgotStatus');
-      const username = (document.getElementById('forgotUsername').value || '').trim().toLowerCase();
-      if (!username || username.length < 3) { status.textContent = 'Enter your username.'; status.style.color = '#f87171'; return; }
+      const email = (document.getElementById('forgotEmail').value || '').trim().toLowerCase();
+      if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { status.textContent = 'Enter a valid email address.'; status.style.color = '#f87171'; return; }
       btn.disabled = true;
       status.style.color = 'var(--muted)';
       status.textContent = 'Sending request…';
@@ -8948,13 +9016,13 @@ document.addEventListener("click", async (e) => {
         const res = await fetch(WORKER_URL + '?api=forgotPassword', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ username }),
+          body: JSON.stringify({ email }),
         });
         const data = await res.json();
         if (data.ok) {
           status.style.color = '#4ade80';
-          status.textContent = 'Request sent. Bryan will DM you a reset link (usually within a few minutes).';
-          setTimeout(() => { document.getElementById('forgotModal').style.display = 'none'; }, 3200);
+          status.textContent = data.message || 'If that email is on file, we sent a reset link. Check your inbox.';
+          setTimeout(() => { document.getElementById('forgotModal').style.display = 'none'; }, 3500);
         } else {
           status.style.color = '#f87171';
           status.textContent = data.error || 'Something went wrong. Try again.';
@@ -9031,21 +9099,18 @@ document.addEventListener("click", async (e) => {
 
     // Wire the Forgot password link + modal buttons.
     document.addEventListener('DOMContentLoaded', () => {
-      // v425 gate: only reveal the "Forgot password?" link if the URL has
-      // ?forgot=1. This is an admin-only escape hatch until the production
-      // email flow replaces the current Discord-mediated interim.
-      try {
-        if (new URLSearchParams(window.location.search).get('forgot') === '1') {
-          const btn = document.getElementById('authForgotBtn');
-          if (btn) btn.style.display = '';
-        }
-      } catch(_){}
+      // v428: email delivery is live — reveal "Forgot password?" for everyone.
+      // (The v425 ?forgot=1 gate is obsolete; email-based flow doesn't need it.)
+      const forgotVisBtn = document.getElementById('authForgotBtn');
+      if (forgotVisBtn) forgotVisBtn.style.display = '';
       const forgotBtn = document.getElementById('authForgotBtn');
       if (forgotBtn) forgotBtn.addEventListener('click', () => {
         document.getElementById('forgotStatus').textContent = '';
-        document.getElementById('forgotUsername').value = (document.getElementById('authUsername').value || '').trim();
+        // v428: pre-fill from authEmail if visible (create mode), else clear
+        const authEmail = (document.getElementById('authEmail')?.value || '').trim();
+        document.getElementById('forgotEmail').value = authEmail;
         document.getElementById('forgotModal').style.display = 'flex';
-        document.getElementById('forgotUsername').focus();
+        document.getElementById('forgotEmail').focus();
       });
       const cancelBtn = document.getElementById('forgotCancelBtn');
       if (cancelBtn) cancelBtn.addEventListener('click', () => { document.getElementById('forgotModal').style.display = 'none'; });
@@ -9055,6 +9120,20 @@ document.addEventListener("click", async (e) => {
       if (modal) modal.addEventListener('click', (e) => { if (e.target === modal) modal.style.display = 'none'; });
       const resetModal = document.getElementById('resetPwModal');
       if (resetModal) resetModal.addEventListener('click', (e) => { if (e.target === resetModal) resetModal.style.display = 'none'; });
+
+      // v428: add-email BLOCKING modal for grandfathered users. No dismiss —
+      // must save an email or sign out. Enter key submits.
+      const addEmailSubmit = document.getElementById('addEmailSubmitBtn');
+      if (addEmailSubmit) addEmailSubmit.addEventListener('click', submitAddEmail_);
+      const addEmailSignOut = document.getElementById('addEmailSignOutBtn');
+      if (addEmailSignOut) addEmailSignOut.addEventListener('click', () => {
+        document.getElementById('addEmailBlockingModal').style.display = 'none';
+        if (typeof signOut_ === 'function') signOut_();
+      });
+      const addEmailInp = document.getElementById('addEmailInput');
+      if (addEmailInp) addEmailInp.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') { e.preventDefault(); submitAddEmail_(); }
+      });
     });
 
     if (document.readyState === 'loading') {
@@ -9196,7 +9275,9 @@ document.addEventListener("click", async (e) => {
       </div>
       <div id="authError" class="auth-error"></div>
       <div class="auth-form">
-        <input type="text" id="authUsername" class="auth-input" placeholder="Username or email" autocomplete="username" maxlength="100" inputmode="email">
+        <input type="text" id="authUsername" class="auth-input" placeholder="Username" autocomplete="username" maxlength="100">
+        <!-- v428: email input is shown only in Get Started mode (authSwitchTab_) — required for new signups so password reset works. -->
+        <input type="email" id="authEmail" class="auth-input" placeholder="Email (for password recovery)" autocomplete="email" maxlength="254" inputmode="email" style="display:none;">
         <input type="password" id="authPassword" class="auth-input" placeholder="Password" autocomplete="current-password">
         <button id="authSubmitBtn" class="auth-submit">Sign In</button>
         <!-- v425 Discord-mediated forgot-password link (interim, admin-only until email replaces).
@@ -9207,16 +9288,35 @@ document.addEventListener("click", async (e) => {
     </div>
   </div>
 
-  <!-- v425 Forgot Password modal — collects username, hits ?api=forgotPassword, tells user to check with admin -->
+  <!-- v428 Add-Email BLOCKING modal — fires on boot for grandfathered users
+       (accounts created before email was required). No dismiss button —
+       user must add email or sign out. This is the ONLY path to add an
+       email to an existing account, which is what makes the forgot-password
+       flow safe (attackers can't add an email without being signed in). -->
+  <div id="addEmailBlockingModal" role="dialog" aria-modal="true" style="display:none;position:fixed;inset:0;z-index:10004;align-items:center;justify-content:center;background:rgba(8,12,19,0.95);padding:20px;">
+    <div class="modal-box" style="max-width:420px;background:var(--card);border:1px solid var(--border);border-radius:14px;padding:26px;">
+      <div style="font-size:1.6em;text-align:center;margin-bottom:8px;">📬</div>
+      <h3 style="margin:0 0 8px;font-size:1.15em;text-align:center;">Add your email</h3>
+      <p class="modal-sub" style="color:var(--muted);font-size:.88em;margin:0 0 16px;line-height:1.55;text-align:center;">Your account was created before we required email. Add one now so you can reset your password if you ever forget it — this is the only way to enable password recovery.</p>
+      <input type="email" id="addEmailInput" placeholder="you@example.com" autocomplete="email" inputmode="email" maxlength="254" style="width:100%;box-sizing:border-box;padding:11px 14px;margin-bottom:12px;background:var(--card);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:.95em;">
+      <div id="addEmailStatus" style="font-size:.85em;color:var(--muted);margin-bottom:14px;min-height:1.2em;line-height:1.4;text-align:center;"></div>
+      <div style="display:flex;flex-direction:column;gap:10px;">
+        <button id="addEmailSubmitBtn" type="button" class="btn" style="width:100%;background:#f59e0b;color:#0c0700;border-color:#f59e0b;padding:12px;font-weight:700;">Save email</button>
+        <button id="addEmailSignOutBtn" type="button" class="btn btn2" style="width:100%;font-size:.85em;color:var(--muted);">Sign out instead</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- v428 Forgot Password modal — collects email, hits ?api=forgotPassword, delivers reset via Resend -->
   <div id="forgotModal" role="dialog" aria-modal="true" style="display:none;position:fixed;inset:0;z-index:10003;align-items:center;justify-content:center;background:rgba(0,0,0,.75);padding:20px;">
     <div class="modal-box" style="max-width:400px;background:var(--card);border:1px solid var(--border);border-radius:14px;padding:24px;">
       <h3 style="margin:0 0 8px;font-size:1.1em;">Reset your password</h3>
-      <p class="modal-sub" style="color:var(--muted);font-size:.88em;margin:0 0 14px;line-height:1.55;">Enter your username. We'll notify the admin, who will DM you a one-time reset link (this beta doesn't have automated email yet).</p>
-      <input type="text" id="forgotUsername" class="auth-input" placeholder="Username or email" autocomplete="username" style="width:100%;box-sizing:border-box;padding:10px 12px;margin-bottom:12px;background:var(--card);border:1px solid var(--border);border-radius:8px;color:var(--text);">
-      <div id="forgotStatus" style="font-size:.85em;color:var(--muted);margin-bottom:12px;min-height:1em;"></div>
+      <p class="modal-sub" style="color:var(--muted);font-size:.88em;margin:0 0 14px;line-height:1.55;">Enter the email on your Allot account. We'll send you a one-time link to set a new password.</p>
+      <input type="email" id="forgotEmail" class="auth-input" placeholder="you@example.com" autocomplete="email" inputmode="email" maxlength="254" style="width:100%;box-sizing:border-box;padding:10px 12px;margin-bottom:12px;background:var(--card);border:1px solid var(--border);border-radius:8px;color:var(--text);">
+      <div id="forgotStatus" style="font-size:.85em;color:var(--muted);margin-bottom:12px;min-height:1em;line-height:1.4;"></div>
       <div style="display:flex;justify-content:flex-end;gap:10px;">
         <button id="forgotCancelBtn" type="button" class="btn btn2">Cancel</button>
-        <button id="forgotSubmitBtn" type="button" class="btn" style="background:#f59e0b;color:#0c0700;border-color:#f59e0b;">Send request</button>
+        <button id="forgotSubmitBtn" type="button" class="btn" style="background:#f59e0b;color:#0c0700;border-color:#f59e0b;">Send reset link</button>
       </div>
     </div>
   </div>
