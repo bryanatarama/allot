@@ -854,9 +854,15 @@ body { padding:0; overflow-x: hidden; }
 /* ── Auth overlay ── */
 #authOverlay { display:none; position:fixed; inset:0; z-index:10002; background:rgba(8,12,19,0.99); align-items:center; justify-content:center; padding:24px; }
 #authOverlay.open { display:flex; }
-.auth-card { background:var(--panel); border:1px solid var(--border); border-radius:20px; width:100%; max-width:360px; padding:32px 24px; display:flex; flex-direction:column; gap:18px; }
-.auth-logo { font-size:44px; text-align:center; }
-.auth-title { font-size:1.3em; font-weight:800; text-align:center; margin:0; color:var(--text); }
+.auth-card { background:var(--panel); border:1px solid var(--border); border-radius:20px; width:100%; max-width:380px; padding:28px 24px; display:flex; flex-direction:column; gap:14px; }
+.auth-logo { font-size:44px; text-align:center; line-height:1; }
+.auth-title { font-size:1.35em; font-weight:800; text-align:center; margin:0; color:var(--text); letter-spacing:-.01em; }
+/* v427: tagline + explanatory copy for irregular-income positioning. */
+.auth-tagline { text-align:center; font-size:.82em; font-weight:600; color:var(--accent-text); letter-spacing:.02em; margin:-6px 0 0; }
+.auth-hook { font-size:.82em; color:var(--muted); line-height:1.55; margin:0; }
+.auth-hook p { margin:0 0 8px; }
+.auth-hook p:last-child { margin-bottom:0; }
+.auth-hook strong { color:var(--text); font-weight:600; }
 .auth-tabs { display:flex; gap:4px; background:var(--panel2); border-radius:10px; padding:4px; }
 .auth-tab { flex:1; background:none; border:none; border-radius:8px; padding:10px; font-family:inherit; font-size:.88em; font-weight:600; color:var(--muted); cursor:pointer; transition:background .15s,color .15s; }
 .auth-tab.active { background:var(--accent-bg); color:var(--accent-text); }
@@ -1782,7 +1788,7 @@ body { padding:0; overflow-x: hidden; }
       // ===== Header pills =====
       const whereEl = document.getElementById("where");
       const specEl = document.getElementById("specVersion");
-      const BUILD_STAMP = "v426h-pages";
+      const BUILD_STAMP = "v427-pages";
       const SPEC_VERSION = "";
       specEl.textContent = "Spec: " + SPEC_VERSION;
       whereEl.textContent = "Here: " + window.location.href;
@@ -8800,7 +8806,7 @@ document.addEventListener("click", async (e) => {
       _authMode = mode;
       document.getElementById('authTabSignIn').classList.toggle('active', mode === 'signin');
       document.getElementById('authTabCreate').classList.toggle('active', mode === 'create');
-      document.getElementById('authSubmitBtn').textContent = mode === 'signin' ? 'Sign In' : 'Create Account';
+      document.getElementById('authSubmitBtn').textContent = mode === 'signin' ? 'Sign In' : 'Get Started';
       document.getElementById('authPassword').autocomplete = mode === 'signin' ? 'current-password' : 'new-password';
       document.getElementById('authError').style.display = 'none';
     }
@@ -9179,9 +9185,14 @@ document.addEventListener("click", async (e) => {
     <div class="auth-card">
       <div class="auth-logo">💸</div>
       <h1 class="auth-title">Allot</h1>
+      <p class="auth-tagline">Budgeting for irregular income</p>
+      <div class="auth-hook">
+        <p>Most budgeting apps assume steady biweekly paychecks. <strong>Allot doesn't</strong> — it works backwards from your bills. Post each deposit as it lands and Allot routes it across your pools: bills first, then debt, savings, spending. You always know how much to move where, and how much each bill is already covered.</p>
+        <p>Bills reset monthly (or per due date) with a graphical view of where you stand. No spreadsheet required.</p>
+      </div>
       <div class="auth-tabs">
         <button class="auth-tab active" id="authTabSignIn">Sign In</button>
-        <button class="auth-tab" id="authTabCreate">Create Account</button>
+        <button class="auth-tab" id="authTabCreate">Get Started</button>
       </div>
       <div id="authError" class="auth-error"></div>
       <div class="auth-form">
