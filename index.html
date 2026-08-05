@@ -1782,7 +1782,7 @@ body { padding:0; overflow-x: hidden; }
       // ===== Header pills =====
       const whereEl = document.getElementById("where");
       const specEl = document.getElementById("specVersion");
-      const BUILD_STAMP = "v426f-pages";
+      const BUILD_STAMP = "v426g-pages";
       const SPEC_VERSION = "";
       specEl.textContent = "Spec: " + SPEC_VERSION;
       whereEl.textContent = "Here: " + window.location.href;
@@ -3318,12 +3318,21 @@ const TAB_IDS = ["dashboard", "accounts", "expenseCategories", "budgeter", "debt
           const tab = btn.getAttribute("data-tab");
           const catDirty = typeof CategoriesState !== "undefined" && CategoriesState.dirty;
           const debtDirty = typeof DebtState !== "undefined" && DebtState.dirty;
-          if (catDirty || debtDirty) {
+          // v426g: Bills Split table on the Allot tab has its own Edit/Save/
+          // Cancel flow via BillsEditState — the guard used to miss it, so
+          // switching tabs while editing bills dropped the work silently.
+          const billsEditing = typeof BillsEditState !== "undefined" && BillsEditState.active;
+          if (catDirty || debtDirty || billsEditing) {
             const action = await showUnsavedModal_();
             if (action === "cancel") return;
             if (action === "save") {
               if (catDirty) await saveCategoriesServer_();
               if (debtDirty) await saveDebtNow_();
+              if (billsEditing && typeof exitBillsEditMode_ === "function") await exitBillsEditMode_(true);
+            } else if (action === "leave") {
+              // Discard path: bills edit mode holds a snapshot for rollback.
+              // exitBillsEditMode_(false) restores from snapshot + closes edit UI.
+              if (billsEditing && typeof exitBillsEditMode_ === "function") await exitBillsEditMode_(false);
             }
           }
           setActiveTab_(tab);
@@ -3356,7 +3365,8 @@ const TAB_IDS = ["dashboard", "accounts", "expenseCategories", "budgeter", "debt
       window.addEventListener("beforeunload", (e) => {
         const catDirty  = typeof CategoriesState !== "undefined" && CategoriesState.dirty;
         const debtDirty = typeof DebtState !== "undefined" && DebtState.dirty;
-        if (catDirty || debtDirty) {
+        const billsEditing = typeof BillsEditState !== "undefined" && BillsEditState.active;
+        if (catDirty || debtDirty || billsEditing) {
           e.preventDefault();
           e.returnValue = ""; // required by legacy Chrome/Safari
           return "";
