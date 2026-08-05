@@ -1782,7 +1782,7 @@ body { padding:0; overflow-x: hidden; }
       // ===== Header pills =====
       const whereEl = document.getElementById("where");
       const specEl = document.getElementById("specVersion");
-      const BUILD_STAMP = "v426e-pages";
+      const BUILD_STAMP = "v426f-pages";
       const SPEC_VERSION = "";
       specEl.textContent = "Spec: " + SPEC_VERSION;
       whereEl.textContent = "Here: " + window.location.href;
@@ -5174,7 +5174,14 @@ function resetPaidMTD_(){
         { name: "Internet",     target: "" },
         { name: "Insurance",    target: "" },
       ];
-      const MIM_STARTER_SPENDING_CATS = ["Groceries", "Gas", "Restaurants", "Fun"];
+      // v426f: renamed from MIM_STARTER_SPENDING_CATS. These get added as
+      // target=Bills / type="Living expenses" so they show in the Allot
+      // tab's Bills Split table under the Living section and are funded
+      // from the 20% Living sub-pool of the Bills allocation. Prior code
+      // added them as target=Spending / type="" which routed them to the
+      // Spending pool entirely and hid them from the Bills Split table —
+      // hence "starter cats don't show up on Allot" bug.
+      const MIM_STARTER_LIVING_CATS = ["Groceries", "Gas", "Restaurants", "Fun"];
 
       function mimAddBillRow_(name = "", target = "", dueDay = "") {
         const container = document.getElementById("mimBillsRows");
@@ -5315,12 +5322,13 @@ function resetPaidMTD_(){
             newCatRows.push([d.name, "Debt", ""]);
             preservedKeys.add(k);
           }
-          // Starter spending cats (opt-in, skip duplicates)
+          // Starter living-expense cats (opt-in, skip duplicates).
+          // v426f: target=Bills / type="Living expenses" (was Spending/"").
           if (includeStarterCats) {
-            for (const name of MIM_STARTER_SPENDING_CATS) {
+            for (const name of MIM_STARTER_LIVING_CATS) {
               const k = name.toLowerCase();
               if (preservedKeys.has(k)) continue;
-              newCatRows.push([name, "Spending", ""]);
+              newCatRows.push([name, "Bills", "Living expenses"]);
               preservedKeys.add(k);
             }
           }
@@ -8559,7 +8567,7 @@ document.addEventListener("click", async (e) => {
       { tab: 'dashboard', tabLabel: '🏠 Home',   target: '#dashProfileCard',  title: '⚖️ The Split Profile',
         body: 'This controls how every deposit gets divided. Leave it on Default while you\'re learning — you can switch to Conservative, Survival, or Custom anytime later.' },
       { tab: 'budgeter',  tabLabel: '⚖️ Allot',  target: '#engBillsTable',    title: '📋 Your Bills',
-        body: 'Bills fund top-down. The bill at the top gets covered first out of every deposit\'s Bills pool. Put your most critical expenses on top so rent lands before Netflix.' },
+        body: 'Two sections in one table. Bills = fixed amounts (rent, phone, insurance) — funded top-down so your most critical hit first. Living Expenses = variable spending (groceries, gas) — gets a smaller slice of the Bills pool since amounts flex month to month. Reorder either section anytime.' },
       { tab: 'budgeter',  tabLabel: '⚖️ Allot',  target: '#engBillsTable',    title: '✅ The Paid Checkbox',
         body: 'Already paid a bill this month? Check its box. Allot skips it for this deposit and starts pre-funding it toward next month instead — so nothing gets double-counted.' },
       { tab: 'budgeter',  tabLabel: '⚖️ Allot',  target: '#engBillsEditBar',  title: '✏️ Add & Edit Bills',
@@ -9249,8 +9257,8 @@ document.addEventListener("click", async (e) => {
       <label style="display:flex;align-items:flex-start;gap:10px;margin-bottom:14px;padding:10px 12px;background:rgba(245,158,11,.06);border:1px solid rgba(245,158,11,.20);border-radius:8px;cursor:pointer;">
         <input type="checkbox" id="mimStarterCatsChk" checked style="margin-top:3px;width:16px;height:16px;accent-color:#f59e0b;flex-shrink:0;">
         <span style="font-size:.9em;line-height:1.4;">
-          <strong style="color:var(--text);">Add starter spending categories</strong>
-          <span style="color:var(--muted);display:block;margin-top:2px;">Groceries, Gas, Restaurants, Fun. Uncheck if you want a blank slate.</span>
+          <strong style="color:var(--text);">Add starter living-expense categories</strong>
+          <span style="color:var(--muted);display:block;margin-top:2px;">Groceries, Gas, Restaurants, Fun. These show up under <strong style="color:var(--text);">Living Expenses</strong> on the Allot tab — variable spending that gets a slice of your Bills pool (separate from your fixed bills). Uncheck for a blank slate.</span>
         </span>
       </label>
 
