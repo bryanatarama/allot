@@ -1788,7 +1788,7 @@ body { padding:0; overflow-x: hidden; }
       // ===== Header pills =====
       const whereEl = document.getElementById("where");
       const specEl = document.getElementById("specVersion");
-      const BUILD_STAMP = "v428-pages";
+      const BUILD_STAMP = "v428a-pages";
       const SPEC_VERSION = "";
       specEl.textContent = "Spec: " + SPEC_VERSION;
       whereEl.textContent = "Here: " + window.location.href;
@@ -8635,13 +8635,14 @@ document.addEventListener("click", async (e) => {
         // v426e: body is a function so we can adapt copy to demo state. The
         // Make-it-mine banner is only rendered when loadDemoMode_() is true,
         // so referencing it for existing users on real data was a lie.
+        // v428a: 🚩 copy expanded to match the coach card's phrasing.
         body: function() {
           try {
             if (typeof loadDemoMode_ === 'function' && loadDemoMode_()) {
-              return 'The 🚩 sends feedback anytime. The ? replays this tour. When you\'re ready to swap sample data for your real numbers, tap Make it mine at the top of Home.';
+              return 'The 🚩 opens a form to report a bug or suggest a feature — your notes come straight to us. The ? replays this tour. When you\'re ready to swap sample data for your real numbers, tap Make it mine at the top of Home.';
             }
           } catch(_){}
-          return 'The 🚩 sends feedback anytime. The ? replays this tour whenever you want a refresher. That\'s the loop — post deposits, mark bills paid, and Allot handles the rest.';
+          return 'The 🚩 opens a form to report a bug or suggest a feature — your notes come straight to us. The ? replays this tour whenever you want a refresher. That\'s the loop — post deposits, mark bills paid, and Allot handles the rest.';
         } },
     ];
     const OB_TOTAL = TOUR_STEPS.length;
