@@ -1,5 +1,7 @@
 # Allot — working notes for Claude
 
+> ⚠️ **This file is mirrored to `~/Dropbox/allot-docs/CLAUDE.md`.** When you edit this file, copy it over to the Dropbox path (or vice versa). They should stay identical — the Dropbox copy exists so Bryan can work on Allot from any machine with Dropbox synced (even without a fresh `git pull`). Not a symlink because git symlinks break across machines.
+
 Personal budgeting web app. Live at **myallot.money**. Repo: github.com/bryanatarama/allot.
 
 ## Read these first (before touching anything)
