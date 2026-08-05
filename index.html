@@ -1788,7 +1788,7 @@ body { padding:0; overflow-x: hidden; }
       // ===== Header pills =====
       const whereEl = document.getElementById("where");
       const specEl = document.getElementById("specVersion");
-      const BUILD_STAMP = "v428a-pages";
+      const BUILD_STAMP = "v429-pages";
       const SPEC_VERSION = "";
       specEl.textContent = "Spec: " + SPEC_VERSION;
       whereEl.textContent = "Here: " + window.location.href;
@@ -8845,7 +8845,11 @@ document.addEventListener("click", async (e) => {
         const pwHash = await hashPassword_(password);
         const endpoint = _authMode === 'signin' ? 'login' : 'register';
         const payload = { username, pwHash };
-        if (_authMode === 'create') payload.email = email;
+        if (_authMode === 'create') {
+          payload.email = email;
+          // v429: attach the captured signup source so the worker can attribute it.
+          try { payload.src = localStorage.getItem('ALLOT_SIGNUP_SRC_V1') || ''; } catch(_) {}
+        }
         const res = await fetch(WORKER_URL + '?api=' + endpoint, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -8854,6 +8858,9 @@ document.addEventListener("click", async (e) => {
         const data = await res.json();
         if (!data.ok) { showErr(data.error || 'Something went wrong. Try again.'); return; }
         try { localStorage.setItem(LS_KEY_SESSION, JSON.stringify({ token: data.token, username: data.username, issuedAt: Date.now() })); } catch(_) {}
+        // v429: clear the source token after a successful signup so it can't
+        // attach to a different account created later on the same browser.
+        if (_authMode === 'create') { try { localStorage.removeItem('ALLOT_SIGNUP_SRC_V1'); } catch(_) {} }
         onAuthSuccess_(data.username);
       } catch(e) {
         showErr('Network error. Check your connection and try again.');
@@ -9096,6 +9103,24 @@ document.addEventListener("click", async (e) => {
           setTimeout(openReset, 100);
         }
       } catch(_){}
+    })();
+
+    // v429: capture ?src=<channel> on landing so the eventual signup is
+    // attributed to whatever drove the visit (Instagram, a subreddit, the
+    // reactivation email, etc.). Persisted to localStorage so it survives the
+    // whole register flow. First-touch wins — we never overwrite an existing
+    // value, so the original channel keeps credit even if the user navigates
+    // around before creating an account.
+    (function _captureSrcParam_(){
+      try {
+        const raw = new URLSearchParams(window.location.search).get('src');
+        if (!raw) return;
+        const clean = raw.slice(0, 60).replace(/[^\w.\-]/g, '');
+        if (!clean) return;
+        if (!localStorage.getItem('ALLOT_SIGNUP_SRC_V1')) {
+          localStorage.setItem('ALLOT_SIGNUP_SRC_V1', clean);
+        }
+      } catch(_) {}
     })();
 
     // Wire the Forgot password link + modal buttons.
