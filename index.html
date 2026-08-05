@@ -1782,7 +1782,7 @@ body { padding:0; overflow-x: hidden; }
       // ===== Header pills =====
       const whereEl = document.getElementById("where");
       const specEl = document.getElementById("specVersion");
-      const BUILD_STAMP = "v426g-pages";
+      const BUILD_STAMP = "v426h-pages";
       const SPEC_VERSION = "";
       specEl.textContent = "Spec: " + SPEC_VERSION;
       whereEl.textContent = "Here: " + window.location.href;
@@ -3322,17 +3322,26 @@ const TAB_IDS = ["dashboard", "accounts", "expenseCategories", "budgeter", "debt
           // Cancel flow via BillsEditState — the guard used to miss it, so
           // switching tabs while editing bills dropped the work silently.
           const billsEditing = typeof BillsEditState !== "undefined" && BillsEditState.active;
-          if (catDirty || debtDirty || billsEditing) {
+          // v426h: Bill Due Dates + Bills Pool Split sections each have their
+          // own Save button; typing in either was previously unguarded.
+          const dueDatesDirty = !!window._dueDatesDirty;
+          const poolSplitDirty = !!window._billsPoolSplitDirty;
+          if (catDirty || debtDirty || billsEditing || dueDatesDirty || poolSplitDirty) {
             const action = await showUnsavedModal_();
             if (action === "cancel") return;
             if (action === "save") {
               if (catDirty) await saveCategoriesServer_();
               if (debtDirty) await saveDebtNow_();
               if (billsEditing && typeof exitBillsEditMode_ === "function") await exitBillsEditMode_(true);
+              if (dueDatesDirty) document.getElementById("billDueDatesSaveBtn")?.click();
+              if (poolSplitDirty) document.getElementById("billsSplitSaveBtn")?.click();
             } else if (action === "leave") {
-              // Discard path: bills edit mode holds a snapshot for rollback.
-              // exitBillsEditMode_(false) restores from snapshot + closes edit UI.
+              // Discard path: reset in-memory edits back to saved state so
+              // the next visit renders cleanly. bills-edit mode already has
+              // its own snapshot restore via exitBillsEditMode_(false).
               if (billsEditing && typeof exitBillsEditMode_ === "function") await exitBillsEditMode_(false);
+              if (dueDatesDirty && typeof window._renderBillDueDatesPanel_ === "function") { window._renderBillDueDatesPanel_(); window._dueDatesDirty = false; }
+              if (poolSplitDirty && typeof window._resetBillsPoolSplitFromSaved_ === "function") { window._resetBillsPoolSplitFromSaved_(); window._billsPoolSplitDirty = false; }
             }
           }
           setActiveTab_(tab);
@@ -3366,7 +3375,9 @@ const TAB_IDS = ["dashboard", "accounts", "expenseCategories", "budgeter", "debt
         const catDirty  = typeof CategoriesState !== "undefined" && CategoriesState.dirty;
         const debtDirty = typeof DebtState !== "undefined" && DebtState.dirty;
         const billsEditing = typeof BillsEditState !== "undefined" && BillsEditState.active;
-        if (catDirty || debtDirty || billsEditing) {
+        const dueDatesDirty = !!window._dueDatesDirty;
+        const poolSplitDirty = !!window._billsPoolSplitDirty;
+        if (catDirty || debtDirty || billsEditing || dueDatesDirty || poolSplitDirty) {
           e.preventDefault();
           e.returnValue = ""; // required by legacy Chrome/Safari
           return "";
@@ -8385,6 +8396,9 @@ document.addEventListener("click", async (e) => {
           inp.addEventListener("input", () => {
             const v = parseInt(inp.value);
             hint.textContent = (v >= 1 && v <= 28) ? `${v}${v===1?'st':v===2?'nd':v===3?'rd':'th'}` : "—";
+            // v426h: mark section dirty so the tab-switch guard catches
+            // unsaved due-date edits.
+            window._dueDatesDirty = true;
           });
           row.appendChild(lbl);
           row.appendChild(inp);
@@ -8414,6 +8428,7 @@ document.addEventListener("click", async (e) => {
           });
           saveBillDueDates_(dueDates);
           renderBillDueDatesPanel_();
+          window._dueDatesDirty = false; // v426h
           try { normalizePaidMonth_(); } catch(_) {}
           try { renderEngineBillsSplitTable_(); } catch(_) {}
           if (statusEl) {
@@ -8423,6 +8438,9 @@ document.addEventListener("click", async (e) => {
           }
         });
       }
+      // v426h: expose render fn so the tab-switch guard's "Leave" path can
+      // discard pending edits by re-rendering from saved state.
+      window._renderBillDueDatesPanel_ = renderBillDueDatesPanel_;
     } catch(_) {}
 
     // Wire Bills Pool Split collapsible
@@ -8453,7 +8471,18 @@ document.addEventListener("click", async (e) => {
         profileSel.dataset.wired = "1";
         profileSel.addEventListener("change", () => {
           if (customRow) customRow.style.display = profileSel.value === "custom" ? "flex" : "none";
+          window._billsPoolSplitDirty = true; // v426h
         });
+      }
+      // v426h: bInp/lInp had no change handlers before — typing new %s
+      // silently drifted from saved state until Save was clicked.
+      if (bInp && !bInp.dataset.wired) {
+        bInp.dataset.wired = "1";
+        bInp.addEventListener("input", () => { window._billsPoolSplitDirty = true; });
+      }
+      if (lInp && !lInp.dataset.wired) {
+        lInp.dataset.wired = "1";
+        lInp.addEventListener("input", () => { window._billsPoolSplitDirty = true; });
       }
 
       if (saveBtn && !saveBtn.dataset.wired) {
@@ -8479,6 +8508,7 @@ document.addEventListener("click", async (e) => {
           const r = loadBillsSplitRatio_();
           if (bInp) bInp.value = Math.round(r.billsShare * 100);
           if (lInp) lInp.value = Math.round(r.livingShare * 100);
+          window._billsPoolSplitDirty = false; // v426h
           try { recomputeBillsAllocations_(); } catch(_) {}
           try { renderEngineBillsSplitTable_(); } catch(_) {}
           try { renderDashboardAppTables_(); } catch(_) {}
@@ -8489,6 +8519,15 @@ document.addEventListener("click", async (e) => {
           }
         });
       }
+      // v426h: exposed helper to reset custom inputs + selection back to
+      // saved state (used by the tab-switch guard's "Leave" path).
+      window._resetBillsPoolSplitFromSaved_ = () => {
+        const r = loadBillsSplitRatio_();
+        if (profileSel) profileSel.value = r.profile;
+        if (bInp) bInp.value = Math.round(r.billsShare * 100);
+        if (lInp) lInp.value = Math.round(r.livingShare * 100);
+        if (customRow) customRow.style.display = r.profile === "custom" ? "flex" : "none";
+      };
     } catch(_) {}
 
     // 1. Render from cache instantly — UI is interactive before any server call
