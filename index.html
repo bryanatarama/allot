@@ -1788,7 +1788,7 @@ body { padding:0; overflow-x: hidden; }
       // ===== Header pills =====
       const whereEl = document.getElementById("where");
       const specEl = document.getElementById("specVersion");
-      const BUILD_STAMP = "v429-pages";
+      const BUILD_STAMP = "v430-pages";
       const SPEC_VERSION = "";
       specEl.textContent = "Spec: " + SPEC_VERSION;
       whereEl.textContent = "Here: " + window.location.href;
@@ -8812,6 +8812,16 @@ document.addEventListener("click", async (e) => {
       // v428: reveal email input only in Get Started mode.
       const emailInp = document.getElementById('authEmail');
       if (emailInp) emailInp.style.display = mode === 'create' ? '' : 'none';
+      // v430: pitch copy lives behind Get Started. On the Sign In tab it stays
+      // visible only for brand-new visitors (no returning flag yet), so people
+      // arriving from a share link still see the hook on the default tab while
+      // returning users get a lean password screen.
+      const hookEl = document.getElementById('authHook');
+      if (hookEl) {
+        let returning = false;
+        try { returning = !!localStorage.getItem('ALLOT_RETURNING_V1'); } catch(_) {}
+        hookEl.style.display = (mode === 'create' || !returning) ? '' : 'none';
+      }
       document.getElementById('authError').style.display = 'none';
     }
 
@@ -8898,6 +8908,9 @@ document.addEventListener("click", async (e) => {
     });
 
     function onAuthSuccess_(username) {
+      // v430: mark this browser as a returning user — future visits to the
+      // sign-in screen skip the intro pitch (it still shows in Get Started mode).
+      try { localStorage.setItem('ALLOT_RETURNING_V1', '1'); } catch(_) {}
       document.getElementById('authOverlay').classList.remove('open');
       setUserDisplay_(username);
       window.location.reload();
@@ -9291,9 +9304,13 @@ document.addEventListener("click", async (e) => {
       <div class="auth-logo">💸</div>
       <h1 class="auth-title">Allot</h1>
       <p class="auth-tagline">Budgeting for irregular income</p>
-      <div class="auth-hook">
-        <p>Most budgeting apps assume steady biweekly paychecks. <strong>Allot doesn't</strong> — it works backwards from your bills. Add your bills, then post each deposit as it lands. Allot routes it across your pools: bills first, then debt, savings, spending. You always know how much to move where — and how much you've already set aside toward each bill.</p>
-        <p>Bills reset monthly (or per due date) with a graphical view of where you stand. No spreadsheet required.</p>
+      <!-- v430: rewritten from problem-vocabulary, not system-vocabulary (no "pools"/"route").
+           Shown to new visitors and in Get Started mode; hidden for returning users on
+           the Sign In tab (ALLOT_RETURNING_V1 flag, set on successful auth). -->
+      <div class="auth-hook" id="authHook">
+        <p><strong>A check lands. How much of it is already spoken for?</strong></p>
+        <p>Add your bills once. Post each deposit as it comes in. Allot shows what's covered, what's short, and what's actually yours to spend.</p>
+        <p>One bank account or five — no transfers required, no spreadsheet.</p>
       </div>
       <div class="auth-tabs">
         <button class="auth-tab active" id="authTabSignIn">Sign In</button>
@@ -9682,6 +9699,17 @@ document.addEventListener("click", async (e) => {
     wire('authTabSignIn',  'click', function() { if (typeof authSwitchTab_ === 'function') authSwitchTab_('signin'); });
     wire('authTabCreate',  'click', function() { if (typeof authSwitchTab_ === 'function') authSwitchTab_('create'); });
     wire('authSubmitBtn',  'click', function() { if (typeof authSubmit_ === 'function') authSubmit_(); });
+    // v430: boot-time pitch visibility — HTML defaults the hook visible (new
+    // visitors see it on the default Sign In tab); returning users get it
+    // hidden immediately so the sign-in screen is just tagline + fields.
+    (function() {
+      try {
+        if (localStorage.getItem('ALLOT_RETURNING_V1')) {
+          var hookEl = document.getElementById('authHook');
+          if (hookEl) hookEl.style.display = 'none';
+        }
+      } catch(_) {}
+    })();
 
     // Feedback modal
     wire('feedbackModal',    'click', function(e) { if (e.target === document.getElementById('feedbackModal') && typeof closeFeedbackModal_ === 'function') closeFeedbackModal_(); });
