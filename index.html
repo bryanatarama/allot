@@ -1681,6 +1681,30 @@ body { padding:0; overflow-x: hidden; }
 
 
 
+      <!-- ✅ Debt Bucket Redirect (v431) -->
+      <div class="panel">
+        <div class="tab-header" style="margin-bottom:8px">
+          <div>
+            <h3 style="margin:0">Debt Bucket Redirect</h3>
+            <div class="muted">
+              When you have no debts listed, or every listed debt has a $0 balance,
+              the Debt bucket has nothing to fund. Pick where that money should go instead.
+            </div>
+          </div>
+        </div>
+        <div style="display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin-top:4px">
+          <div class="seg" role="radiogroup" aria-label="Debt redirect target" id="debtRedirectTargetSeg">
+            <button id="debtRedirBtn-savings"  type="button" data-target="savings">Savings</button>
+            <button id="debtRedirBtn-spending" type="button" data-target="spending">Spending</button>
+            <button id="debtRedirBtn-split"    type="button" data-target="split">Split 50/50</button>
+          </div>
+          <span id="debtRedirStatus" class="status-pill" style="margin-left:auto">—</span>
+        </div>
+        <div class="hint" style="margin-top:8px">
+          Applies only when no debts need funding. Debt allocation logic is otherwise unchanged.
+        </div>
+      </div>
+
       <!-- ✅ Bills % Split view toggle (restored) -->
       <div class="panel">
         <div class="tab-header" style="margin-bottom:8px">
@@ -1788,7 +1812,7 @@ body { padding:0; overflow-x: hidden; }
       // ===== Header pills =====
       const whereEl = document.getElementById("where");
       const specEl = document.getElementById("specVersion");
-      const BUILD_STAMP = "v430-pages";
+      const BUILD_STAMP = "v431-pages";
       const SPEC_VERSION = "";
       specEl.textContent = "Spec: " + SPEC_VERSION;
       whereEl.textContent = "Here: " + window.location.href;
@@ -2475,9 +2499,18 @@ function saveDepositHistory_(st) {
   try { localStorage.setItem(LS_KEY_DEPOSIT_HISTORY, JSON.stringify(st)); } catch(e) {}
   workerSet_("depositHistory", st || {}).catch(()=>{});
 }
-function addDepositHistoryEntry_(deposit, breakdown) {
+function addDepositHistoryEntry_(deposit, breakdown, debtRedirect) {
   const st = loadDepositHistory_();
-  st.entries.push({ postedAt: new Date().toISOString(), deposit, breakdown });
+  const entry = { postedAt: new Date().toISOString(), deposit, breakdown };
+  if (debtRedirect) {
+    entry.debtRedirect = {
+      target: debtRedirect.target,
+      debtAmount: debtRedirect.debtAmount,
+      toSavings: debtRedirect.toSavings,
+      toSpending: debtRedirect.toSpending,
+    };
+  }
+  st.entries.push(entry);
   saveDepositHistory_(st);
 }
 async function postGuardCheckOrThrow_(deposit){
@@ -3919,12 +3952,26 @@ dashPreviewTbody.appendChild(tr);
         `<div style="font-size:.95em;font-weight:700;" class="mono">${formatMoney_(e.breakdown?.[l] || 0)}</div>` +
       `</div>`
     ).join("");
+    let redirectPill = "";
+    if (e.debtRedirect && (Number(e.debtRedirect.debtAmount || 0) > 0)) {
+      const t = String(e.debtRedirect.target || "savings");
+      const targetLabel = (t === "spending") ? "Spending"
+                        : (t === "split")    ? "Savings + Spending (50/50)"
+                        :                      "Savings";
+      redirectPill =
+        `<div style="margin-top:10px;padding:6px 10px;border-radius:6px;` +
+        `background:rgba(59,130,246,.10);border:1px solid rgba(59,130,246,.35);` +
+        `font-size:.75em;color:var(--muted);">` +
+        `↪ Debt bucket auto-redirected to ${escapeHtml_(targetLabel)} (no active debts)` +
+        `</div>`;
+    }
     return `<div class="dash-card" style="padding:14px 16px;">` +
       `<div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:10px;">` +
         `<span style="font-size:.8em;color:var(--muted);">${escapeHtml_(timeStr)}</span>` +
         `<span class="mono" style="font-size:1.15em;font-weight:700;color:var(--text);">${escapeHtml_(formatMoney_(e.deposit))}</span>` +
       `</div>` +
       `<div style="display:flex;gap:6px;border-top:1px solid var(--border);padding-top:10px;">${breakdown}</div>` +
+      redirectPill +
     `</div>`;
   }).join("");
 }
@@ -4156,6 +4203,27 @@ function dashTileLiveAmts_(deposit) {
       tiles[1] = round2_(tiles[1] + redist.toDebt);
       tiles[2] = round2_(tiles[2] + redist.toSavings);
       tiles[3] = round2_(tiles[3] + redist.toSpending);
+    }
+  } catch(_){}
+  // v431: If there are no active debts, forward the Debt tile to Savings /
+  // Spending per config so the pre-post preview matches what postDeposit_
+  // will actually record. The receipt (if any) is authoritative once a matching
+  // deposit has been posted; otherwise recompute live from current tile value.
+  try {
+    if ((tiles[1] || 0) > 0) {
+      const redirectRcpt = loadDebtRedirect_();
+      const snap2 = loadPostSnapshot_();
+      const isPostedDep2 = redirectRcpt && snap2 && Math.abs((Number(snap2.deposit)||0) - (Number(deposit)||0)) < 0.005;
+      if (redirectRcpt && isPostedDep2) {
+        tiles[1] = Math.max(0, round2_(tiles[1] - redirectRcpt.debtAmount));
+        tiles[2] = round2_(tiles[2] + redirectRcpt.toSavings);
+        tiles[3] = round2_(tiles[3] + redirectRcpt.toSpending);
+      } else if (noActiveDebts_()) {
+        const split = computeDebtRedirect_(tiles[1]);
+        tiles[1] = 0;
+        tiles[2] = round2_(tiles[2] + split.toSavings);
+        tiles[3] = round2_(tiles[3] + split.toSpending);
+      }
     }
   } catch(_){}
   return tiles;
@@ -4759,6 +4827,72 @@ function resetPaidMTD_(){
         } catch(e) {}
       }
 
+      // v431: Debt-redirect config + receipt.
+      // Config: user's chosen target when the Debt bucket has nothing to do
+      // (savings|spending|split). Persistent, cross-device.
+      // Receipt: per-post record of what actually redirected, month-scoped, in
+      // the same shape/lifecycle as skipRedistribution above.
+      const LS_KEY_DEBT_REDIRECT_TARGET = "BUDGETER_DEBT_REDIRECT_TARGET_V1";
+      const DEBT_REDIRECT_LS_KEY = "BUDGETER_DEBT_REDIRECT_RECEIPT_V1";
+
+      function loadDebtRedirectTarget_() {
+        const v = String(localStorage.getItem(LS_KEY_DEBT_REDIRECT_TARGET) || "savings").toLowerCase();
+        return (v === "spending" || v === "split") ? v : "savings";
+      }
+      function saveDebtRedirectTarget_(t) {
+        const v = (t === "spending" || t === "split") ? t : "savings";
+        try { localStorage.setItem(LS_KEY_DEBT_REDIRECT_TARGET, v); } catch(e){}
+        try { workerSet_("debtRedirectTarget", { target: v }).catch(()=>{}); } catch(e){}
+      }
+
+      function loadDebtRedirect_() {
+        try {
+          const raw = localStorage.getItem(DEBT_REDIRECT_LS_KEY);
+          if (!raw) return null;
+          const obj = JSON.parse(raw);
+          if (!obj || typeof obj !== "object") return null;
+          if (obj.monthKey !== monthKeyLocal_()) return null;
+          return obj;
+        } catch(e) { return null; }
+      }
+      function saveDebtRedirect_(obj) {
+        try {
+          if (obj == null) localStorage.removeItem(DEBT_REDIRECT_LS_KEY);
+          else localStorage.setItem(DEBT_REDIRECT_LS_KEY, JSON.stringify(obj));
+          workerSet_("debtRedirect", obj || {}).catch(()=>{});
+        } catch(e) {}
+      }
+
+      // True when there are no debts listed OR every listed debt has $0 balance.
+      // Deliberately balance-only: the debt waterfall's minTarget is already
+      // Math.min(minPmt, balance), so a $0 balance means $0 need regardless of
+      // configured min payment.
+      function noActiveDebts_() {
+        const items = appState.debtItems || {};
+        const keys = Object.keys(items);
+        if (!keys.length) return true;
+        for (const k of keys) {
+          const bal = Number(items[k]?.balance || 0) || 0;
+          if (bal > 0) return false;
+        }
+        return true;
+      }
+
+      // Given the Debt bucket dollars and the current target, return the
+      // Savings/Spending split. "split" is 50/50 between Savings and Spending;
+      // any rounding remainder goes to Spending so Savings + Spending === amount.
+      function computeDebtRedirect_(debtAmount) {
+        const target = loadDebtRedirectTarget_();
+        const amt = round2_(Math.max(0, Number(debtAmount || 0) || 0));
+        if (amt <= 0) return { target, toSavings: 0, toSpending: 0 };
+        if (target === "spending") return { target, toSavings: 0, toSpending: amt };
+        if (target === "split") {
+          const half = round2_(amt / 2);
+          return { target, toSavings: half, toSpending: round2_(amt - half) };
+        }
+        return { target, toSavings: amt, toSpending: 0 };
+      }
+
       function loadManualFunded_() {
         // Calendar-month reset: when the month rolls over, ALL manual-funded
         // flags drop, regardless of a bill's due-date cycle. Keeps the June
@@ -5150,6 +5284,7 @@ function resetPaidMTD_(){
         saveNextMonthPaid_({});
         try { saveFFAskedSet_(new Set()); } catch(_){}
         try { saveSkipRedistribution_(null); } catch(_){}
+        try { saveDebtRedirect_(null); } catch(_){}
 
         // Track what was seeded (v425 wipe/merge uses this)
         saveDemoSeed_({
@@ -5421,6 +5556,7 @@ function resetPaidMTD_(){
           savePostGuard_(null);
           try { saveFFAskedSet_(new Set()); } catch(_){}
           try { saveSkipRedistribution_(null); } catch(_){}
+          try { saveDebtRedirect_(null); } catch(_){}
           saveDepositHistory_({ monthKey: monthKeyLocal_(), entries: [] });
 
           // Clear demo flags
@@ -6636,7 +6772,32 @@ function resetPaidMTD_(){
     _histTiles[2] = round2_((_histTiles[2] || 0) + skipRedist.toSavings);
     _histTiles[3] = round2_((_histTiles[3] || 0) + skipRedist.toSpending);
   }
-  addDepositHistoryEntry_(deposit, { Bills: _histTiles[0], Debt: _histTiles[1], Savings: _histTiles[2], Spending: _histTiles[3] });
+
+  // v431: If there are no active debts, redirect the Debt bucket to Savings /
+  // Spending / 50-50 per the user's config. Runs AFTER skipRedist so anything
+  // pushed into Debt by the Bills-skip path also gets forwarded (nothing sits
+  // in a bucket that has no fundable target).
+  const debtRedirect = (noActiveDebts_() && ((_histTiles[1] || 0) > 0)) ? (function(){
+    const amt = round2_(Number(_histTiles[1] || 0) || 0);
+    const split = computeDebtRedirect_(amt);
+    return {
+      postedAt: new Date().toISOString(),
+      monthKey: paidState.monthKey,
+      deposit:  round2_(deposit),
+      debtAmount: amt,
+      target:   split.target,
+      toSavings: split.toSavings,
+      toSpending: split.toSpending,
+    };
+  })() : null;
+  if (debtRedirect) {
+    _histTiles[1] = Math.max(0, round2_((_histTiles[1] || 0) - debtRedirect.debtAmount));
+    _histTiles[2] = round2_((_histTiles[2] || 0) + debtRedirect.toSavings);
+    _histTiles[3] = round2_((_histTiles[3] || 0) + debtRedirect.toSpending);
+  }
+  saveDebtRedirect_(debtRedirect);
+
+  addDepositHistoryEntry_(deposit, { Bills: _histTiles[0], Debt: _histTiles[1], Savings: _histTiles[2], Spending: _histTiles[3] }, debtRedirect);
 
   // ✅ Log ledger for Post (single entry)
   recomputeBillsAllocations_(true, { log:true, mode:"post", reason:"postDeposit" });
@@ -7968,6 +8129,42 @@ engRawEl.textContent = JSON.stringify(res, null, 2);
         if (budD) budD.addEventListener("click", () => onSet("default"));
         if (budC) budC.addEventListener("click", () => onSet("computed"));
       }
+
+      // v431: Debt Bucket Redirect target toggle (Config tab).
+      function applyDebtRedirectTargetUI_(target) {
+        const t = (target === "spending" || target === "split") ? target : "savings";
+        const buttons = [
+          ["debtRedirBtn-savings",  "savings"],
+          ["debtRedirBtn-spending", "spending"],
+          ["debtRedirBtn-split",    "split"],
+        ];
+        for (const [id, val] of buttons) {
+          const el = document.getElementById(id);
+          if (el) el.classList.toggle("active", val === t);
+        }
+        const st = document.getElementById("debtRedirStatus");
+        if (st) st.textContent =
+          (t === "spending") ? "→ Spending"
+        : (t === "split")    ? "→ Savings + Spending (50/50)"
+        :                      "→ Savings";
+      }
+      function wireDebtRedirectToggle_() {
+        const buttons = [
+          ["debtRedirBtn-savings",  "savings"],
+          ["debtRedirBtn-spending", "spending"],
+          ["debtRedirBtn-split",    "split"],
+        ];
+        for (const [id, val] of buttons) {
+          const el = document.getElementById(id);
+          if (!el) continue;
+          el.addEventListener("click", () => {
+            saveDebtRedirectTarget_(val);
+            applyDebtRedirectTargetUI_(val);
+            try { renderDashboardAppTables_(); } catch(_){}
+          });
+        }
+        applyDebtRedirectTargetUI_(loadDebtRedirectTarget_());
+      }
 // ✅ Export Data
 async function runDataExport_() {
   const statusEl = document.getElementById("exportStatus");
@@ -8094,7 +8291,7 @@ document.addEventListener("click", async (e) => {
 
       async function syncDepositStateFromKV_() {
         const _s = (p) => p.catch(() => ({ ok: false, state: null }));
-        const [ps, snap, guard, hist, profile, customPcts, manualFunded, nextMonthPaid, billDueDates, billsSplitRatio, demoMode, demoSeed] = await Promise.all([
+        const [ps, snap, guard, hist, profile, customPcts, manualFunded, nextMonthPaid, billDueDates, billsSplitRatio, demoMode, demoSeed, debtRedirTgt, debtRedir] = await Promise.all([
           _s(workerGet_("paidState")),
           _s(workerGet_("postSnapshot")),
           _s(workerGet_("postGuard")),
@@ -8107,6 +8304,8 @@ document.addEventListener("click", async (e) => {
           _s(workerGet_("billsSplitRatio")),
           _s(workerGet_("demoMode")),
           _s(workerGet_("demoSeed")),
+          _s(workerGet_("debtRedirectTarget")),
+          _s(workerGet_("debtRedirect")),
         ]);
         let synced = 0;
         if (ps?.ok && ps.state)     { try { localStorage.setItem(LS_KEY_BILLS_PAID,      JSON.stringify(ps.state));   synced++; } catch(_){} }
@@ -8146,6 +8345,25 @@ document.addEventListener("click", async (e) => {
         if (demoSeed?.ok && demoSeed.state) {
           try { localStorage.setItem(DEMO_SEED_LS_KEY, JSON.stringify(demoSeed.state)); synced++; } catch(_){}
         }
+        // v431: Debt redirect config + receipt. Target defaults to "savings" if
+        // absent; treat an empty {} receipt (worker's "clear" marker) as null.
+        if (debtRedirTgt?.ok && debtRedirTgt.state && typeof debtRedirTgt.state === "object") {
+          try {
+            const t = String(debtRedirTgt.state.target || "savings").toLowerCase();
+            const v = (t === "spending" || t === "split") ? t : "savings";
+            localStorage.setItem(LS_KEY_DEBT_REDIRECT_TARGET, v);
+            try { applyDebtRedirectTargetUI_(v); } catch(_){}
+            synced++;
+          } catch(_){}
+        }
+        if (debtRedir?.ok) {
+          try {
+            const empty = !debtRedir.state || (typeof debtRedir.state === "object" && !Object.keys(debtRedir.state).length);
+            if (empty) localStorage.removeItem(DEBT_REDIRECT_LS_KEY);
+            else       localStorage.setItem(DEBT_REDIRECT_LS_KEY, JSON.stringify(debtRedir.state));
+            synced++;
+          } catch(_){}
+        }
         return synced;
       }
 
@@ -8176,6 +8394,7 @@ document.addEventListener("click", async (e) => {
   try{
     wireBillsViewToggles_();
     applyBillsViewMode_(loadBillsViewMode_());
+    try { wireDebtRedirectToggle_(); } catch(_){}
 
     // Reverse Last Deposit
     async function reverseLastDeposit_() {
@@ -8221,6 +8440,9 @@ document.addEventListener("click", async (e) => {
       // v412: clear any skip-redistribution receipt — otherwise the banner
       // outlives the deposit that produced it.
       try { saveSkipRedistribution_(null); } catch(_) {}
+      // v431: same story for the debt-redirect receipt — reversing the deposit
+      // should retract the auto-redirect record too.
+      try { saveDebtRedirect_(null); } catch(_) {}
       // v417: also clear the forward-fund "asked" suppression set so the user
       // gets a fresh chance to fund/skip on the next post.
       try { localStorage.removeItem(FF_ASKED_LS_KEY); } catch(_) {}
