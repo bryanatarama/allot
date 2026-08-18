@@ -557,43 +557,43 @@
 #classifyReminderModal .modal-sub { color:var(--text); font-size:.88em; margin:0 0 16px; line-height:1.55; }
 #classifyReminderModal .modal-footer { display:flex; gap:10px; justify-content:flex-end; }
 /* Redirect-paid modal (fires when Paid? is checked while allocation exists) */
-#redirectPaidModal {
+#redirectPaidModal, #debtRedirectModal {
   display:none; position:fixed; inset:0; z-index:9999;
   background:rgba(8,12,19,0.85); align-items:center; justify-content:center;
 }
-#redirectPaidModal.open { display:flex; }
-#redirectPaidModal .modal-box {
+#redirectPaidModal.open, #debtRedirectModal.open { display:flex; }
+#redirectPaidModal .modal-box, #debtRedirectModal .modal-box {
   background:var(--card); border:1px solid var(--border); border-radius:12px;
   padding:24px; max-width:460px; width:92%;
 }
-#redirectPaidModal h3 { margin:0 0 6px; font-size:1.05em; color:var(--text); }
-#redirectPaidModal .modal-sub { color:var(--muted); font-size:.88em; margin:0 0 16px; line-height:1.5; }
-#redirectPaidModal .rp-option {
+#redirectPaidModal h3, #debtRedirectModal h3 { margin:0 0 6px; font-size:1.05em; color:var(--text); }
+#redirectPaidModal .modal-sub, #debtRedirectModal .modal-sub { color:var(--muted); font-size:.88em; margin:0 0 16px; line-height:1.5; }
+#redirectPaidModal .rp-option, #debtRedirectModal .rp-option {
   display:block; border:1px solid var(--border); border-radius:10px;
   padding:12px 14px; margin-bottom:10px; cursor:pointer;
   background:var(--panel2);
 }
-#redirectPaidModal .rp-option:has(input:checked) {
+#redirectPaidModal .rp-option:has(input:checked), #debtRedirectModal .rp-option:has(input:checked) {
   border-color:var(--accent-border, rgba(56,189,248,.45));
   background:rgba(56,189,248,.06);
 }
-#redirectPaidModal .rp-option-header { display:flex; align-items:center; gap:10px; }
-#redirectPaidModal .rp-option-header input[type="radio"] { flex-shrink:0; accent-color:var(--accent); }
-#redirectPaidModal .rp-option-label { font-weight:600; font-size:.95em; color:var(--text); }
-#redirectPaidModal .rp-option-detail { font-size:.82em; color:var(--muted); margin-top:4px; padding-left:24px; line-height:1.5; }
+#redirectPaidModal .rp-option-header, #debtRedirectModal .rp-option-header { display:flex; align-items:center; gap:10px; }
+#redirectPaidModal .rp-option-header input[type="radio"], #debtRedirectModal .rp-option-header input[type="radio"] { flex-shrink:0; accent-color:var(--accent); }
+#redirectPaidModal .rp-option-label, #debtRedirectModal .rp-option-label { font-weight:600; font-size:.95em; color:var(--text); }
+#redirectPaidModal .rp-option-detail, #debtRedirectModal .rp-option-detail { font-size:.82em; color:var(--muted); margin-top:4px; padding-left:24px; line-height:1.5; }
 #redirectPaidModal .rp-move-select {
   margin-top:8px; margin-left:24px; padding:6px 10px;
   background:var(--panel); border:1px solid var(--border); border-radius:6px;
   color:var(--text); font-family:inherit; font-size:.88em; max-width:100%;
 }
 #redirectPaidModal .rp-move-select:disabled { opacity:.4; cursor:not-allowed; }
-#redirectPaidModal .modal-footer { display:flex; gap:10px; justify-content:flex-end; margin-top:14px; }
-#redirectPaidModal .btn-confirm-rp {
+#redirectPaidModal .modal-footer, #debtRedirectModal .modal-footer { display:flex; gap:10px; justify-content:flex-end; margin-top:14px; }
+#redirectPaidModal .btn-confirm-rp, #debtRedirectModal .btn-confirm-rp {
   background:var(--accent-bg, rgba(56,189,248,.12)); border:1px solid var(--accent-border, rgba(56,189,248,.4));
   color:var(--accent-text, #38bdf8); border-radius:8px; padding:8px 18px;
   font-family:inherit; font-size:.9em; font-weight:700; cursor:pointer;
 }
-#redirectPaidModal .btn-confirm-rp:disabled { opacity:.4; cursor:not-allowed; }
+#redirectPaidModal .btn-confirm-rp:disabled, #debtRedirectModal .btn-confirm-rp:disabled { opacity:.4; cursor:not-allowed; }
 /* Clear custom pct modal */
 #clearPctModal {
   display:none; position:fixed; inset:0; z-index:9999;
@@ -1681,30 +1681,6 @@ body { padding:0; overflow-x: hidden; }
 
 
 
-      <!-- ✅ Debt Bucket Redirect (v431) -->
-      <div class="panel">
-        <div class="tab-header" style="margin-bottom:8px">
-          <div>
-            <h3 style="margin:0">Debt Bucket Redirect</h3>
-            <div class="muted">
-              When you have no debts listed, or every listed debt has a $0 balance,
-              the Debt bucket has nothing to fund. Pick where that money should go instead.
-            </div>
-          </div>
-        </div>
-        <div style="display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin-top:4px">
-          <div class="seg" role="radiogroup" aria-label="Debt redirect target" id="debtRedirectTargetSeg">
-            <button id="debtRedirBtn-savings"  type="button" data-target="savings">Savings</button>
-            <button id="debtRedirBtn-spending" type="button" data-target="spending">Spending</button>
-            <button id="debtRedirBtn-split"    type="button" data-target="split">Split 50/50</button>
-          </div>
-          <span id="debtRedirStatus" class="status-pill" style="margin-left:auto">—</span>
-        </div>
-        <div class="hint" style="margin-top:8px">
-          Applies only when no debts need funding. Debt allocation logic is otherwise unchanged.
-        </div>
-      </div>
-
       <!-- ✅ Bills % Split view toggle (restored) -->
       <div class="panel">
         <div class="tab-header" style="margin-bottom:8px">
@@ -1812,7 +1788,7 @@ body { padding:0; overflow-x: hidden; }
       // ===== Header pills =====
       const whereEl = document.getElementById("where");
       const specEl = document.getElementById("specVersion");
-      const BUILD_STAMP = "v431-pages";
+      const BUILD_STAMP = "v432-pages";
       const SPEC_VERSION = "";
       specEl.textContent = "Spec: " + SPEC_VERSION;
       whereEl.textContent = "Here: " + window.location.href;
@@ -4205,25 +4181,17 @@ function dashTileLiveAmts_(deposit) {
       tiles[3] = round2_(tiles[3] + redist.toSpending);
     }
   } catch(_){}
-  // v431: If there are no active debts, forward the Debt tile to Savings /
-  // Spending per config so the pre-post preview matches what postDeposit_
-  // will actually record. The receipt (if any) is authoritative once a matching
-  // deposit has been posted; otherwise recompute live from current tile value.
+  // v432: For a posted deposit whose Debt bucket was redirected, replay the
+  // receipt so tiles reflect the final distribution. For a pre-post preview
+  // we deliberately leave the Debt tile alone — the user hasn't chosen yet.
   try {
-    if ((tiles[1] || 0) > 0) {
-      const redirectRcpt = loadDebtRedirect_();
-      const snap2 = loadPostSnapshot_();
-      const isPostedDep2 = redirectRcpt && snap2 && Math.abs((Number(snap2.deposit)||0) - (Number(deposit)||0)) < 0.005;
-      if (redirectRcpt && isPostedDep2) {
-        tiles[1] = Math.max(0, round2_(tiles[1] - redirectRcpt.debtAmount));
-        tiles[2] = round2_(tiles[2] + redirectRcpt.toSavings);
-        tiles[3] = round2_(tiles[3] + redirectRcpt.toSpending);
-      } else if (noActiveDebts_()) {
-        const split = computeDebtRedirect_(tiles[1]);
-        tiles[1] = 0;
-        tiles[2] = round2_(tiles[2] + split.toSavings);
-        tiles[3] = round2_(tiles[3] + split.toSpending);
-      }
+    const redirectRcpt = loadDebtRedirect_();
+    const snap2 = loadPostSnapshot_();
+    const isPostedDep2 = redirectRcpt && snap2 && Math.abs((Number(snap2.deposit)||0) - (Number(deposit)||0)) < 0.005;
+    if (redirectRcpt && isPostedDep2) {
+      tiles[1] = Math.max(0, round2_(tiles[1] - redirectRcpt.debtAmount));
+      tiles[2] = round2_(tiles[2] + redirectRcpt.toSavings);
+      tiles[3] = round2_(tiles[3] + redirectRcpt.toSpending);
     }
   } catch(_){}
   return tiles;
@@ -4827,23 +4795,12 @@ function resetPaidMTD_(){
         } catch(e) {}
       }
 
-      // v431: Debt-redirect config + receipt.
-      // Config: user's chosen target when the Debt bucket has nothing to do
-      // (savings|spending|split). Persistent, cross-device.
-      // Receipt: per-post record of what actually redirected, month-scoped, in
-      // the same shape/lifecycle as skipRedistribution above.
-      const LS_KEY_DEBT_REDIRECT_TARGET = "BUDGETER_DEBT_REDIRECT_TARGET_V1";
+      // v431 (updated v432): Debt-redirect receipt. Per-post record of what
+      // was redirected out of the Debt bucket when there were no active debts.
+      // Month-scoped, same shape/lifecycle as skipRedistribution above. The
+      // per-post choice comes from a modal (showDebtRedirectModal_) rather
+      // than a persistent config — v432 dropped the Config-tab toggle.
       const DEBT_REDIRECT_LS_KEY = "BUDGETER_DEBT_REDIRECT_RECEIPT_V1";
-
-      function loadDebtRedirectTarget_() {
-        const v = String(localStorage.getItem(LS_KEY_DEBT_REDIRECT_TARGET) || "savings").toLowerCase();
-        return (v === "spending" || v === "split") ? v : "savings";
-      }
-      function saveDebtRedirectTarget_(t) {
-        const v = (t === "spending" || t === "split") ? t : "savings";
-        try { localStorage.setItem(LS_KEY_DEBT_REDIRECT_TARGET, v); } catch(e){}
-        try { workerSet_("debtRedirectTarget", { target: v }).catch(()=>{}); } catch(e){}
-      }
 
       function loadDebtRedirect_() {
         try {
@@ -4878,19 +4835,19 @@ function resetPaidMTD_(){
         return true;
       }
 
-      // Given the Debt bucket dollars and the current target, return the
+      // Given the Debt bucket dollars and a user-picked target, return the
       // Savings/Spending split. "split" is 50/50 between Savings and Spending;
       // any rounding remainder goes to Spending so Savings + Spending === amount.
-      function computeDebtRedirect_(debtAmount) {
-        const target = loadDebtRedirectTarget_();
+      function computeDebtRedirect_(debtAmount, target) {
+        const t = (target === "spending" || target === "split") ? target : "savings";
         const amt = round2_(Math.max(0, Number(debtAmount || 0) || 0));
-        if (amt <= 0) return { target, toSavings: 0, toSpending: 0 };
-        if (target === "spending") return { target, toSavings: 0, toSpending: amt };
-        if (target === "split") {
+        if (amt <= 0) return { target: t, toSavings: 0, toSpending: 0 };
+        if (t === "spending") return { target: t, toSavings: 0, toSpending: amt };
+        if (t === "split") {
           const half = round2_(amt / 2);
-          return { target, toSavings: half, toSpending: round2_(amt - half) };
+          return { target: t, toSavings: half, toSpending: round2_(amt - half) };
         }
-        return { target, toSavings: amt, toSpending: 0 };
+        return { target: t, toSavings: amt, toSpending: 0 };
       }
 
       function loadManualFunded_() {
@@ -5780,6 +5737,34 @@ function resetPaidMTD_(){
           confirmBtn.addEventListener("click", onConfirm);
           cancelBtn.addEventListener("click", onCancel);
 
+          modal.classList.add("open");
+        });
+      }
+
+      // v432: prompt during postDeposit_ when the Debt bucket has money but
+      // every listed debt is at $0 (or none listed). Returns the user's chosen
+      // target: "savings" | "spending" | "split" | "keep". If the modal is
+      // missing (shouldn't happen), defaults to "savings" so we don't strand
+      // the deposit mid-post.
+      function showDebtRedirectModal_(debtAmount) {
+        return new Promise(resolve => {
+          const modal = document.getElementById("debtRedirectModal");
+          const sub = document.getElementById("drModalSub");
+          const confirmBtn = document.getElementById("drModalConfirmBtn");
+          if (!modal || !sub || !confirmBtn) { resolve("savings"); return; }
+          sub.innerHTML = `The Debt bucket got <strong>${escapeHtml_(formatMoney_(debtAmount))}</strong> allotted, but every listed debt is at $0 balance. Where should this money go?`;
+          const savingsRadio = modal.querySelector('input[name="dr-choice"][value="savings"]');
+          if (savingsRadio) savingsRadio.checked = true;
+          const cleanup = (result) => {
+            modal.classList.remove("open");
+            confirmBtn.removeEventListener("click", onConfirm);
+            resolve(result);
+          };
+          const onConfirm = () => {
+            const val = modal.querySelector('input[name="dr-choice"]:checked')?.value || "savings";
+            cleanup(val);
+          };
+          confirmBtn.addEventListener("click", onConfirm);
           modal.classList.add("open");
         });
       }
@@ -6773,27 +6758,29 @@ function resetPaidMTD_(){
     _histTiles[3] = round2_((_histTiles[3] || 0) + skipRedist.toSpending);
   }
 
-  // v431: If there are no active debts, redirect the Debt bucket to Savings /
-  // Spending / 50-50 per the user's config. Runs AFTER skipRedist so anything
-  // pushed into Debt by the Bills-skip path also gets forwarded (nothing sits
-  // in a bucket that has no fundable target).
-  const debtRedirect = (noActiveDebts_() && ((_histTiles[1] || 0) > 0)) ? (function(){
-    const amt = round2_(Number(_histTiles[1] || 0) || 0);
-    const split = computeDebtRedirect_(amt);
-    return {
-      postedAt: new Date().toISOString(),
-      monthKey: paidState.monthKey,
-      deposit:  round2_(deposit),
-      debtAmount: amt,
-      target:   split.target,
-      toSavings: split.toSavings,
-      toSpending: split.toSpending,
-    };
-  })() : null;
-  if (debtRedirect) {
-    _histTiles[1] = Math.max(0, round2_((_histTiles[1] || 0) - debtRedirect.debtAmount));
-    _histTiles[2] = round2_((_histTiles[2] || 0) + debtRedirect.toSavings);
-    _histTiles[3] = round2_((_histTiles[3] || 0) + debtRedirect.toSpending);
+  // v432: If there are no active debts and the Debt bucket has money, prompt
+  // the user where to send it. Runs AFTER skipRedist so anything pushed into
+  // Debt by the Bills-skip path can also be forwarded. "keep" leaves the
+  // money in Debt as a payoff buffer (writes no receipt).
+  let debtRedirect = null;
+  if (noActiveDebts_() && ((_histTiles[1] || 0) > 0)) {
+    const debtAmt = round2_(Number(_histTiles[1] || 0) || 0);
+    const target = await showDebtRedirectModal_(debtAmt);
+    if (target !== "keep") {
+      const split = computeDebtRedirect_(debtAmt, target);
+      debtRedirect = {
+        postedAt: new Date().toISOString(),
+        monthKey: paidState.monthKey,
+        deposit:  round2_(deposit),
+        debtAmount: debtAmt,
+        target:   split.target,
+        toSavings: split.toSavings,
+        toSpending: split.toSpending,
+      };
+      _histTiles[1] = Math.max(0, round2_((_histTiles[1] || 0) - debtRedirect.debtAmount));
+      _histTiles[2] = round2_((_histTiles[2] || 0) + debtRedirect.toSavings);
+      _histTiles[3] = round2_((_histTiles[3] || 0) + debtRedirect.toSpending);
+    }
   }
   saveDebtRedirect_(debtRedirect);
 
@@ -8130,41 +8117,6 @@ engRawEl.textContent = JSON.stringify(res, null, 2);
         if (budC) budC.addEventListener("click", () => onSet("computed"));
       }
 
-      // v431: Debt Bucket Redirect target toggle (Config tab).
-      function applyDebtRedirectTargetUI_(target) {
-        const t = (target === "spending" || target === "split") ? target : "savings";
-        const buttons = [
-          ["debtRedirBtn-savings",  "savings"],
-          ["debtRedirBtn-spending", "spending"],
-          ["debtRedirBtn-split",    "split"],
-        ];
-        for (const [id, val] of buttons) {
-          const el = document.getElementById(id);
-          if (el) el.classList.toggle("active", val === t);
-        }
-        const st = document.getElementById("debtRedirStatus");
-        if (st) st.textContent =
-          (t === "spending") ? "→ Spending"
-        : (t === "split")    ? "→ Savings + Spending (50/50)"
-        :                      "→ Savings";
-      }
-      function wireDebtRedirectToggle_() {
-        const buttons = [
-          ["debtRedirBtn-savings",  "savings"],
-          ["debtRedirBtn-spending", "spending"],
-          ["debtRedirBtn-split",    "split"],
-        ];
-        for (const [id, val] of buttons) {
-          const el = document.getElementById(id);
-          if (!el) continue;
-          el.addEventListener("click", () => {
-            saveDebtRedirectTarget_(val);
-            applyDebtRedirectTargetUI_(val);
-            try { renderDashboardAppTables_(); } catch(_){}
-          });
-        }
-        applyDebtRedirectTargetUI_(loadDebtRedirectTarget_());
-      }
 // ✅ Export Data
 async function runDataExport_() {
   const statusEl = document.getElementById("exportStatus");
@@ -8291,7 +8243,7 @@ document.addEventListener("click", async (e) => {
 
       async function syncDepositStateFromKV_() {
         const _s = (p) => p.catch(() => ({ ok: false, state: null }));
-        const [ps, snap, guard, hist, profile, customPcts, manualFunded, nextMonthPaid, billDueDates, billsSplitRatio, demoMode, demoSeed, debtRedirTgt, debtRedir] = await Promise.all([
+        const [ps, snap, guard, hist, profile, customPcts, manualFunded, nextMonthPaid, billDueDates, billsSplitRatio, demoMode, demoSeed, debtRedir] = await Promise.all([
           _s(workerGet_("paidState")),
           _s(workerGet_("postSnapshot")),
           _s(workerGet_("postGuard")),
@@ -8304,7 +8256,6 @@ document.addEventListener("click", async (e) => {
           _s(workerGet_("billsSplitRatio")),
           _s(workerGet_("demoMode")),
           _s(workerGet_("demoSeed")),
-          _s(workerGet_("debtRedirectTarget")),
           _s(workerGet_("debtRedirect")),
         ]);
         let synced = 0;
@@ -8345,17 +8296,9 @@ document.addEventListener("click", async (e) => {
         if (demoSeed?.ok && demoSeed.state) {
           try { localStorage.setItem(DEMO_SEED_LS_KEY, JSON.stringify(demoSeed.state)); synced++; } catch(_){}
         }
-        // v431: Debt redirect config + receipt. Target defaults to "savings" if
-        // absent; treat an empty {} receipt (worker's "clear" marker) as null.
-        if (debtRedirTgt?.ok && debtRedirTgt.state && typeof debtRedirTgt.state === "object") {
-          try {
-            const t = String(debtRedirTgt.state.target || "savings").toLowerCase();
-            const v = (t === "spending" || t === "split") ? t : "savings";
-            localStorage.setItem(LS_KEY_DEBT_REDIRECT_TARGET, v);
-            try { applyDebtRedirectTargetUI_(v); } catch(_){}
-            synced++;
-          } catch(_){}
-        }
+        // v431 (updated v432): Debt-redirect receipt. Treat an empty {}
+        // receipt (worker's "clear" marker) as null. v432 dropped the
+        // debtRedirectTarget config sync — target is chosen per-post via modal.
         if (debtRedir?.ok) {
           try {
             const empty = !debtRedir.state || (typeof debtRedir.state === "object" && !Object.keys(debtRedir.state).length);
@@ -8394,7 +8337,6 @@ document.addEventListener("click", async (e) => {
   try{
     wireBillsViewToggles_();
     applyBillsViewMode_(loadBillsViewMode_());
-    try { wireDebtRedirectToggle_(); } catch(_){}
 
     // Reverse Last Deposit
     async function reverseLastDeposit_() {
@@ -9867,6 +9809,46 @@ document.addEventListener("click", async (e) => {
       <div class="modal-footer">
         <button id="rpModalCancelBtn" class="btn btn2">Cancel</button>
         <button id="rpModalConfirmBtn" class="btn-confirm-rp">Confirm</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="debtRedirectModal" role="dialog" aria-modal="true" aria-labelledby="drModalTitle">
+    <div class="modal-box">
+      <h3 id="drModalTitle">Debt bucket has money, but no active debts</h3>
+      <p class="modal-sub" id="drModalSub">Where should this money go?</p>
+      <div id="drModalOptions">
+        <label class="rp-option">
+          <span class="rp-option-header">
+            <input type="radio" name="dr-choice" value="savings" checked>
+            <span class="rp-option-label">Savings</span>
+          </span>
+          <div class="rp-option-detail">Add the entire Debt bucket to your Savings pool.</div>
+        </label>
+        <label class="rp-option">
+          <span class="rp-option-header">
+            <input type="radio" name="dr-choice" value="spending">
+            <span class="rp-option-label">Spending</span>
+          </span>
+          <div class="rp-option-detail">Add it to Spending instead.</div>
+        </label>
+        <label class="rp-option">
+          <span class="rp-option-header">
+            <input type="radio" name="dr-choice" value="split">
+            <span class="rp-option-label">Split 50/50</span>
+          </span>
+          <div class="rp-option-detail">Half to Savings, half to Spending.</div>
+        </label>
+        <label class="rp-option">
+          <span class="rp-option-header">
+            <input type="radio" name="dr-choice" value="keep">
+            <span class="rp-option-label">Keep in Debt</span>
+          </span>
+          <div class="rp-option-detail">Leave it in the Debt bucket as a payoff buffer for future use.</div>
+        </label>
+      </div>
+      <div class="modal-footer">
+        <button id="drModalConfirmBtn" class="btn-confirm-rp">Confirm</button>
       </div>
     </div>
   </div>
