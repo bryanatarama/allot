@@ -1788,7 +1788,7 @@ body { padding:0; overflow-x: hidden; }
       // ===== Header pills =====
       const whereEl = document.getElementById("where");
       const specEl = document.getElementById("specVersion");
-      const BUILD_STAMP = "v433-pages";
+      const BUILD_STAMP = "v434-pages";
       const SPEC_VERSION = "";
       specEl.textContent = "Spec: " + SPEC_VERSION;
       whereEl.textContent = "Here: " + window.location.href;
@@ -3119,8 +3119,13 @@ function debtRowKey_(row) {
   return k.trim().toLowerCase();
 }
 
-function computeDebtAllocations_() {
-  const debtPool = getDebtPoolFromEngine_();
+// v434: optional poolOverride lets postDeposit_ pass the Debt pool that
+// INCLUDES skipRedist.toDebt (money the Bills-skip path pushed into Debt).
+// Without it the waterfall only ever sees the splitter's base Debt share.
+function computeDebtAllocations_(poolOverride) {
+  const debtPool = (typeof poolOverride === "number" && isFinite(poolOverride))
+    ? round2_(Math.max(0, poolOverride))
+    : getDebtPoolFromEngine_();
   const rows = getDebtInputsOrdered_();
 
   const weights = rows.map(r => debtWeight_(r)); // your Option C etc
@@ -3200,8 +3205,8 @@ function computeDebtAllocations_() {
 }
 
 
-function recordDebtDeposit_() {
-  const calc = computeDebtAllocations_();
+function recordDebtDeposit_(poolOverride) {
+  const calc = computeDebtAllocations_(poolOverride);
   const paidByKey = getDebtPaidByKeyThisMonth_();
 
   calc.rows.forEach((r, i) => {
@@ -4672,11 +4677,18 @@ async function resetAllMTD_(){
 
   // =========================
   // 3) Clear Already Paid checkboxes + next-month pre-funding + deposit history
+  //    + both post receipts
   // =========================
-  try { localStorage.removeItem(MANUAL_FUNDED_LS_KEY); } catch(e){}
-  try { localStorage.removeItem(NEXT_MONTH_PAID_LS_KEY); } catch(e){}
-  try { localStorage.removeItem(FF_ASKED_LS_KEY); } catch(e){}
-  try { localStorage.removeItem(LS_KEY_DEPOSIT_HISTORY); } catch(e){}
+  // v434: these MUST go through the save functions so KV is cleared too.
+  // Previously this block only removed the localStorage copies, so the next
+  // boot (or the 60s auto-refresh on tab return) pulled every one of them
+  // straight back from KV — and other devices never saw the reset at all.
+  try { saveManualFunded_({}); } catch(e){}
+  try { saveNextMonthPaid_({}); } catch(e){}
+  try { saveFFAskedSet_(new Set()); } catch(e){}
+  try { saveDepositHistory_({ monthKey: monthKeyLocal_(), entries: [] }); } catch(e){}
+  try { saveSkipRedistribution_(null); } catch(e){}
+  try { saveDebtRedirect_(null); } catch(e){}
 
   // =========================
   // 4) Force Budgeter/Engine deposit to 0 and trigger the normal recompute pipeline
@@ -6719,6 +6731,31 @@ function resetPaidMTD_(){
       skippedByKey: Object.assign({}, skippedByKey),
     };
   })() : null;
+
+  // v434: Drop any receipts left over from a PREVIOUS post this month from
+  // localStorage BEFORE computing this post's tiles. dashTileLiveAmts_ replays
+  // whichever receipts it finds whenever the snapshot deposit matches — so
+  // without this, (a) the skipRedist receipt saved just below would be applied
+  // by dashTileLiveAmts_ AND again by the block after it (double-count), and
+  // (b) the previous post's debtRedirect receipt would leak into this post's
+  // tiles once the snapshot is overwritten. Local-only removal here; the KV
+  // side is written exactly once each by saveSkipRedistribution_(skipRedist)
+  // below and saveDebtRedirect_(debtRedirect) further down (fire-and-forget
+  // KV writes to the same key are unordered, so we avoid a clear+set pair).
+  try { localStorage.removeItem(SKIP_REDIST_LS_KEY); } catch(_) {}
+  try { localStorage.removeItem(DEBT_REDIRECT_LS_KEY); } catch(_) {}
+
+  // ✅ Base tiles for this deposit (no receipt replay possible now), then apply
+  // this post's skip-redistribution exactly once so the history entry reflects
+  // the FINAL distribution the user should actually move in their bank.
+  const _histTiles = dashTileLiveAmts_(deposit);
+  if (skipRedist) {
+    _histTiles[0] = Math.max(0, round2_((_histTiles[0] || 0) - skipRedist.skipped));
+    _histTiles[1] = round2_((_histTiles[1] || 0) + skipRedist.toDebt);
+    _histTiles[2] = round2_((_histTiles[2] || 0) + skipRedist.toSavings);
+    _histTiles[3] = round2_((_histTiles[3] || 0) + skipRedist.toSpending);
+  }
+
   saveSkipRedistribution_(skipRedist);
 
   // Save post snapshot for Option A hold (what the table shows)
@@ -6733,17 +6770,15 @@ function resetPaidMTD_(){
   // ✅ Guard stamp (month + deposit)
   savePostGuard_({ postedAt: new Date().toISOString(), monthKey: paidState.monthKey, deposit });
 
-  // ✅ Deposit history (unbounded, resets monthly)
-  // If we redistributed skipped bill money, adjust the tile amounts so the
-  // history entry (and, downstream, dashTileLiveAmts_) reflects the FINAL
-  // distribution the user should actually move in their bank.
-  const _histTiles = dashTileLiveAmts_(deposit);
-  if (skipRedist) {
-    _histTiles[0] = Math.max(0, round2_((_histTiles[0] || 0) - skipRedist.skipped));
-    _histTiles[1] = round2_((_histTiles[1] || 0) + skipRedist.toDebt);
-    _histTiles[2] = round2_((_histTiles[2] || 0) + skipRedist.toSavings);
-    _histTiles[3] = round2_((_histTiles[3] || 0) + skipRedist.toSpending);
-  }
+  // v434: the Debt pool this post actually carries = the splitter's Debt share
+  // PLUS anything the Bills-skip path pushed into Debt. The debt waterfall must
+  // see the whole thing — otherwise skipRedist.toDebt sits in the tile but is
+  // never applied to any debt, and the leftover check below flags it as
+  // "extra" on every skip even when debts have plenty of balance.
+  const _debtPoolForPost = round2_(
+    (Number(computeEffectiveSplitterAmounts_(deposit)?.effective?.Debt || 0) || 0)
+    + (skipRedist ? (Number(skipRedist.toDebt || 0) || 0) : 0)
+  );
 
   // v433: If the Debt bucket carries more money than the waterfall can actually
   // apply to debts this post (all debts already at $0, OR just excess pool
@@ -6755,7 +6790,7 @@ function resetPaidMTD_(){
   {
     let actualDebtPaid = 0;
     try {
-      const _dcalc = computeDebtAllocations_();
+      const _dcalc = computeDebtAllocations_(_debtPoolForPost);
       actualDebtPaid = round2_((_dcalc?.thisDepositPay || []).reduce((s, x) => s + (Number(x) || 0), 0));
     } catch(_){ actualDebtPaid = 0; }
     const debtLeftover = round2_(Math.max(0, (Number(_histTiles[1] || 0) || 0) - actualDebtPaid));
@@ -6785,8 +6820,10 @@ function resetPaidMTD_(){
   // ✅ Log ledger for Post (single entry)
   recomputeBillsAllocations_(true, { log:true, mode:"post", reason:"postDeposit" });
 
-  // ✅ Debt Paid MTD is post-only
-  if (typeof recordDebtDeposit_ === "function") recordDebtDeposit_();
+  // ✅ Debt Paid MTD is post-only. v434: apply the full post pool (incl. any
+  // skipRedist.toDebt) so that money actually lands on debts instead of
+  // sitting untracked in the tile.
+  if (typeof recordDebtDeposit_ === "function") recordDebtDeposit_(_debtPoolForPost);
 
   // Clear deposit inputs ready for next entry
   if (engDepositEl) engDepositEl.value = "0";
@@ -8320,6 +8357,12 @@ document.addEventListener("click", async (e) => {
       function _onVisible_() {
         if (document.visibilityState !== 'visible') return;
         if (!DashboardState.loadedOnce) return;
+        // v434: never reload mid-post. postDeposit_ writes state progressively
+        // and awaits modals (forward-fund, due-date, debt-redirect) part-way
+        // through — a reload while the user is on one of those (e.g. hopped to
+        // their bank app for a minute) committed paid/snapshot/guard but never
+        // wrote the history entry, ledger, or debt MTD.
+        if (window._postDepositInFlight) return;
         const age = DashboardState.lastLoadedAt
           ? Date.now() - new Date(DashboardState.lastLoadedAt).getTime()
           : Infinity;
@@ -8370,11 +8413,19 @@ document.addEventListener("click", async (e) => {
       try { savePostSnapshot_(null); } catch(_) {}
       try { savePostGuard_(null); } catch(_) {}
       try { savePaidState_({ monthKey: monthKeyLocal_(), paidByKey: {} }); } catch(_) {}
-      try { localStorage.removeItem(MANUAL_FUNDED_LS_KEY); } catch(_) {}
+      // v434: was a localStorage-only removeItem — KV kept the flags and they
+      // came back on the next reload / other device. Go through the save fn.
+      try { saveManualFunded_({}); } catch(_) {}
       // Forward-funded amounts must roll back too — otherwise reversing a deposit
       // that pre-funded next month leaves the next-month funding stranded.
       try { localStorage.removeItem(NEXT_MONTH_PAID_LS_KEY); } catch(_) {}
       try { saveNextMonthPaid_({}); } catch(_) {}
+      // v434: this is a full-month reset (see modal copy), so the Deposit
+      // History card and the Debt tab's Paid-MTD must roll back with it —
+      // otherwise the card still lists the reversed deposit and "Total Paid
+      // This Month" keeps the amount the reversed post applied to debts.
+      try { saveDepositHistory_({ monthKey: monthKeyLocal_(), entries: [] }); } catch(_) {}
+      try { saveDebtPaidState_({ monthKey: monthKeyLocal_(), paidByKey: {} }); } catch(_) {}
       // v412: clear any skip-redistribution receipt — otherwise the banner
       // outlives the deposit that produced it.
       try { saveSkipRedistribution_(null); } catch(_) {}
@@ -8388,6 +8439,9 @@ document.addEventListener("click", async (e) => {
       // renderDashboardAppTables_ refreshes Home tiles AND the Allot pool tiles.
       try { renderDashboardAppTables_(); } catch(_) {}
       try { if (typeof renderBillsSplitTable_ === 'function') renderBillsSplitTable_(); } catch(_) {}
+      // v434: Debt tab KPIs read debtPaidState — refresh so the reset shows.
+      try { if (typeof renderDebtLocal_ === 'function') renderDebtLocal_(); } catch(_) {}
+      try { if (typeof updateDebtComputedInPlace_ === 'function') updateDebtComputedInPlace_(); } catch(_) {}
     }
     // Exposed on window so the centralized wiring in the second <script> (a
     // separate IIFE) can reach it — without this, the button handler sees
@@ -9086,7 +9140,32 @@ document.addEventListener("click", async (e) => {
         }).catch(() => {});
       }
       try { localStorage.removeItem(LS_KEY_SESSION); } catch(_) {}
-      document.getElementById('authOverlay').classList.add('open');
+      // v434: wipe this account's cached data so it can't leak into the next
+      // account signed in on this browser. syncDepositStateFromKV_ only
+      // overwrites local when KV has a value, so a fresh account (null KV keys)
+      // would otherwise inherit the previous user's paidState / history /
+      // manualFunded / ledger / debt MTD — and the first save (e.g. the boot
+      // auto-flip) would push it into the NEW user's KV. Device prefs are kept
+      // (view mode, onboarding/coach flags, returning-user + signup-src marks).
+      try {
+        const keep = new Set([
+          LS_KEY_SESSION, LS_KEY_ONBOARDING_DONE, LS_KEY_BILLS_VIEW_MODE,
+          'ALLOT_COACH_DONE_V1', 'ALLOT_RETURNING_V1', 'ALLOT_SIGNUP_SRC_V1',
+          'BUDGETER_PREVIEW_AS_USER',
+        ]);
+        const doomed = [];
+        for (let i = 0; i < localStorage.length; i++) {
+          const k = localStorage.key(i);
+          if (!k) continue;
+          if (keep.has(k)) continue;
+          if (k.indexOf('BUDGETER_COACH_') === 0) continue;
+          if (k.indexOf('BUDGETER_') === 0 || k.indexOf('ALLOT_') === 0) doomed.push(k);
+        }
+        doomed.forEach(k => { try { localStorage.removeItem(k); } catch(_) {} });
+      } catch(_) {}
+      // Reload so in-memory appState / EngineState drop too — the sign-in
+      // screen then comes up on a clean slate (same as onAuthSuccess_ does).
+      window.location.reload();
     }
 
     const LS_KEY_COACH_DONE = 'ALLOT_COACH_DONE_V1';
