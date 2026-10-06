@@ -1788,7 +1788,7 @@ body { padding:0; overflow-x: hidden; }
       // ===== Header pills =====
       const whereEl = document.getElementById("where");
       const specEl = document.getElementById("specVersion");
-      const BUILD_STAMP = "v434-pages";
+      const BUILD_STAMP = "v435-pages";
       const SPEC_VERSION = "";
       specEl.textContent = "Spec: " + SPEC_VERSION;
       whereEl.textContent = "Here: " + window.location.href;
@@ -2158,7 +2158,10 @@ async function loadDebtItemsServer_(){
         balance: String(it.balance ?? ""),
         apr: String(it.apr ?? ""),
         minPayment: String(it.min ?? ""),
-        notes: "",
+        // v434: notes round-trip through KV now (were hardcoded to "" on load
+        // and never sent on save, so the editable Notes column lost its
+        // contents on every reload).
+        notes: String(it.notes ?? ""),
       };
     }
 
@@ -2208,12 +2211,12 @@ async function loadBillsSplitTargetsServer_(){
     for (const key of Object.keys(map)){
       const serverVal = Number(map[key] || 0) || 0;
 
-      // If server has 0 AND we already have a non-zero local value, keep local.
-      const localVal = Number(appState.billsSplit?.[key]?.monthlyTarget || 0) || 0;
-      const useVal = (serverVal === 0 && localVal > 0) ? localVal : serverVal;
-
+      // v434: KV is the source of truth — take the server value as-is. The old
+      // "if server has 0 but local is non-zero, keep local" branch resurrected
+      // targets another device had deliberately set to $0 (and the next target
+      // edit on this device wrote the stale value back to KV).
       appState.billsSplit[key] = appState.billsSplit[key] || {};
-      appState.billsSplit[key].monthlyTarget = String(Math.round(useVal * 100) / 100);
+      appState.billsSplit[key].monthlyTarget = String(Math.round(serverVal * 100) / 100);
     }
 
     saveBillsSplitToStorage_(); // fallback mirror
@@ -2272,6 +2275,7 @@ async function saveDebtItemsServer_(){
       apr: Number(rawFromFormatted_(it.apr) || 0) || 0,
       min: Number(rawFromFormatted_(it.minPayment) || 0) || 0,
       weight: 0,
+      notes: String(it.notes ?? "").slice(0, 500),
     });
   }
 
@@ -2279,6 +2283,66 @@ async function saveDebtItemsServer_(){
   if (!res || !res.ok) throw new Error(res && res.error ? res.error : "debtItemsSet failed");
 
   saveDebtItemsToStorage_();
+  return { ok:true };
+}
+
+// v435: rename a debt in place. A debt's name is also its key (lowercased) in
+// cfgCategories, debtItems, and debtPaidState.paidByKey, so all three move
+// together — otherwise balance/APR/min/notes and this month's paid-to-date
+// would be orphaned under the old name.
+async function renameDebt_(oldKey, newName){
+  const name = String(newName || "").trim();
+  if (!oldKey) return { ok:false, error:"Missing debt key." };
+  if (!name) return { ok:false, error:"Debt needs a name." };
+  if (/^[=+\-@\t\r]/.test(name)) return { ok:false, error:"Names can't start with = + - or @." };
+  if (typeof CategoriesState !== "undefined" && CategoriesState.dirty) {
+    return { ok:false, error:"Save or cancel your open category edits on Allot first." };
+  }
+  const newKey = name.toLowerCase();
+
+  const rows = Array.isArray(appState.cfgCategories) ? clone2D_(appState.cfgCategories) : [];
+  const idx = rows.findIndex(r =>
+    String((r && r[1]) || "").trim() === "Debt" &&
+    String((r && r[0]) || "").trim().toLowerCase() === oldKey);
+  if (idx < 0) return { ok:false, error:"Couldn't find that debt's category row." };
+  if (newKey !== oldKey && rows.some((r, i) => i !== idx &&
+      String((r && r[0]) || "").trim().toLowerCase() === newKey)) {
+    return { ok:false, error:`"${name}" already exists.` };
+  }
+
+  // 1) Category row (name only; target + type untouched)
+  rows[idx] = [name].concat((rows[idx] || []).slice(1));
+  saveCategoriesToStorage_(rows);
+  setCfgCategories_(rows);
+  if (typeof CategoriesState !== "undefined") { CategoriesState.rows = clone2D_(rows); CategoriesState.dirty = false; }
+
+  // 2) Debt item (balance / apr / min / notes)
+  appState.debtItems = appState.debtItems || {};
+  const item = Object.assign({}, appState.debtItems[oldKey] || {}, { name });
+  if (newKey !== oldKey) delete appState.debtItems[oldKey];
+  appState.debtItems[newKey] = item;
+  saveDebtItemsToStorage_();
+
+  // 3) This month's paid-to-date
+  if (newKey !== oldKey) {
+    const st = loadDebtPaidState_();
+    if (st.paidByKey && Object.prototype.hasOwnProperty.call(st.paidByKey, oldKey)) {
+      st.paidByKey[newKey] = round2_(Number(st.paidByKey[newKey] || 0) + Number(st.paidByKey[oldKey] || 0));
+      delete st.paidByKey[oldKey];
+      saveDebtPaidState_(st);
+    }
+  }
+
+  // Persist categories + debt items to KV
+  try {
+    await Promise.allSettled([
+      workerSet_("categories", { rows }),
+      saveDebtItemsServer_(),
+    ]);
+  } catch(_){}
+
+  if (typeof renderDebtLocal_ === "function") renderDebtLocal_();
+  if (typeof renderCategories_ === "function") { try { renderCategories_(); } catch(_){} }
   return { ok:true };
 }
 
@@ -2746,7 +2810,7 @@ function renderDebtLocal_(){
     if (!(balanceNum > 0)) tr.classList.add("debt-paid-off");
 
     tr.innerHTML = `
-      <td class="mono">${escapeHtml_(r.name)}</td>
+      <td class="mono"><input class="cell-input mono" data-role="debtName" data-k="${escapeHtml_(r.key)}" type="text" maxlength="60" value="${escapeHtml_(r.name)}" title="Tap to rename"></td>
       <td><input class="cell-input mono" data-k="${escapeHtml_(r.key)}" data-f="balance" type="text" inputmode="decimal" value="${escapeHtml_(formatMoneyInput_(String(it.balance ?? "")))}"></td>
       <td><input class="cell-input mono" data-k="${escapeHtml_(r.key)}" data-f="apr" type="text" inputmode="decimal" value="${escapeHtml_(formatAprInput_(String(it.apr ?? "")))}"></td>
       <td><input class="cell-input mono" data-k="${escapeHtml_(r.key)}" data-f="minPayment" type="text" inputmode="decimal" value="${escapeHtml_(formatMoneyInput_(String(it.minPayment ?? "")))}"></td>
@@ -2823,7 +2887,7 @@ function renderDebtLocal_(){
       if (prev > 0 && now === 0) {
         const k = inp.getAttribute("data-k");
         const tr = inp.closest("tr");
-        const name = tr ? (tr.querySelector("td:first-child")?.textContent || k) : k;
+        const name = tr ? (tr.querySelector('input[data-role="debtName"]')?.value || k) : k;
         if (typeof openDebtZeroModal_ === "function") openDebtZeroModal_(k, String(name).trim());
       }
     });
@@ -2831,6 +2895,29 @@ function renderDebtLocal_(){
 
 
 
+
+  // v435: debt names are editable inline. Commit on blur / Enter, Escape reverts.
+  // Name doubles as the debt's key, so renameDebt_ migrates every keyed store.
+  debtTbody.querySelectorAll('input[data-role="debtName"]').forEach(inp => {
+    inp.addEventListener("focus", () => { inp.dataset.orig = inp.value; });
+    inp.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") { e.preventDefault(); inp.blur(); }
+      else if (e.key === "Escape") { e.preventDefault(); inp.value = inp.dataset.orig || inp.value; inp.blur(); }
+    });
+    inp.addEventListener("blur", async () => {
+      const oldKey = inp.getAttribute("data-k") || "";
+      const orig = inp.dataset.orig != null ? inp.dataset.orig : inp.value;
+      const next = String(inp.value || "").trim();
+      if (next === String(orig).trim()) { inp.value = orig; return; }
+      const res = await renameDebt_(oldKey, next);
+      if (!res.ok) {
+        inp.value = orig;
+        inp.classList.add("cell-invalid");
+        inp.title = res.error;
+        setTimeout(() => { inp.classList.remove("cell-invalid"); inp.title = "Tap to rename"; }, 3500);
+      }
+    });
+  });
 
   // Format on blur (don’t fight the user while typing)
   debtTbody.querySelectorAll('input[data-f="balance"], input[data-f="minPayment"]').forEach(inp => {
@@ -4596,6 +4683,11 @@ function saveDebtPaidState_(st) {
   try {
     localStorage.setItem(LS_KEY_DEBT_PAID_STATE, JSON.stringify(st || {}));
   } catch (e) {}
+  // v434: debtPaidState was localStorage-only. It feeds computeDebtAllocations_
+  // (remaining min-need) so the Debt waterfall for the SAME deposit differed per
+  // device, as did the Debt KPIs. Now the 14th synced KV key. workerSet_ is
+  // gated on _kvSyncReady so pre-sync rollover writes can't clobber KV.
+  try { workerSet_("debtPaidState", st || {}).catch(()=>{}); } catch (e) {}
 }
 
 function getDebtPaidByKeyThisMonth_() {
@@ -6547,6 +6639,14 @@ function resetPaidMTD_(){
   const confirmed = await showConfirmDepositModal_(formatted);
   if (!confirmed) return;
 
+  // ✅ v434: Double-post guard runs HERE — before the forward-fund prompt below,
+  // which persists manualFunded / ffAsked as soon as the user answers. Previously
+  // the guard ran after that prompt, so cancelling "Post anyway?" left bills
+  // flagged Paid?/forward-funded and suppressed from future prompts, from a post
+  // that never happened. The guard only depends on (month, deposit), so it's
+  // safe to ask first.
+  await postGuardCheckOrThrow_(deposit);
+
   // Bills the user chose to forward-fund in the "fully funded last deposit"
   // prompt below. Tracked so the next-month prompt (Part B) doesn't ask about
   // the same bills again, and so they're funded automatically.
@@ -6597,8 +6697,7 @@ function resetPaidMTD_(){
     }
   }
 
-  // ✅ Post guard should run BEFORE we mutate any state
-  await postGuardCheckOrThrow_(deposit);
+  // (v434: the double-post guard moved above the forward-fund prompt — see there.)
 
   if (!(deposit > 0)){
     throw new Error("Deposit must be > 0 to post.");
@@ -7492,6 +7591,9 @@ async function loadCategoriesServer_(){
     CategoriesState.rows = compactRows_(normalizeFixedRows_(mapped, CategoriesState.maxRows, 3), CategoriesState.maxRows, 3);
     CategoriesState.dirty = false;
     CategoriesState.loadedOnce = true;
+    // v434: loadedOnce is also set by the LOCAL cache load, so it can't tell
+    // boot_ whether the server actually answered. serverLoaded can.
+    CategoriesState.serverLoaded = true;
     CategoriesState.displayCount = computeBaselineCatDisplayCount_();
 
     renderCategories_();
@@ -8169,16 +8271,23 @@ async function runDataExport_() {
       safe(workerGet_("accounts")),
     ]);
 
+    // v434: use the real key constants — the previous literal names
+    // ("BUDGETER_SPLITTER_PROFILE", "BUDGETER_BILLS_POOL_PROFILE", …) never
+    // existed, so only bill due dates ever made it into the export.
     const lsKeys = [
-      "BUDGETER_SPLITTER_PROFILE",
-      "BUDGETER_SPLITTER_CUSTOM_PCTS",
-      "BUDGETER_BILL_DUE_DATES_V1",
-      "BUDGETER_BILLS_POOL_PROFILE",
-      "BUDGETER_BILLS_POOL_CUSTOM",
+      LS_KEY_SPLITTER_PROFILE,
+      LS_KEY_SPLITTER_CUSTOM_PCTS,
+      LS_KEY_BILL_DUE_DATES,
+      LS_KEY_BILLS_SPLIT_RATIO,
     ];
     const localSettings = {};
     lsKeys.forEach(k => {
-      try { const v = localStorage.getItem(k); if (v !== null) localSettings[k] = JSON.parse(v); } catch(_){}
+      try {
+        const v = localStorage.getItem(k);
+        if (v === null) return;
+        // splitterProfile is stored as a bare string ("default"), not JSON.
+        try { localSettings[k] = JSON.parse(v); } catch(_) { localSettings[k] = v; }
+      } catch(_){}
     });
 
     const exportDoc = {
@@ -8276,7 +8385,7 @@ document.addEventListener("click", async (e) => {
 
       async function syncDepositStateFromKV_() {
         const _s = (p) => p.catch(() => ({ ok: false, state: null }));
-        const [ps, snap, guard, hist, profile, customPcts, manualFunded, nextMonthPaid, billDueDates, billsSplitRatio, demoMode, demoSeed, debtRedir] = await Promise.all([
+        const [ps, snap, guard, hist, profile, customPcts, manualFunded, nextMonthPaid, billDueDates, billsSplitRatio, demoMode, demoSeed, debtRedir, skipRedist, ffAsked, debtPaid] = await Promise.all([
           _s(workerGet_("paidState")),
           _s(workerGet_("postSnapshot")),
           _s(workerGet_("postGuard")),
@@ -8290,7 +8399,17 @@ document.addEventListener("click", async (e) => {
           _s(workerGet_("demoMode")),
           _s(workerGet_("demoSeed")),
           _s(workerGet_("debtRedirect")),
+          // v434: these three were WRITTEN to KV but never read back, so other
+          // devices never saw them (A7/A8 in the v433 audit).
+          _s(workerGet_("skipRedistribution")),
+          _s(workerGet_("ffAsked")),
+          _s(workerGet_("debtPaidState")),
         ]);
+        // v434: record whether the core read actually reached the worker. A
+        // new account legitimately returns ok:true with state:null, so "ok"
+        // (not "state") is the health signal. boot_ uses this to decide
+        // whether it's safe to flip _kvSyncReady (see there).
+        window._kvCoreSyncOk = !!(ps && ps.ok);
         let synced = 0;
         if (ps?.ok && ps.state)     { try { localStorage.setItem(LS_KEY_BILLS_PAID,      JSON.stringify(ps.state));   synced++; } catch(_){} }
         if (snap?.ok)               { try { snap.state ? localStorage.setItem(LS_KEY_POST_SNAPSHOT,  JSON.stringify(snap.state))  : localStorage.removeItem(LS_KEY_POST_SNAPSHOT);  synced++; } catch(_){} }
@@ -8339,6 +8458,31 @@ document.addEventListener("click", async (e) => {
             else       localStorage.setItem(DEBT_REDIRECT_LS_KEY, JSON.stringify(debtRedir.state));
             synced++;
           } catch(_){}
+        }
+        // v434: skip-redistribution receipt — same {} = "cleared" convention as
+        // debtRedirect (saveSkipRedistribution_ writes `obj || {}`).
+        if (skipRedist?.ok) {
+          try {
+            const empty = !skipRedist.state || (typeof skipRedist.state === "object" && !Object.keys(skipRedist.state).length);
+            if (empty) localStorage.removeItem(SKIP_REDIST_LS_KEY);
+            else       localStorage.setItem(SKIP_REDIST_LS_KEY, JSON.stringify(skipRedist.state));
+            synced++;
+          } catch(_){}
+        }
+        // v434: forward-fund "already asked" set. Always saved with a monthKey;
+        // loadFFAskedSet_ month-scopes on read, so a stale month is harmless.
+        if (ffAsked?.ok) {
+          try {
+            const empty = !ffAsked.state || (typeof ffAsked.state === "object" && !Object.keys(ffAsked.state).length);
+            if (empty) localStorage.removeItem(FF_ASKED_LS_KEY);
+            else       localStorage.setItem(FF_ASKED_LS_KEY, JSON.stringify(ffAsked.state));
+            synced++;
+          } catch(_){}
+        }
+        // v434: debt paid MTD. Shape { monthKey, paidByKey }; loadDebtPaidState_
+        // normalizes and getDebtPaidByKeyThisMonth_ month-scopes on read.
+        if (debtPaid?.ok && debtPaid.state && typeof debtPaid.state === "object" && debtPaid.state.paidByKey) {
+          try { localStorage.setItem(LS_KEY_DEBT_PAID_STATE, JSON.stringify(debtPaid.state)); synced++; } catch(_){}
         }
         return synced;
       }
@@ -8769,15 +8913,29 @@ document.addEventListener("click", async (e) => {
       syncDepositStateFromKV_(),
     ]);
 
-    // KV is now synced (server state read into localStorage) — enable writes, then
-    // apply month rollover against the AUTHORITATIVE synced state so it pushes to KV
-    // instead of clobbering it with pre-sync local data. If another device already
-    // rolled over this month, normalizePaidMonth_ sees the current monthKey and no-ops.
-    _kvSyncReady = true;
-    try { normalizePaidMonth_(); } catch(_){}
-    // v425l: after month rollover, retroactively flag any fully-funded bill.
-    // Covers accounts that had 100%-funded bills before the auto-flip existed.
-    try { autoFlipFullyFundedBills_(); } catch(_){}
+    // v434: only enable KV writes if the boot sync actually reached the worker.
+    // Previously _kvSyncReady flipped true unconditionally after allSettled, so
+    // an offline / 401 / flaky boot ran normalizePaidMonth_ + autoFlip on stale
+    // LOCAL data and their writes (or any later one) clobbered KV once the
+    // network came back — exactly the clobber the flag exists to prevent. One
+    // retry, then fail closed: writes stay deferred and the user is told.
+    if (!window._kvCoreSyncOk) {
+      try { await syncDepositStateFromKV_(); } catch(_){}
+    }
+    if (window._kvCoreSyncOk) {
+      // KV is now synced (server state read into localStorage) — enable writes, then
+      // apply month rollover against the AUTHORITATIVE synced state so it pushes to KV
+      // instead of clobbering it with pre-sync local data. If another device already
+      // rolled over this month, normalizePaidMonth_ sees the current monthKey and no-ops.
+      _kvSyncReady = true;
+      try { normalizePaidMonth_(); } catch(_){}
+      // v425l: after month rollover, retroactively flag any fully-funded bill.
+      // Covers accounts that had 100%-funded bills before the auto-flip existed.
+      try { autoFlipFullyFundedBills_(); } catch(_){}
+    } else {
+      try { console.warn("[boot] KV sync unreachable — writes deferred this session"); } catch(_){}
+      try { if (typeof showDashError_ === "function") showDashError_("Couldn't reach sync. Showing cached data; changes won't save until you reload with a connection."); } catch(_){}
+    }
 
     // v424 demo mode: after KV sync, decide whether to seed. Two triggers:
     //   1. loadDemoMode_() is true AND local state has no categories (fresh device,
@@ -8785,10 +8943,14 @@ document.addEventListener("click", async (e) => {
     //   2. loadDemoMode_() is false AND isEmptyUserAccount_() is true (first-time
     //      user, never signed in before — auto-enroll them in demo mode).
     // In either case, seedDemoData_() writes canonical data + flips demoMode true.
+    // v434: gated on the categories having ACTUALLY loaded from the server and
+    // KV being reachable — otherwise a transient load failure on an existing
+    // account made isEmptyUserAccount_() true and seeded demo data over it.
     try {
-      const demoOn = loadDemoMode_();
       const empty = isEmptyUserAccount_();
-      if (empty) await seedDemoData_();
+      const safeToSeed = _kvSyncReady && !!(CategoriesState && CategoriesState.serverLoaded);
+      if (empty && safeToSeed) await seedDemoData_();
+      else if (empty) { try { console.warn("[demo] account looks empty but server load didn't complete — not seeding"); } catch(_){} }
     } catch(e) { try { console.warn("[demo] seed check failed:", e); } catch(_){} }
     try { updateDemoBanner_(); } catch(_){}
 
@@ -9477,9 +9639,10 @@ document.addEventListener("click", async (e) => {
         if (_feedbackImageFile) {
           btn.textContent = "Uploading image…";
           const blob = await compressFeedbackImage_(_feedbackImageFile);
+          // v434: imageSet now requires a signed-in session (worker hardening).
           const upRes = await fetch(FEEDBACK_WORKER + "?api=imageSet", {
             method: "POST",
-            headers: { "Content-Type": "image/jpeg" },
+            headers: { "Content-Type": "image/jpeg", "Authorization": "Bearer " + getAuthToken_() },
             body: blob
           });
           const upData = await upRes.json();
