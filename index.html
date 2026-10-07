@@ -409,7 +409,7 @@
       body.admin-mode .dev-only { display: block !important; }
       /* Config tab hidden in public mode */
       #tabBtn-config { display: none; }
-      body.admin-mode #tabBtn-config { display: inline-block; }
+      body.admin-mode #tabBtn-config { display: flex; }   /* v464: same column layout as the other tabs */
       details.diag summary { cursor:pointer; user-select:none; color: var(--muted); margin-bottom: 8px; }
       .btn-danger{ background: var(--danger-bg); border-color: var(--danger-border); color: var(--danger-text); }
       .btn-ok{ background: var(--ok-bg); border-color: var(--ok-border); color: var(--ok-text); }
@@ -920,7 +920,7 @@ body { padding:0; overflow-x: hidden; }
   .appbar-inner { padding: 10px 14px 8px; }
 
   /* ── Content padding (room for bottom nav) ── */
-  .main { padding: 14px 8px calc(180px + env(safe-area-inset-bottom)); }
+  .main { padding: 14px 8px calc(96px + env(safe-area-inset-bottom)); }   /* v464: bar is ~76px now */
 
   /* ── Bottom tab bar ── */
   .nav {
@@ -943,20 +943,20 @@ body { padding:0; overflow-x: hidden; }
     min-width: 0;
     overflow: hidden;
     margin: 0;
-    padding: 20px 4px 16px;
+    padding: 8px 4px 6px;
     border-radius: 0;
     border: none;
     background: transparent;
     color: #7a9ab0;
-    font-size: 20px;
+    font-size: 13px;
     font-weight: 700;
     line-height: 1.2;
     white-space: nowrap;
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 10px;
-    min-height: 160px;
+    gap: 3px;
+    min-height: 68px;
     justify-content: center;
     -webkit-tap-highlight-color: transparent;
     transition: color 0.12s;
@@ -966,7 +966,7 @@ body { padding:0; overflow-x: hidden; }
   .nav button:active { background: rgba(96,165,250,.1); }
 
   .nav button .tab-icon {
-    font-size: 52px;
+    font-size: 28px;
     line-height: 1;
     display: block;
     flex-shrink: 0;
@@ -981,7 +981,7 @@ body { padding:0; overflow-x: hidden; }
 
   .nav button .tab-label {
     display: block;
-    font-size: 18px;
+    font-size: 12px;
     font-weight: 600;
     letter-spacing: 0.01em;
     overflow: hidden;
@@ -990,7 +990,7 @@ body { padding:0; overflow-x: hidden; }
   }
 
   .nav button.active { color: var(--accent); background: var(--accent-bg); border-top: 2px solid var(--accent); }
-  .nav button.active .tab-icon { transform: scale(1.15); }
+  .nav button.active .tab-icon { transform: scale(1.1); }
 
   /* ── Panels ── */
   .panel {
@@ -1901,7 +1901,7 @@ body { padding:0; overflow-x: hidden; }
       // ===== Header pills =====
       const whereEl = document.getElementById("where");
       const specEl = document.getElementById("specVersion");
-      const BUILD_STAMP = "v463-pages";
+      const BUILD_STAMP = "v464-pages";
       const SPEC_VERSION = "";
       specEl.textContent = "Spec: " + SPEC_VERSION;
       whereEl.textContent = "Here: " + window.location.href;
