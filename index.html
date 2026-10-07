@@ -1859,7 +1859,7 @@ body { padding:0; overflow-x: hidden; }
       // ===== Header pills =====
       const whereEl = document.getElementById("where");
       const specEl = document.getElementById("specVersion");
-      const BUILD_STAMP = "v452-pages";
+      const BUILD_STAMP = "v453-pages";
       const SPEC_VERSION = "";
       specEl.textContent = "Spec: " + SPEC_VERSION;
       whereEl.textContent = "Here: " + window.location.href;
@@ -10429,6 +10429,17 @@ document.addEventListener("click", async (e) => {
         await plaidInboxLoadDecisions_();
         const r = await plaidApi_('plaidInflows&days=45');
         if (r && r.ok) { PlaidInbox.inflows = r.inflows || []; PlaidInbox.loaded = true; }
+        // Reconcile with deposits already posted this month (manual posts, or posts
+        // made before the bank was linked): same amount → treat as posted.
+        try {
+          const hist = loadDepositHistory_();
+          const used = new Set(); let changed = false;
+          for (const t of plaidInboxCandidates_()) {
+            const i = (hist.entries || []).findIndex((e, k) => !used.has(k) && Math.abs(Number(e.deposit) - t.amount) < 0.01);
+            if (i >= 0) { used.add(i); PlaidInbox.decisions.posted[t.id] = { amount: t.amount, date: t.date, postedAt: hist.entries[i].postedAt || null, reconciled: true }; changed = true; }
+          }
+          if (changed) await plaidInboxSaveDecisions_();
+        } catch(_) {}
       } catch(_) {} finally { PlaidInbox.busy = false; }
       plaidInboxRender_();
     }
