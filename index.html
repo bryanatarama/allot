@@ -1875,7 +1875,7 @@ body { padding:0; overflow-x: hidden; }
       // ===== Header pills =====
       const whereEl = document.getElementById("where");
       const specEl = document.getElementById("specVersion");
-      const BUILD_STAMP = "v456-pages";
+      const BUILD_STAMP = "v457-pages";
       const SPEC_VERSION = "";
       specEl.textContent = "Spec: " + SPEC_VERSION;
       whereEl.textContent = "Here: " + window.location.href;
@@ -10699,16 +10699,26 @@ document.addEventListener("click", async (e) => {
       const cands = plaidBillsCandidates_();
       if (!cands.length) { card.style.display = 'none'; list.innerHTML = ''; return; }
       card.style.display = '';
-      list.innerHTML = cands.map(st => `
-        <label style="display:flex;align-items:center;gap:10px;padding:8px 0;border-top:1px solid var(--border);cursor:pointer">
+      let rows = []; try { rows = (getCfgCategoryRows_() || []).filter(r => String(r.targetAccount || '') === 'Bills' || String(r.targetAccount || '') === 'Living Expenses'); } catch(_) {}
+      const tgtOf = k => Number(appState.billsSplit?.[k]?.monthlyTarget || 0) || 0;
+      list.innerHTML = cands.map(st => {
+        const monthly = plaidStreamMonthly_(st);
+        const opts = rows.map(r => `<option value="${escapeHtml_(r.key)}">Put in: ${escapeHtml_(r.name)}${tgtOf(r.key) ? ' (' + formatMoney_(tgtOf(r.key)) + ')' : ''}</option>`).join('');
+        return `
+        <div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-top:1px solid var(--border);flex-wrap:wrap">
           <input type="checkbox" data-plaid-bill="${escapeHtml_(st.stream_id)}" ${st.status === 'MATURE' ? 'checked' : ''} style="width:18px;height:18px">
           <div style="flex:1;min-width:160px">
             <div style="font-weight:700">${escapeHtml_(plaidStreamName_(st))}</div>
             <div class="muted" style="font-size:.8em">${escapeHtml_(formatMoney_(st.average || 0))} ${escapeHtml_(PLAID_FREQ_LABEL[st.frequency] || '')} · last ${escapeHtml_(st.last_date || '')}${st.status === 'EARLY_DETECTION' ? ' · new, unconfirmed' : ''}</div>
           </div>
-          <div class="mono" style="white-space:nowrap">${escapeHtml_(formatMoney_(plaidStreamMonthly_(st)))}/mo</div>
+          <div class="mono" style="white-space:nowrap">${escapeHtml_(formatMoney_(monthly))}/mo</div>
+          <select class="cell-input" data-plaid-bill-dest="${escapeHtml_(st.stream_id)}" style="width:auto;max-width:230px;font-size:.85em">
+            <option value="">Add as new bill</option>
+            ${opts}
+          </select>
+          <label class="muted" data-plaid-bill-tgtwrap="${escapeHtml_(st.stream_id)}" style="display:none;font-size:.78em;align-items:center;gap:4px"><input type="checkbox" data-plaid-bill-settgt="${escapeHtml_(st.stream_id)}" checked> set target to this amount</label>
           <button type="button" data-plaid-bill-dismiss="${escapeHtml_(st.stream_id)}" title="Not a bill" style="font-size:.78em">✕</button>
-        </label>`).join('');
+        </div>`; }).join('');
     }
     async function plaidBillsAddSelected_() {
       if (typeof CategoriesState !== 'undefined' && CategoriesState.dirty) { alertBillsCard_('Save or cancel your open edits first.'); return; }
@@ -10716,27 +10726,46 @@ document.addEventListener("click", async (e) => {
       if (!ids.length) return;
       let rows = plaidFindCategoryRows_();
       appState.billsSplit = appState.billsSplit || {};
-      let added = 0;
+      let added = 0, linked = 0, rowsChanged = false;
+      const sumByKey = {};   // streams put into the same existing row add up (e.g. two Flex payments → Rent)
       for (const id of ids) {
         const st = PlaidBills.streams.find(s => s.stream_id === id); if (!st) continue;
+        const dest = (document.querySelector(`select[data-plaid-bill-dest="${id}"]`) || {}).value || '';
+        const monthly = plaidStreamMonthly_(st);
+        if (dest) {
+          PlaidBills.decisions.added[id] = dest; linked++;
+          const setTgt = document.querySelector(`input[data-plaid-bill-settgt="${id}"]`);
+          if (!setTgt || setTgt.checked) sumByKey[dest] = Math.round(((sumByKey[dest] || 0) + monthly) * 100) / 100;
+          continue;
+        }
         const name = plaidStreamName_(st); const key = name.toLowerCase();
         const next = plaidInsertCategoryRow_(rows, name, 'Bills');
         if (!next) { PlaidBills.decisions.added[id] = key; continue; }   // same-name row exists already
-        rows = next;
-        appState.billsSplit[key] = { monthlyTarget: String(plaidStreamMonthly_(st).toFixed(2)) };
+        rows = next; rowsChanged = true;
+        appState.billsSplit[key] = { monthlyTarget: String(monthly.toFixed(2)) };
         PlaidBills.decisions.added[id] = key; added++;
       }
-      await plaidCommitCategories_(rows);
-      try { saveBillsSplitToStorage_(); await saveBillsSplitTargetsServer_(); } catch(e) { console.warn('[plaid] bills targets save failed:', e); }
+      for (const [k, amt] of Object.entries(sumByKey)) appState.billsSplit[k] = Object.assign({}, appState.billsSplit[k] || {}, { monthlyTarget: String(amt.toFixed(2)) });
+      if (rowsChanged) await plaidCommitCategories_(rows);
+      if (rowsChanged || Object.keys(sumByKey).length) {
+        try { saveBillsSplitToStorage_(); await saveBillsSplitTargetsServer_(); } catch(e) { console.warn('[plaid] bills targets save failed:', e); }
+        try { if (typeof renderEngineBillsSplitTable_ === 'function') renderEngineBillsSplitTable_(); } catch(_) {}
+      }
       await plaidBillsSaveDecisions_();
       plaidBillsRender_();
-      alertBillsCard_(added ? `Added ${added} bill${added === 1 ? '' : 's'}. Adjust targets anytime with Edit.` : 'Those bills already exist.');
+      const parts = []; if (added) parts.push(`added ${added} new`); if (linked) parts.push(`linked ${linked} to existing rows`);
+      alertBillsCard_(parts.length ? parts.join(', ') + '. Adjust targets anytime with Edit.' : 'Nothing to do.');
     }
     function alertBillsCard_(msg) { const el = document.getElementById('plaidRecurringStatus'); if (el) { el.textContent = msg; setTimeout(() => { el.textContent = ''; }, 6000); } }
 
     document.addEventListener('DOMContentLoaded', () => {
       document.getElementById('plaidRecurringAddBtn')?.addEventListener('click', plaidBillsAddSelected_);
       document.getElementById('plaidRecurringRefreshBtn')?.addEventListener('click', () => plaidBillsLoad_(true));
+      document.getElementById('plaidRecurringList')?.addEventListener('change', e => {
+        const sel = e.target.closest('select[data-plaid-bill-dest]'); if (!sel) return;
+        const wrap = document.querySelector(`[data-plaid-bill-tgtwrap="${sel.getAttribute('data-plaid-bill-dest')}"]`);
+        if (wrap) wrap.style.display = sel.value ? 'inline-flex' : 'none';
+      });
       document.getElementById('plaidRecurringList')?.addEventListener('click', async e => {
         const b = e.target.closest('button[data-plaid-bill-dismiss]'); if (!b) return;
         e.preventDefault();
