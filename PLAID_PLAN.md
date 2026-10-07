@@ -146,7 +146,15 @@ them manually. (workflow_id: wf_d61e6f13700562e5)
   Verdict applies to worker deployed 2026-10-07 (DO migration v1-plaid-do) and
   index.html v439.
 - Round 3 (2026-10-07, PRODUCTION): all 15 checks passed. Real institution linked end to
-  end; identity match returned 'mismatch' for the developer (advisory badge only).
+  end. The first identity result was 'mismatch' (score 14) because of a frontend bug: a
+  name typed while a Link handler was already pre-initialised was never sent. Fixed in
+  v440 (`plaidSetName` saves the name independently; a "Name didn't match · fix" badge
+  opens a Save & re-check flow that calls `plaidIdentityCheck`).
+- Field note: Capital One returned Plaid's ITEM_NOT_SUPPORTED screen ("Account not
+  currently supported") inside Link after OAuth. Per Plaid's docs this is an
+  institution-side restriction (e.g. Capital One does not allow linking credit cards
+  whose payments are past due; guest/limited accounts; unsupported MFA). Nothing in the
+  Link configuration causes it.
 - Storage incident during round 1→2: with state in Workers KV, a Plaid webhook (Plaid's
   data center) and the browser (another data center) each read a ~60 s-stale cached copy
   and wrote the whole record back, silently losing the other's update (an OAuth-linked

@@ -1634,7 +1634,10 @@ body { padding:0; overflow-x: hidden; }
           <div style="font-size:.88em;color:var(--muted);margin-bottom:14px;line-height:1.6;">Connect checking, savings, credit cards, loans, or investments. Allot never sees your bank login, the connection uses bank-level encryption, and you can unlink anytime.</div>
           <div id="plaidNameRow" style="display:none;max-width:320px;margin:0 auto 12px;text-align:left;">
             <label for="plaidNameInput" style="display:block;font-size:.8em;color:var(--muted);margin-bottom:4px;">Your full name, as it appears on your bank account</label>
-            <input id="plaidNameInput" class="cell-input" type="text" autocomplete="name" maxlength="120" placeholder="e.g. Jane Q. Public" />
+            <div style="display:flex;gap:8px;align-items:center">
+              <input id="plaidNameInput" class="cell-input" type="text" autocomplete="name" maxlength="120" placeholder="e.g. Jane Q. Public" />
+              <button id="plaidNameSaveBtn" type="button" style="display:none;white-space:nowrap">Save &amp; re-check</button>
+            </div>
             <div class="muted" style="font-size:.75em;margin-top:4px;">Used once to confirm the linked account is yours. Not shown anywhere.</div>
           </div>
           <button id="plaidAddBtn" type="button" style="width:100%;max-width:320px;padding:14px;font-size:.95em;font-weight:700;border-radius:12px;background:#f59e0b;color:#0c0700;border:none;cursor:pointer;letter-spacing:.02em;">Add a bank account →</button>
@@ -1838,7 +1841,7 @@ body { padding:0; overflow-x: hidden; }
       // ===== Header pills =====
       const whereEl = document.getElementById("where");
       const specEl = document.getElementById("specVersion");
-      const BUILD_STAMP = "v439-pages";
+      const BUILD_STAMP = "v440-pages";
       const SPEC_VERSION = "";
       specEl.textContent = "Spec: " + SPEC_VERSION;
       whereEl.textContent = "Here: " + window.location.href;
@@ -9820,7 +9823,7 @@ document.addEventListener("click", async (e) => {
     function plaidIdentityBadge_(it) {
       const id = it.identity || {};
       if (id.status === 'matched') return '<span class="status-pill status-ok" title="The name on this account matched the name you gave Allot">Ownership verified</span>';
-      if (id.status === 'mismatch') return '<span class="status-pill status-warn" title="The name on this account did not match the name you gave Allot">Name didn\'t match</span>';
+      if (id.status === 'mismatch') return `<button type="button" class="status-pill status-warn" data-plaid-recheck="${escapeHtml_(it.item_id)}" style="cursor:pointer" title="The name on this account did not match the name you gave Allot. Tap to enter it again and re-check.">Name didn't match · fix</button>`;
       if (id.status === 'pending') return '<span class="status-pill">Checking owner…</span>';
       return '';
     }
@@ -10050,10 +10053,16 @@ document.addEventListener("click", async (e) => {
     // first — the token request also saves it).
     async function plaidPrepareLink_(legalName) {
       if (!window.Plaid) { plaidAddHint_('Bank linking script failed to load. Check your connection and refresh.'); return false; }
+      if (legalName) {
+        // v440: save the name first, independent of whether a handler is already prepared.
+        const sv = await plaidApi_('plaidSetName', { legalName });
+        if (!sv.ok) { plaidAddHint_(sv.error || 'Could not save your name.'); return false; }
+        PlaidState.hasName = true;
+      }
       if (PlaidState.handler && PlaidState.mode === 'link') return true;
-      if (!PlaidState.hasName && !legalName) { plaidAddHint_(''); return false; }
+      if (!PlaidState.hasName) { plaidAddHint_(''); return false; }
       try {
-        const res = await plaidApi_('plaidLinkToken', legalName ? { legalName } : {});
+        const res = await plaidApi_('plaidLinkToken', {});
         if (!res.ok) { plaidAddHint_(res.error || 'Could not start bank linking.'); return false; }
         if (legalName) PlaidState.hasName = true;
         plaidDestroyHandler_();
@@ -10087,6 +10096,23 @@ document.addEventListener("click", async (e) => {
       } finally {
         btn.disabled = false;
       }
+    }
+
+    async function plaidSaveNameAndRecheck_() {
+      const inp = document.getElementById('plaidNameInput');
+      const legalName = String(inp && inp.value || '').trim();
+      if (legalName.length < 2) { plaidAddHint_('Enter your full name first.'); inp && inp.focus(); return; }
+      const btn = document.getElementById('plaidNameSaveBtn'); btn.disabled = true;
+      try {
+        const sv = await plaidApi_('plaidSetName', { legalName });
+        if (!sv.ok) { plaidAddHint_(sv.error || 'Could not save your name.'); return; }
+        PlaidState.hasName = true;
+        const itemId = PlaidState.recheckItemId; PlaidState.recheckItemId = null;
+        btn.style.display = 'none';
+        if (itemId) { plaidAddHint_('Checking…'); const r = await plaidApi_('plaidIdentityCheck', { item_id: itemId }); if (!r.ok) plaidShowError_(r.error || 'Could not re-check.'); }
+        plaidAddHint_('');
+        await plaidLoad_({ skipPrepare: true });
+      } finally { btn.disabled = false; }
     }
 
     async function plaidRelink_(itemId) {
@@ -10145,7 +10171,8 @@ document.addEventListener("click", async (e) => {
       const tabBtn = document.getElementById('tabBtn-accounts');
       if (tabBtn) tabBtn.addEventListener('click', () => { if (!PlaidState.loadedOnce) plaidLoad_(); });
       document.getElementById('plaidAddBtn')?.addEventListener('click', plaidOnAddClick_);
-      document.getElementById('plaidNameInput')?.addEventListener('keydown', e => { if (e.key === 'Enter') plaidOnAddClick_(); });
+      document.getElementById('plaidNameInput')?.addEventListener('keydown', e => { if (e.key === 'Enter') (PlaidState.recheckItemId ? plaidSaveNameAndRecheck_() : plaidOnAddClick_()); });
+      document.getElementById('plaidNameSaveBtn')?.addEventListener('click', plaidSaveNameAndRecheck_);
       document.getElementById('plaidRefreshBtn')?.addEventListener('click', async () => {
         plaidSetStatus_('Refreshing…');
         const res = await plaidApi_('plaidSync', {});
@@ -10161,6 +10188,16 @@ document.addEventListener("click", async (e) => {
           const rm = b.getAttribute('data-plaid-remove');
           const rmc = b.getAttribute('data-plaid-remove-confirm');
           const sb = b.getAttribute('data-plaid-sandbox');
+          const recheck = b.getAttribute('data-plaid-recheck');
+          if (recheck) {
+            PlaidState.recheckItemId = recheck;
+            const row = document.getElementById('plaidNameRow'); row.style.display = '';
+            document.getElementById('plaidNameSaveBtn').style.display = '';
+            const inp = document.getElementById('plaidNameInput'); inp.value = ''; inp.focus();
+            window.scrollTo(0, 0);
+            plaidAddHint_('Enter your name exactly as your bank has it, then tap Save & re-check.');
+            return;
+          }
           if (relink) return plaidRelink_(relink);
           if (sync) { b.disabled = true; b.textContent = 'Refreshing…'; const r = await plaidApi_('plaidSync', { item_id: sync }); if (!r.ok) plaidShowError_(r.error || 'Refresh failed.'); return plaidLoad_({ skipPrepare: true }); }
           if (rm) { PlaidState.pendingRemove = rm; plaidRender_(); setTimeout(() => { if (PlaidState.pendingRemove === rm) { PlaidState.pendingRemove = null; plaidRender_(); } }, 6000); return; }
