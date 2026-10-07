@@ -163,23 +163,47 @@ changes invalidate it.
 
 ## How to test
 
-### Link a sandbox bank
-1. Sign in at https://myallot.money, open the **Accounts** tab.
-2. Enter your name (first time only), tap **Add a bank account**.
-3. Pick **First Platypus Bank**, credentials `user_good` / `pass_good`.
-4. Expected: the bank card appears with accounts and balances within a few seconds;
-   "Importing transactions…" clears within about a minute and Recent Activity fills.
-   The card shows **Ownership verified** only if the name you entered matches
-   "Alberta Bobbeth Charleson" (sandbox owner) — otherwise "Name didn't match", which
-   is the expected sandbox result for a real name.
+Sandbox only (`PLAID_ENV = "sandbox"`). Sign in at https://myallot.money as the owner
+(admin mode on, "Preview as User" off) and open the **Accounts** tab.
 
-### Webhook + reconnect (sandbox buttons on each bank card)
-1. **Sandbox: fire webhook** → within ~5 s the card's "Synced" time updates.
-2. **Sandbox: break login** → card shows **Needs reconnect**; tap **Reconnect**, sign in
-   again with `user_good` / `pass_good`; card returns to **Connected**.
+### 1. Link a bank (credentials flow)
+1. Tap **Add a bank account**. First time only: enter a name. In sandbox use
+   `Alberta Bobbeth Charleson` (the sandbox account owner) so the ownership check passes.
+2. In Plaid Link choose **Continue without phone number**.
+3. Search **First Platypus Bank**, sign in with `user_good` / `pass_good`, select all
+   accounts, finish.
+4. Expected: a bank card with the institution logo, accounts and balances within a few
+   seconds; **Connected** and **Ownership verified** pills; "Importing transactions…"
+   clears within about a minute and **Recent Activity** fills (money in shows green).
+   Credit/loan rows show APR · Min · Due.
 
-### Remove
-1. Tap **Remove** then **Confirm remove** → card disappears; Plaid's Item is removed.
+### 2. Link an OAuth bank (redirect flow)
+1. **Add a bank account** → **Continue without phone number** → search
+   **Platypus OAuth Bank** (not Patelco / First Platypus).
+2. Approve on the fake bank page. You are sent to myallot.money/plaid-oauth and Link
+   resumes by itself.
+3. Expected: a second bank card appears; pill reads "2 banks connected · sandbox".
+   Picking a bank that is already connected is refused with "… is already connected".
+
+### 3. Webhook
+1. On a bank card tap **Sandbox: fire webhook**.
+2. Expected: within ~5 s the card's "Synced …" time updates.
+
+### 4. Reconnect (broken login)
+1. Tap **Sandbox: break login** → card shows **Needs reconnect** and an explanation.
+2. Tap **Reconnect**, sign in with `user_good` / `pass_good`.
+3. Expected: card returns to **Connected**; "Synced" time advances.
+
+### 5. Fill a Debt row from a credit card
+1. On a credit-card or loan row pick **Fills Debt → <category>**.
+2. Expected: the Debt tab's row shows that account's balance, APR, and minimum; it
+   re-applies on every Accounts-tab visit while mapped (unless the Debt tab has unsaved
+   edits). Pick "Not linked" to stop (values stay as last written).
+
+### 6. Remove
+1. Tap **Remove**, then **Confirm remove** (within 6 s).
+2. Expected: card disappears, its transactions leave Recent Activity, the Item is
+   removed at Plaid.
 
 ## Decisions made
 
