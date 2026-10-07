@@ -1878,7 +1878,7 @@ body { padding:0; overflow-x: hidden; }
       // ===== Header pills =====
       const whereEl = document.getElementById("where");
       const specEl = document.getElementById("specVersion");
-      const BUILD_STAMP = "v458-pages";
+      const BUILD_STAMP = "v459-pages";
       const SPEC_VERSION = "";
       specEl.textContent = "Spec: " + SPEC_VERSION;
       whereEl.textContent = "Here: " + window.location.href;
@@ -3177,12 +3177,16 @@ function metThisDeposit_(key, target, paidAfter, allocThisDeposit){
         try { localStorage.setItem(LS_KEY_ALLOC_LEDGER, JSON.stringify(arr || [])); } catch(e){}
         // v454: the ledger used to be browser-only, so a post made on one device
         // never showed in another's ledger. Now synced (19th user KV key).
-        workerSet_("allocLedger", arr || []).catch(()=>{});
+        // Slim copy: drop the per-row category snapshot (`cats`, ~2–3 KB each) and
+        // cap rows so the value stays well under the worker's 256 KB limit.
+        const slim = (arr || []).slice(0, 60).map(e => { if (!e || typeof e !== 'object') return e; const { cats, ...rest } = e; return rest; });
+        workerSet_("allocLedger", slim).catch(()=>{});
       }
       // Union of server + local rows (by timestamp), newest first, capped.
       function mergeAllocLedger_(serverArr, localArr){
         const seen = new Set(); const out = [];
-        for (const e of [...(serverArr || []), ...(localArr || [])]) {
+        // Local rows first so a full local row (with `cats`) wins over the server's slim copy.
+        for (const e of [...(localArr || []), ...(serverArr || [])]) {
           const k = String((e && (e.ts || e.time || e.at)) || '') + '|' + String((e && e.deposit) || '');
           if (seen.has(k)) continue; seen.add(k); out.push(e);
         }
@@ -3543,6 +3547,12 @@ const TAB_IDS = ["dashboard", "accounts", "expenseCategories", "budgeter", "debt
           if (panel) panel.hidden = (id !== tabId);
           if (btn) btn.classList.toggle("active", id === tabId);
         });
+        // v459: programmatic switches (tour, "Add a bank account" prompt, OAuth
+        // return) must load the Plaid panels the same way a tap on the tab does.
+        try {
+          if (tabId === 'accounts' && typeof PlaidState !== 'undefined' && !PlaidState.loadedOnce && getAuthToken_()) plaidLoad_();
+          if (tabId === 'budgeter' && typeof PlaidBills !== 'undefined' && !PlaidBills.loaded && getAuthToken_()) plaidBillsLoad_(false);
+        } catch(_) {}
       }
 
       document.querySelectorAll(".nav button[data-tab]").forEach(btn => {
@@ -9823,7 +9833,10 @@ document.addEventListener("click", async (e) => {
     // link_token is kept client-side, and only so an OAuth bank redirect
     // (myallot.money/plaid-oauth) can resume the same Link session.
     // ============================================================
-    const PLAID_LS_LINK_TOKEN = "ALLOT_PLAID_LINK_TOKEN_V1";
+    const PLAID_LS_LINK_TOKEN = "ALLOT_PLAID_LINK_TOKEN_V1";   // JSON {token, mode, itemId} — only while a Link session may redirect
+    function plaidSaveLinkSession_(token, mode, itemId) { try { localStorage.setItem(PLAID_LS_LINK_TOKEN, JSON.stringify({ token, mode, itemId: itemId || null, at: Date.now() })); } catch(_) {} }
+    function plaidReadLinkSession_() { try { const v = JSON.parse(localStorage.getItem(PLAID_LS_LINK_TOKEN) || 'null'); return (v && typeof v === 'object' && v.token) ? v : null; } catch(_) { return null; } }
+    function plaidClearLinkSession_() { try { localStorage.removeItem(PLAID_LS_LINK_TOKEN); sessionStorage.removeItem(PLAID_LS_LINK_TOKEN + ':mode'); } catch(_) {} }
     const PLAID_OAUTH_PATH = "/plaid-oauth";
     const PlaidState = {
       items: [], txns: [], total: 0, env: null, hasName: false,
@@ -9886,10 +9899,9 @@ document.addEventListener("click", async (e) => {
         PlaidState.env = res.env || null;
         PlaidState.hasName = !!res.hasName;
         PlaidState.loadedOnce = true;
-        plaidShowError_(null);
-        if (PlaidState.debtMap === null) {
-          try { const m = await workerGet_('plaidDebtMap'); PlaidState.debtMap = (m && m.ok && m.state && typeof m.state === 'object') ? m.state : {}; } catch(_) { PlaidState.debtMap = {}; }
-        }
+        if (!(opts && opts.keepError)) plaidShowError_(null);
+        // v459: always re-read the map (another device may have changed it) before this load mutates it.
+        try { const m = await workerGet_('plaidDebtMap'); PlaidState.debtMap = (m && m.ok && m.state && typeof m.state === 'object') ? m.state : (PlaidState.debtMap || {}); } catch(_) { PlaidState.debtMap = PlaidState.debtMap || {}; }
         // v443: drop mappings for accounts that no longer exist (removed/relinked banks).
         if (PlaidState.debtMap && Object.keys(PlaidState.debtMap).length) {
           const live = new Set(PlaidState.items.flatMap(it => (it.accounts || []).map(a => a.account_id)));
@@ -9941,7 +9953,7 @@ document.addEventListener("click", async (e) => {
 
       // Name row: shown until a name is on file (needed for the ownership check).
       const nameRow = document.getElementById('plaidNameRow');
-      if (nameRow) nameRow.style.display = PlaidState.hasName ? 'none' : '';
+      if (nameRow) nameRow.style.display = (PlaidState.hasName && !PlaidState.recheckItemId) ? 'none' : '';
       // v455: demo data active → don't let a real bank get linked onto demo rows.
       const demo = (typeof loadDemoMode_ === 'function') && loadDemoMode_();
       const addBtn = document.getElementById('plaidAddBtn');
@@ -10262,14 +10274,15 @@ document.addEventListener("click", async (e) => {
     function plaidDestroyHandler_() {
       try { if (PlaidState.handler) PlaidState.handler.destroy(); } catch(_) {}
       PlaidState.handler = null; PlaidState.linkToken = null; PlaidState.mode = null; PlaidState.itemId = null;
+      plaidClearLinkSession_();
     }
 
     function plaidHandlerConfig_(token, extra) {
       return Object.assign({
         token,
         onSuccess: async (public_token, metadata) => {
-          try { localStorage.removeItem(PLAID_LS_LINK_TOKEN); } catch(_) {}
           const mode = PlaidState.mode, itemId = PlaidState.itemId;
+          plaidClearLinkSession_();
           let failMsg = '';
           plaidDestroyHandler_();
           plaidSetStatus_('Finishing…');
@@ -10295,7 +10308,7 @@ document.addEventListener("click", async (e) => {
           setTimeout(() => { plaidLoad_({ skipPrepare: true }); }, 20000);
         },
         onExit: (err, metadata) => {
-          try { localStorage.removeItem(PLAID_LS_LINK_TOKEN); } catch(_) {}
+          plaidClearLinkSession_();
           const sid = metadata && metadata.link_session_id;
           if (err) {
             console.warn('[plaid] link exit', err.error_type, err.error_code, 'link_session_id=' + sid, 'request_id=' + (metadata && metadata.request_id));
@@ -10356,7 +10369,7 @@ document.addEventListener("click", async (e) => {
       try {
         const ok = await plaidPrepareLink_(legalName || undefined);
         if (!ok || !PlaidState.handler) return;
-        try { localStorage.setItem(PLAID_LS_LINK_TOKEN, PlaidState.linkToken); } catch(_) {}
+        plaidSaveLinkSession_(PlaidState.linkToken, 'link', null);
         const nameRow = document.getElementById('plaidNameRow');
         if (nameRow && PlaidState.hasName) nameRow.style.display = 'none';
         PlaidState.handler.open();
@@ -10390,7 +10403,7 @@ document.addEventListener("click", async (e) => {
       plaidDestroyHandler_();
       PlaidState.linkToken = res.link_token; PlaidState.mode = 'update'; PlaidState.itemId = itemId;
       PlaidState.handler = window.Plaid.create(plaidHandlerConfig_(res.link_token));
-      try { localStorage.setItem(PLAID_LS_LINK_TOKEN, res.link_token); sessionStorage.setItem(PLAID_LS_LINK_TOKEN + ':mode', 'update:' + itemId); } catch(_) {}
+      plaidSaveLinkSession_(res.link_token, 'update', itemId);
       PlaidState.handler.open();
     }
 
@@ -10398,15 +10411,13 @@ document.addEventListener("click", async (e) => {
     // session with the saved link_token, no user gesture required.
     function plaidMaybeResumeOAuth_() {
       if (window.location.pathname !== PLAID_OAUTH_PATH) return false;
-      let token = null, modeStr = '';
-      try { token = localStorage.getItem(PLAID_LS_LINK_TOKEN); modeStr = sessionStorage.getItem(PLAID_LS_LINK_TOKEN + ':mode') || ''; } catch(_) {}
+      const sess = plaidReadLinkSession_();
       const receivedRedirectUri = window.location.href;
       try { window.history.replaceState({}, '', '/'); } catch(_) {}
-      if (!token || !window.Plaid) { plaidShowError_('Your bank sent you back, but the linking session had expired. Please try again.'); return true; }
-      if (modeStr.startsWith('update:')) { PlaidState.mode = 'update'; PlaidState.itemId = modeStr.slice(7); } else { PlaidState.mode = 'link'; }
-      try { sessionStorage.removeItem(PLAID_LS_LINK_TOKEN + ':mode'); } catch(_) {}
-      PlaidState.linkToken = token;
-      PlaidState.handler = window.Plaid.create(plaidHandlerConfig_(token, { receivedRedirectUri }));
+      if (!sess || !window.Plaid || (Date.now() - (sess.at || 0)) > 4 * 3600 * 1000) { plaidClearLinkSession_(); plaidShowError_('Your bank sent you back, but the linking session had expired. Please try again.'); return true; }
+      PlaidState.mode = sess.mode === 'update' ? 'update' : 'link'; PlaidState.itemId = sess.itemId || null;
+      PlaidState.linkToken = sess.token;
+      PlaidState.handler = window.Plaid.create(plaidHandlerConfig_(sess.token, { receivedRedirectUri }));
       PlaidState.handler.open();
       return true;
     }
@@ -10420,14 +10431,16 @@ document.addEventListener("click", async (e) => {
       let tries = 0;
       const tick = async () => {
         if (!getAuthToken_()) { if (++tries < 600) setTimeout(tick, 1000); return; }
-        try {
-          const res = await plaidApi_('plaidStatus');
-          if (res && res.ok) {
-            PlaidState.env = res.env || null;
-            const isAdmin = document.body.classList.contains('admin-mode');
-            if (res.env === 'production' || isAdmin) { btn.style.display = ''; const ob = document.getElementById('obGoBankBtn'); if (ob) ob.style.display = ''; }
-          }
-        } catch(_) {}
+        let res = null;
+        for (let i = 0; i < 3 && !(res && res.ok); i++) {
+          try { res = await plaidApi_('plaidStatus'); } catch(_) { res = null; }
+          if (!(res && res.ok)) { if (res && res.missing) break; await new Promise(r => setTimeout(r, 2000 * (i + 1))); }
+        }
+        if (res && res.ok) {
+          PlaidState.env = res.env || null;
+          const isAdmin = document.body.classList.contains('admin-mode');
+          if (res.env === 'production' || isAdmin) { btn.style.display = ''; const ob = document.getElementById('obGoBankBtn'); if (ob) ob.style.display = ''; }
+        }
       };
       setTimeout(tick, 800);
     }
@@ -10451,10 +10464,9 @@ document.addEventListener("click", async (e) => {
       return String(payer || '').toLowerCase().replace(/[0-9#*]+/g, ' ').replace(/[^a-z ]+/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 32);
     }
     async function plaidInboxLoadDecisions_() {
-      if (PlaidInbox.decisions) return PlaidInbox.decisions;
       let d = null;
       try { const r = await workerGet_('plaidDeposits'); d = (r && r.ok && r.state && typeof r.state === 'object') ? r.state : null; } catch(_) {}
-      PlaidInbox.decisions = Object.assign({ posted: {}, ignored: {}, payers: {} }, d || {});
+      PlaidInbox.decisions = Object.assign({ posted: {}, ignored: {}, payers: {} }, d || PlaidInbox.decisions || {});
       return PlaidInbox.decisions;
     }
     async function plaidInboxSaveDecisions_() {
@@ -10491,9 +10503,14 @@ document.addEventListener("click", async (e) => {
         // made before the bank was linked): same amount → treat as posted.
         try {
           const hist = loadDepositHistory_();
+          // Entries already tied to an inflow can't be reused (biweekly paychecks of
+          // the same amount), and the post must be within 3 days of the inflow.
+          const taken = new Set(Object.values(PlaidInbox.decisions.posted).map(p => p.postedAt).filter(Boolean));
           const used = new Set(); let changed = false;
+          const dayOf = iso => String(iso || '').slice(0, 10);
+          const dayDiff = (a, b) => Math.abs((new Date(a + 'T00:00:00Z') - new Date(b + 'T00:00:00Z')) / 86400000);
           for (const t of plaidInboxCandidates_()) {
-            const i = (hist.entries || []).findIndex((e, k) => !used.has(k) && Math.abs(Number(e.deposit) - t.amount) < 0.01);
+            const i = (hist.entries || []).findIndex((e, k) => !used.has(k) && !taken.has(e.postedAt) && Math.abs(Number(e.deposit) - t.amount) < 0.01 && dayDiff(dayOf(e.postedAt), t.date) <= 3);
             if (i >= 0) { used.add(i); PlaidInbox.decisions.posted[t.id] = { amount: t.amount, date: t.date, postedAt: hist.entries[i].postedAt || null, reconciled: true }; changed = true; }
           }
           if (changed) await plaidInboxSaveDecisions_();
@@ -10566,7 +10583,10 @@ document.addEventListener("click", async (e) => {
       let tries = 0;
       const tick = async () => {
         if (!getAuthToken_()) { if (++tries < 600) setTimeout(tick, 1000); return; }
-        try { const st = await plaidApi_('plaidStatus'); if (st && st.ok) plaidInboxLoad_(); } catch(_) {}
+        for (let i = 0; i < 3; i++) {
+          try { const st = await plaidApi_('plaidStatus'); if (st && st.ok) { plaidInboxLoad_(); return; } if (st && st.missing) return; } catch(_) {}
+          await new Promise(r => setTimeout(r, 2000 * (i + 1)));
+        }
       };
       setTimeout(tick, 1500);
     });
@@ -10656,10 +10676,9 @@ document.addEventListener("click", async (e) => {
       return Math.round((Number(st.average) || 0) * per * 100) / 100;
     }
     async function plaidBillsLoadDecisions_() {
-      if (PlaidBills.decisions) return PlaidBills.decisions;
       let d = null;
       try { const r = await workerGet_('plaidBills'); d = (r && r.ok && r.state && typeof r.state === 'object') ? r.state : null; } catch(_) {}
-      PlaidBills.decisions = Object.assign({ added: {}, dismissed: {} }, d || {});
+      PlaidBills.decisions = Object.assign({ added: {}, dismissed: {} }, d || PlaidBills.decisions || {});
       return PlaidBills.decisions;
     }
     async function plaidBillsSaveDecisions_() { try { await workerSet_('plaidBills', PlaidBills.decisions); } catch(_) {} }
@@ -10791,7 +10810,7 @@ document.addEventListener("click", async (e) => {
         plaidSetStatus_('Refreshing…');
         const res = await plaidApi_('plaidSync', {});
         if (!res.ok) plaidShowError_(res.error || 'Refresh failed.');
-        await plaidLoad_({ skipPrepare: true });
+        await plaidLoad_({ skipPrepare: true, keepError: !res.ok });
       });
       const wrap = document.getElementById('plaidItems');
       if (wrap) {
@@ -10803,11 +10822,11 @@ document.addEventListener("click", async (e) => {
           const rmc = b.getAttribute('data-plaid-remove-confirm');
           const sb = b.getAttribute('data-plaid-sandbox');
           const addDebt = b.getAttribute('data-plaid-adddebt');
-          if (addDebt) { b.disabled = true; await plaidAddDebtRow_(addDebt); return; }
+          if (addDebt) { b.disabled = true; try { await plaidAddDebtRow_(addDebt); } finally { plaidRender_(); } return; }
           const editLinks = b.getAttribute('data-plaid-editlinks');
           if (editLinks) { PlaidState.editLinks = PlaidState.editLinks || {}; PlaidState.editLinks[editLinks] = !PlaidState.editLinks[editLinks]; plaidRender_(); return; }
           const useName = b.getAttribute('data-plaid-usebankname');
-          if (useName) { b.disabled = true; await plaidUseBankName_(useName); return; }
+          if (useName) { b.disabled = true; try { await plaidUseBankName_(useName); } finally { plaidRender_(); } return; }
           const recheck = b.getAttribute('data-plaid-recheck');
           if (recheck) {
             PlaidState.recheckItemId = recheck;
@@ -10819,22 +10838,21 @@ document.addEventListener("click", async (e) => {
             return;
           }
           if (relink) return plaidRelink_(relink);
-          if (sync) { b.disabled = true; b.textContent = 'Refreshing…'; const r = await plaidApi_('plaidSync', { item_id: sync }); if (!r.ok) plaidShowError_(r.error || 'Refresh failed.'); return plaidLoad_({ skipPrepare: true }); }
+          if (sync) { b.disabled = true; b.textContent = 'Refreshing…'; const r = await plaidApi_('plaidSync', { item_id: sync }); if (!r.ok) plaidShowError_(r.error || 'Refresh failed.'); return plaidLoad_({ skipPrepare: true, keepError: !r.ok }); }
           if (rm) { PlaidState.pendingRemove = rm; plaidRender_(); setTimeout(() => { if (PlaidState.pendingRemove === rm) { PlaidState.pendingRemove = null; plaidRender_(); } }, 6000); return; }
           if (b.hasAttribute('data-plaid-remove-cancel')) { PlaidState.pendingRemove = null; return plaidRender_(); }
           if (rmc) {
             PlaidState.pendingRemove = null; b.disabled = true; b.textContent = 'Removing…';
             const r = await plaidApi_('plaidRemove', { item_id: rmc });
             if (!r.ok) plaidShowError_(r.error || 'Could not remove.');
-            for (const k of Object.keys(PlaidState.debtMap || {})) { /* keep map entries; harmless if the account is gone */ }
-            return plaidLoad_({ skipPrepare: true });
+            return plaidLoad_({ skipPrepare: true, keepError: !r.ok });
           }
           if (sb) {
             b.disabled = true;
             const r = await plaidApi_('plaidSandbox', { item_id: b.getAttribute('data-item'), action: sb });
             if (!r.ok) plaidShowError_('Sandbox action failed: ' + (r.error || ''));
             // Give Plaid a moment to deliver the webhook before re-reading.
-            setTimeout(() => plaidLoad_({ skipPrepare: true }), sb === 'fire_webhook' ? 4000 : 1500);
+            setTimeout(() => plaidLoad_({ skipPrepare: true, keepError: !r.ok }), sb === 'fire_webhook' ? 4000 : 1500);
             return;
           }
         });
