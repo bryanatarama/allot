@@ -105,6 +105,11 @@ them manually. (workflow_id: wf_d61e6f13700562e5)
 - [x] v442/v443: accounts auto-link to Debt rows by name (fuzzy, iterative tie
       resolution; "Not linked" remembered as `__none__`); "Use bank name" renames the
       row to the bank's label; stale mappings pruned on load.
+- [x] v455/v456: bank-first onboarding — tour step for linking, bank-first setup prompt,
+      demo-mode guard, "Add as Debt row", and **Recurring Transactions** (TXN-016/017:
+      fetched only after historical_update_complete; refreshed on
+      RECURRING_TRANSACTIONS_UPDATE; add-on confirmed enabled in production_by_country
+      and approved by Bryan) powering "Bills we found" on the Allot tab.
 - [x] v452/v453: Deposit inbox on Home (`plaidInflows` + KV `plaidDeposits`): prompts for
       unposted bank inflows (income/check deposits always, other transfers ≥ $100,
       learned payers), never auto-posts; internal transfer pairs filtered; reconciles
