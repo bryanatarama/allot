@@ -105,6 +105,8 @@ them manually. (workflow_id: wf_d61e6f13700562e5)
 - [x] v442/v443: accounts auto-link to Debt rows by name (fuzzy, iterative tie
       resolution; "Not linked" remembered as `__none__`); "Use bank name" renames the
       row to the bank's label; stale mappings pruned on load.
+- [x] v444: user-facing note that accounts carry the bank's names; Debt-tab rename of a
+      linked row warns about the label discrepancy and keeps the link (key remap).
 - [x] Sandbox end-to-end test 2026-10-07 (Patelco Credit Union sandbox, user_good):
       link → 2 accounts, 49 txns, historical complete, identity match score 100;
       `/sandbox/item/fire_webhook` → receiver verified JWT, synced (last_sync advanced);
