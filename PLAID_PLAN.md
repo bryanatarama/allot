@@ -105,6 +105,8 @@ them manually. (workflow_id: wf_d61e6f13700562e5)
 - [x] v442/v443: accounts auto-link to Debt rows by name (fuzzy, iterative tie
       resolution; "Not linked" remembered as `__none__`); "Use bank name" renames the
       row to the bank's label; stale mappings pruned on load.
+- [x] v462: per-user cap of 3 linked banks (`MAX_ITEMS_PER_USER`), server-enforced, to
+      bound pay-as-you-go cost while other users try the integration.
 - [x] v455/v456: bank-first onboarding — tour step for linking, bank-first setup prompt,
       demo-mode guard, "Add as Debt row", and **Recurring Transactions** (TXN-016/017:
       fetched only after historical_update_complete; refreshed on
