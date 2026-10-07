@@ -1852,7 +1852,7 @@ body { padding:0; overflow-x: hidden; }
       // ===== Header pills =====
       const whereEl = document.getElementById("where");
       const specEl = document.getElementById("specVersion");
-      const BUILD_STAMP = "v448-pages";
+      const BUILD_STAMP = "v449-pages";
       const SPEC_VERSION = "";
       specEl.textContent = "Spec: " + SPEC_VERSION;
       whereEl.textContent = "Here: " + window.location.href;
@@ -9914,7 +9914,8 @@ document.addEventListener("click", async (e) => {
             const cur = raw === PLAID_NOLINK ? '' : raw;
             const curRow = debtRows.find(r => r.key === cur);
             const bankLabel = plaidBankLabel_(it, a);
-            const canRename = !!curRow && !plaidLabelsEquivalent_(curRow.name, bankLabel);
+            const canRename = !!curRow && curRow.name.trim().toLowerCase() !== bankLabel.toLowerCase();   // any textual difference → offer the exact bank form
+            const showDiff = !!curRow && !plaidLabelsEquivalent_(curRow.name, bankLabel);                // only a real mismatch gets the warning line
             const auto = PlaidState.autoLinked && PlaidState.autoLinked[a.account_id] && cur;
             debtSel = `<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-top:6px">
               <select class="cell-input" data-plaid-debtmap="${escapeHtml_(a.account_id)}" style="font-size:.85em;max-width:260px;width:auto">
@@ -9924,7 +9925,7 @@ document.addEventListener("click", async (e) => {
               ${canRename ? `<button type="button" data-plaid-usebankname="${escapeHtml_(a.account_id)}" title="Rename the Debt row to \"${escapeHtml_(bankLabel)}\" (balances and paid-this-month carry over)" style="font-size:.78em">Use bank name</button>` : ''}
               ${auto ? '<span class="muted" style="font-size:.75em">auto-linked by name</span>' : ''}
             </div>
-            ${canRename ? `<div class="muted" style="font-size:.75em;margin-top:3px">Bank name: ${escapeHtml_(bankLabel)} · your label differs; balances still sync.</div>` : ''}`;
+            ${showDiff ? `<div class="muted" style="font-size:.75em;margin-top:3px">Bank name: ${escapeHtml_(bankLabel)} · your label differs; balances still sync.</div>` : ''}`;
           } else if (isLiab) {
             debtSel = '<div class="muted" style="font-size:.78em;margin-top:4px">Add a Debt category on the Allot tab to auto-fill its balance from this account.</div>';
           }
