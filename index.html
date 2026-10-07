@@ -1841,7 +1841,7 @@ body { padding:0; overflow-x: hidden; }
       // ===== Header pills =====
       const whereEl = document.getElementById("where");
       const specEl = document.getElementById("specVersion");
-      const BUILD_STAMP = "v441-pages";
+      const BUILD_STAMP = "v442-pages";
       const SPEC_VERSION = "";
       specEl.textContent = "Spec: " + SPEC_VERSION;
       whereEl.textContent = "Here: " + window.location.href;
@@ -9804,7 +9804,8 @@ document.addEventListener("click", async (e) => {
           try { const m = await workerGet_('plaidDebtMap'); PlaidState.debtMap = (m && m.ok && m.state && typeof m.state === 'object') ? m.state : {}; } catch(_) { PlaidState.debtMap = {}; }
         }
         plaidRender_();
-        plaidAutoApplyDebts_();
+        const linked = await plaidAutoMatchDebts_();   // v442: name-match new accounts to Debt rows
+        if (linked) plaidRender_(); else plaidAutoApplyDebts_();
         if (!(opts && opts.skipPrepare)) plaidPrepareLink_();
       } catch (e) {
         plaidSetStatus_('Error', 'warn');
@@ -9876,11 +9877,20 @@ document.addEventListener("click", async (e) => {
           }
           let debtSel = '';
           if (isLiab && debtRows.length) {
-            const cur = debtMap[a.account_id] || '';
-            debtSel = `<select class="cell-input" data-plaid-debtmap="${escapeHtml_(a.account_id)}" style="margin-top:6px;font-size:.85em;max-width:260px">
-              <option value="">Not linked to a Debt row</option>
-              ${debtRows.map(r => `<option value="${escapeHtml_(r.key)}"${r.key === cur ? ' selected' : ''}>Fills Debt → ${escapeHtml_(r.name)}</option>`).join('')}
-            </select>`;
+            const raw = debtMap[a.account_id] || '';
+            const cur = raw === PLAID_NOLINK ? '' : raw;
+            const curRow = debtRows.find(r => r.key === cur);
+            const bankLabel = ((it.institution_name || '') + ' ' + (a.name || '')).replace(/\s+/g, ' ').trim();
+            const canRename = !!curRow && curRow.name.toLowerCase() !== bankLabel.toLowerCase();
+            const auto = PlaidState.autoLinked && PlaidState.autoLinked[a.account_id] && cur;
+            debtSel = `<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-top:6px">
+              <select class="cell-input" data-plaid-debtmap="${escapeHtml_(a.account_id)}" style="font-size:.85em;max-width:260px;width:auto">
+                <option value="">Not linked to a Debt row</option>
+                ${debtRows.map(r => `<option value="${escapeHtml_(r.key)}"${r.key === cur ? ' selected' : ''}>Fills Debt → ${escapeHtml_(r.name)}</option>`).join('')}
+              </select>
+              ${canRename ? `<button type="button" data-plaid-usebankname="${escapeHtml_(a.account_id)}" title="Rename the Debt row to \"${escapeHtml_(bankLabel)}\" (balances and paid-this-month carry over)" style="font-size:.78em">Use bank name</button>` : ''}
+              ${auto ? '<span class="muted" style="font-size:.75em">auto-linked by name</span>' : ''}
+            </div>`;
           } else if (isLiab) {
             debtSel = '<div class="muted" style="font-size:.78em;margin-top:4px">Add a Debt category on the Allot tab to auto-fill its balance from this account.</div>';
           }
@@ -9957,7 +9967,7 @@ document.addEventListener("click", async (e) => {
     // ── Liabilities → Debt tab auto-fill ──────────────────────
     function plaidApplyDebtFromAccount_(it, a) {
       const key = (PlaidState.debtMap || {})[a.account_id];
-      if (!key || typeof appState === 'undefined') return false;
+      if (!key || key === PLAID_NOLINK || typeof appState === 'undefined') return false;
       const liab = it.liabilities || {};
       const L = (liab.credit || []).find(c => c.account_id === a.account_id)
              || (liab.student || []).find(s => s.account_id === a.account_id)
@@ -9980,16 +9990,122 @@ document.addEventListener("click", async (e) => {
       if (!Object.keys(map).length) return;
       if (typeof DebtState !== 'undefined' && DebtState.dirty) return;  // don't clobber unsaved edits
       let changed = false;
-      for (const it of PlaidState.items) for (const a of (it.accounts || [])) if (map[a.account_id]) changed = plaidApplyDebtFromAccount_(it, a) || changed;
+      for (const it of PlaidState.items) for (const a of (it.accounts || [])) if (map[a.account_id] && map[a.account_id] !== PLAID_NOLINK) changed = plaidApplyDebtFromAccount_(it, a) || changed;
       if (!changed) return;
       try { saveDebtItemsToStorage_(); } catch(_) {}
       try { await saveDebtItemsServer_(); } catch(e) { console.warn('[plaid] debt autofill save failed:', e); }
       try { if (typeof renderDebtLocal_ === 'function') renderDebtLocal_(); } catch(_) {}
       try { if (typeof updateDebtComputedInPlace_ === 'function') updateDebtComputedInPlace_(); } catch(_) {}
     }
+    // ── v442: match bank accounts to Debt rows by name ─────────
+    // "Capital One" + "QuicksilverOne" ≈ "Capital One Quicksilver One"; tolerates
+    // typos ("Quicksivler") and run-together words. Explicit "Not linked" is
+    // remembered as "__none__" so auto-match doesn't re-link it next time.
+    const PLAID_NOLINK = '__none__';
+    function plaidTokens_(str) {
+      return String(str || '')
+        .replace(/([a-z])([A-Z])/g, '$1 $2')          // QuicksilverOne → Quicksilver One
+        .toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim().split(/\s+/).filter(Boolean);
+    }
+    function plaidEditDistance_(a, b) {            // plain Levenshtein
+      const m = a.length, n = b.length; if (!m) return n; if (!n) return m;
+      let prev = Array.from({ length: n + 1 }, (_, j) => j);
+      for (let i = 1; i <= m; i++) {
+        const cur = [i];
+        for (let j = 1; j <= n; j++) cur.push(Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1)));
+        prev = cur;
+      }
+      return prev[n];
+    }
+    function plaidTokenEq_(a, b) {
+      if (a === b) return true;
+      const L = Math.max(a.length, b.length);
+      if (L < 4) return false;
+      const d = plaidEditDistance_(a, b);
+      return d <= (L >= 7 ? 2 : 1);
+    }
+    // 0..1: how well a Debt row name describes a bank account. Every word of the
+    // row must appear in institution+account name (fuzzy); leftover account words
+    // lower the score, except generic ones (visa, card, line, of, credit…).
+    const PLAID_GENERIC = new Set(['visa','mastercard','amex','card','credit','account','acct','line','of','the','and','loan','rewards','platinum','signature','world','elite','preferred','cash','plus','one']);
+    function plaidDebtMatchScore_(rowName, it, a) {
+      const rowT = plaidTokens_(rowName);
+      const instT = plaidTokens_(it.institution_name || '');
+      const nameT = plaidTokens_((a.name || '') + ' ' + (a.official_name && a.official_name !== a.name ? a.official_name : ''));
+      const acctT = [...instT, ...nameT];
+      if (!rowT.length || !acctT.length) return 0;
+      const used = new Set(); let hit = 0;
+      for (const t of rowT) { const i = acctT.findIndex((u, k) => !used.has(k) && plaidTokenEq_(t, u)); if (i >= 0) { used.add(i); hit++; } }
+      if (hit < rowT.length) return 0;
+      if (!rowT.some(t => nameT.some(u => plaidTokenEq_(t, u)))) return 0;   // must name the account, not just the bank
+      const leftover = new Set(); let usedName = 0;
+      nameT.forEach((u, k) => { if (used.has(instT.length + k)) usedName++; else if (!PLAID_GENERIC.has(u)) leftover.add(u); });
+      // Tiebreaker: a row that covers the whole account name beats one that covers part of it.
+      return (1 / (1 + 0.2 * leftover.size)) * (0.85 + 0.15 * (usedName / nameT.length));
+    }
+    // Proposals only (no writes): [{account_id, acctLabel, key, rowName, score}]
+    function plaidDebtMatchPreview_() {
+      const map = PlaidState.debtMap || {};
+      let rows = []; try { rows = getDebtCategoryRows_() || []; } catch(_) {}
+      const takenKeys = new Set(Object.values(map).filter(v => v && v !== PLAID_NOLINK));
+      const cands = [];
+      for (const it of PlaidState.items) for (const a of (it.accounts || [])) {
+        if (!(a.type === 'credit' || a.type === 'loan')) continue;
+        if (map[a.account_id]) continue;
+        for (const r of rows) {
+          if (takenKeys.has(r.key)) continue;
+          const score = plaidDebtMatchScore_(r.name, it, a);
+          if (score >= 0.6) cands.push({ account_id: a.account_id, acctLabel: (it.institution_name || '') + ' ' + (a.name || ''), key: r.key, rowName: r.name, score });
+        }
+      }
+      cands.sort((x, y) => y.score - x.score);
+      const out = [], usedA = new Set(), usedK = new Set();
+      // Assign the clearest matches first; repeat, because one assignment can
+      // remove the ambiguity that blocked another (two rows scoring alike).
+      let progress = true;
+      while (progress) {
+        progress = false;
+        for (const c of cands) {
+          if (usedA.has(c.account_id) || usedK.has(c.key)) continue;
+          const tie = cands.find(o => o !== c && o.account_id === c.account_id && !usedK.has(o.key) && Math.abs(o.score - c.score) < 0.05);
+          const rival = cands.find(o => o !== c && o.key === c.key && !usedA.has(o.account_id) && Math.abs(o.score - c.score) < 0.05);
+          if (tie || rival) continue;
+          out.push(c); usedA.add(c.account_id); usedK.add(c.key); progress = true;
+        }
+      }
+      return out;
+    }
+    async function plaidAutoMatchDebts_() {
+      const props = plaidDebtMatchPreview_();
+      if (!props.length) return 0;
+      PlaidState.debtMap = PlaidState.debtMap || {};
+      PlaidState.autoLinked = PlaidState.autoLinked || {};
+      for (const p of props) { PlaidState.debtMap[p.account_id] = p.key; PlaidState.autoLinked[p.account_id] = p.rowName; }
+      try { await workerSet_('plaidDebtMap', PlaidState.debtMap); } catch(e) { console.warn('[plaid] debt map save failed:', e); }
+      await plaidAutoApplyDebts_();
+      return props.length;
+    }
+    // Rename the linked Debt row to the bank's own label ("Capital One QuicksilverOne").
+    async function plaidUseBankName_(accountId) {
+      const key = (PlaidState.debtMap || {})[accountId];
+      if (!key || key === PLAID_NOLINK) return;
+      let it = null, a = null;
+      for (const i of PlaidState.items) { const f = (i.accounts || []).find(x => x.account_id === accountId); if (f) { it = i; a = f; break; } }
+      if (!a) return;
+      const newName = ((it.institution_name || '') + ' ' + (a.name || '')).replace(/\s+/g, ' ').trim().slice(0, 60);
+      if (!newName) return;
+      if (newName.toLowerCase() === key) return;
+      const r = await renameDebt_(key, newName);
+      if (!r.ok) { plaidShowError_(r.error || 'Could not rename the Debt row.'); return; }
+      PlaidState.debtMap[accountId] = newName.toLowerCase();
+      try { await workerSet_('plaidDebtMap', PlaidState.debtMap); } catch(_) {}
+      plaidShowError_(null);
+      plaidRender_();
+    }
+
     async function plaidSetDebtMap_(accountId, key) {
       PlaidState.debtMap = PlaidState.debtMap || {};
-      if (key) PlaidState.debtMap[accountId] = key; else delete PlaidState.debtMap[accountId];
+      if (key) PlaidState.debtMap[accountId] = key; else PlaidState.debtMap[accountId] = PLAID_NOLINK;   // remember the opt-out
       try { await workerSet_('plaidDebtMap', PlaidState.debtMap); } catch(e) { console.warn('[plaid] debt map save failed:', e); }
       await plaidAutoApplyDebts_();
     }
@@ -10191,6 +10307,8 @@ document.addEventListener("click", async (e) => {
           const rm = b.getAttribute('data-plaid-remove');
           const rmc = b.getAttribute('data-plaid-remove-confirm');
           const sb = b.getAttribute('data-plaid-sandbox');
+          const useName = b.getAttribute('data-plaid-usebankname');
+          if (useName) { b.disabled = true; await plaidUseBankName_(useName); return; }
           const recheck = b.getAttribute('data-plaid-recheck');
           if (recheck) {
             PlaidState.recheckItemId = recheck;
