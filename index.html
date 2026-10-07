@@ -1841,7 +1841,7 @@ body { padding:0; overflow-x: hidden; }
       // ===== Header pills =====
       const whereEl = document.getElementById("where");
       const specEl = document.getElementById("specVersion");
-      const BUILD_STAMP = "v442-pages";
+      const BUILD_STAMP = "v443-pages";
       const SPEC_VERSION = "";
       specEl.textContent = "Spec: " + SPEC_VERSION;
       whereEl.textContent = "Here: " + window.location.href;
@@ -9802,6 +9802,12 @@ document.addEventListener("click", async (e) => {
         plaidShowError_(null);
         if (PlaidState.debtMap === null) {
           try { const m = await workerGet_('plaidDebtMap'); PlaidState.debtMap = (m && m.ok && m.state && typeof m.state === 'object') ? m.state : {}; } catch(_) { PlaidState.debtMap = {}; }
+        }
+        // v443: drop mappings for accounts that no longer exist (removed/relinked banks).
+        if (PlaidState.debtMap && Object.keys(PlaidState.debtMap).length) {
+          const live = new Set(PlaidState.items.flatMap(it => (it.accounts || []).map(a => a.account_id)));
+          const stale = Object.keys(PlaidState.debtMap).filter(id => !live.has(id));
+          if (stale.length) { for (const id of stale) delete PlaidState.debtMap[id]; try { await workerSet_('plaidDebtMap', PlaidState.debtMap); } catch(_) {} }
         }
         plaidRender_();
         const linked = await plaidAutoMatchDebts_();   // v442: name-match new accounts to Debt rows
