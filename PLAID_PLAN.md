@@ -33,7 +33,7 @@ them manually. (workflow_id: wf_d61e6f13700562e5)
   `/plaid/webhook`, `redirect_uri` only when `PLAID_REDIRECT_URI` is set (OAUTH-002/005).
 - Platform: web / vanilla JS single-page `index.html` on Cloudflare Pages + Cloudflare
   Worker backend (`worker/worker.js` + `worker/plaid.js`) with Workers KV.
-- Environment: **sandbox** until acceptance passes (`PLAID_ENV` var in `wrangler.toml`).
+- Environment: **production** since 2026-10-07 (`PLAID_ENV` var in `wrangler.toml`; sandbox acceptance passed first).
   The Link client takes its environment from the link_token, so the Worker var is the
   single source of truth (GUIDE-004).
 
@@ -116,9 +116,9 @@ them manually. (workflow_id: wf_d61e6f13700562e5)
 - [x] v439 (2026-10-07): state moved from KV to a per-user Durable Object (`PlaidUser`,
       `[[durable_objects.bindings]] PLAID_USER`, migration `v1-plaid-do`); one-time import
       of the old KV layout on first access. Link-failure message now survives the reload.
-- [ ] Production cut-over (see checklist below).
+- [x] Production cut-over 2026-10-07: sandbox Items removed, production secret set (real terminal), `PLAID_ENV="production"`, redeployed; real Patelco Credit Union linked (6 accounts, 1,255 transactions, liabilities). Per-user link/exchange rate limit raised 30→120/hr (the tab pre-fetches a link token per visit).
 
-## Production checklist (not started)
+## Production checklist (DONE 2026-10-07 — kept for reference)
 
 1. Dashboard: confirm Data Transparency Messaging / use case and company profile +
    data-security questionnaire (gates Chase/PNC OAuth).
@@ -145,6 +145,8 @@ them manually. (workflow_id: wf_d61e6f13700562e5)
   checks passed. OAuth exercised end to end with Platypus OAuth Bank (ins_127287).
   Verdict applies to worker deployed 2026-10-07 (DO migration v1-plaid-do) and
   index.html v439.
+- Round 3 (2026-10-07, PRODUCTION): all 15 checks passed. Real institution linked end to
+  end; identity match returned 'mismatch' for the developer (advisory badge only).
 - Storage incident during round 1→2: with state in Workers KV, a Plaid webhook (Plaid's
   data center) and the browser (another data center) each read a ~60 s-stale cached copy
   and wrote the whole record back, silently losing the other's update (an OAuth-linked
