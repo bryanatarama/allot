@@ -404,6 +404,9 @@
         border-radius: 4px; cursor: pointer; font-family: inherit;
       }
       body.has-preview-banner #mainContent { margin-bottom: 36px; }
+      /* v465: the preview banner used to sit on top of the tab bar; now the bar moves up to make room. */
+      body.has-preview-banner .nav { bottom: 34px; }
+      body.has-preview-banner .main { padding-bottom: calc(130px + env(safe-area-inset-bottom)); }
       /* Admin mode: debug elements hidden by default, visible with ?admin=1 */
       .dev-only { display: none !important; }
       body.admin-mode .dev-only { display: block !important; }
@@ -1901,7 +1904,7 @@ body { padding:0; overflow-x: hidden; }
       // ===== Header pills =====
       const whereEl = document.getElementById("where");
       const specEl = document.getElementById("specVersion");
-      const BUILD_STAMP = "v464-pages";
+      const BUILD_STAMP = "v465-pages";
       const SPEC_VERSION = "";
       specEl.textContent = "Spec: " + SPEC_VERSION;
       whereEl.textContent = "Here: " + window.location.href;
