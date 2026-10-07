@@ -175,7 +175,10 @@
 
       #engBillsTable tbody tr {
         display: grid;
-        grid-template-columns: 1fr 1fr 1fr auto;
+        /* v458: fixed last column — `auto` sized it to the type label, so
+           "LIVING EXP" cards got a wider Paid column and a shorter Target input
+           than "BILLS" cards. */
+        grid-template-columns: 1fr 1fr 1fr 84px;
         grid-template-areas:
           "name name name type"
           "target target target paid"
@@ -1875,7 +1878,7 @@ body { padding:0; overflow-x: hidden; }
       // ===== Header pills =====
       const whereEl = document.getElementById("where");
       const specEl = document.getElementById("specVersion");
-      const BUILD_STAMP = "v457-pages";
+      const BUILD_STAMP = "v458-pages";
       const SPEC_VERSION = "";
       specEl.textContent = "Spec: " + SPEC_VERSION;
       whereEl.textContent = "Here: " + window.location.href;
