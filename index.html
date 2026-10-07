@@ -1633,8 +1633,15 @@ body { padding:0; overflow-x: hidden; }
         <div id="plaidAddCard" style="margin:8px 0 16px;padding:20px;background:linear-gradient(135deg,rgba(245,158,11,.12),rgba(245,158,11,.06));border:1.5px solid #78350f;border-radius:16px;text-align:center;">
           <div style="font-weight:700;color:var(--accent-text);margin-bottom:6px;font-size:.95em;">Add a bank account</div>
           <div style="max-width:480px;margin:0 auto 14px;text-align:center;">
-            <div style="font-size:.9em;color:var(--muted);line-height:1.6;">Connect securely through <b>Plaid</b>, instantly. Allot never sees your bank login, and you can unlink anytime.</div>
-            <div style="font-size:.8em;color:var(--muted);line-height:1.5;margin-top:8px;">Accounts keep the names your bank gives them. Debt rows you made earlier can be linked from each account's dropdown.</div>
+            <div style="font-size:.9em;color:var(--muted);line-height:1.7;">
+              <div>Connect securely through <b>Plaid</b>, instantly.</div>
+              <div>Allot never sees your bank login.</div>
+              <div>Unlink anytime.</div>
+            </div>
+            <div style="font-size:.8em;color:var(--muted);line-height:1.6;margin-top:10px;">
+              <div>Accounts keep the names your bank gives them.</div>
+              <div>Debt rows you made earlier can be linked from each account's dropdown.</div>
+            </div>
           </div>
           <div id="plaidNameRow" style="display:none;max-width:320px;margin:0 auto 12px;text-align:left;">
             <label for="plaidNameInput" style="display:block;font-size:.8em;color:var(--muted);margin-bottom:4px;">Your full name, as it appears on your bank account</label>
@@ -1845,7 +1852,7 @@ body { padding:0; overflow-x: hidden; }
       // ===== Header pills =====
       const whereEl = document.getElementById("where");
       const specEl = document.getElementById("specVersion");
-      const BUILD_STAMP = "v445-pages";
+      const BUILD_STAMP = "v446-pages";
       const SPEC_VERSION = "";
       specEl.textContent = "Spec: " + SPEC_VERSION;
       whereEl.textContent = "Here: " + window.location.href;
