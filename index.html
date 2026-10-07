@@ -92,6 +92,8 @@
       .cell-input { width:100%; box-sizing:border-box; padding:6px 8px; border-radius:10px; border:1px solid var(--border); background: var(--btn2); color: var(--text); }
       .cell-input[readonly]{ opacity: .85; cursor: default; }
       .cell-invalid { outline:2px solid #b91c1c; background:#1a0d10; }
+      #plaidTxnPanel > summary::-webkit-details-marker { display: none; }
+      #plaidTxnPanel[open] .plaid-chev { transform: rotate(180deg); }
       /* v460: Plaid panels on phones — headers stack instead of squeezing the title. */
       @media (max-width: 700px) {
         #tab-accounts > .panel > .tab-header, #plaidRecurringCard > .tab-header, .plaid-card-head {
@@ -1691,20 +1693,22 @@ body { padding:0; overflow-x: hidden; }
         <div id="plaidItems"></div>
       </div>
 
-      <div class="panel" id="plaidTxnPanel" style="display:none">
-        <div class="tab-header" style="margin-bottom:8px">
+      <!-- v461: collapsible (closed by default; open state remembered per device) -->
+      <details class="panel" id="plaidTxnPanel" style="display:none">
+        <summary style="cursor:pointer;list-style:none;display:flex;justify-content:space-between;align-items:center;gap:12px">
           <div>
-            <h3 style="margin:0">Recent Activity</h3>
+            <h3 style="margin:0">Recent Activity <span id="plaidTxnCount" class="muted" style="font-weight:400;font-size:.8em"></span></h3>
             <div class="muted" id="plaidTxnSub">Newest first. Money in shows green.</div>
           </div>
-        </div>
-        <div class="table-wrap">
+          <span class="plaid-chev muted" aria-hidden="true" style="font-size:1.2em">▾</span>
+        </summary>
+        <div class="table-wrap" style="margin-top:10px">
           <table class="grid" id="plaidTxnTable">
             <thead><tr><th style="width:92px">Date</th><th>Description</th><th style="width:140px">Category</th><th class="mono" style="width:110px;text-align:right">Amount</th></tr></thead>
             <tbody id="plaidTxnTbody"></tbody>
           </table>
         </div>
-      </div>
+      </details>
     </section>
 
     <section id="tab-config" class="tab-panel" hidden>
@@ -1885,7 +1889,7 @@ body { padding:0; overflow-x: hidden; }
       // ===== Header pills =====
       const whereEl = document.getElementById("where");
       const specEl = document.getElementById("specVersion");
-      const BUILD_STAMP = "v460-pages";
+      const BUILD_STAMP = "v461-pages";
       const SPEC_VERSION = "";
       specEl.textContent = "Spec: " + SPEC_VERSION;
       whereEl.textContent = "Here: " + window.location.href;
@@ -10077,6 +10081,9 @@ document.addEventListener("click", async (e) => {
       if (panel && tbody) {
         const txns = PlaidState.txns;
         panel.style.display = txns.length ? '' : 'none';
+        const cnt = document.getElementById('plaidTxnCount');
+        if (cnt) cnt.textContent = txns.length ? `· ${txns.length < PlaidState.total ? txns.length + ' of ' + PlaidState.total : txns.length}` : '';
+        if (!panel.dataset.wired) { panel.dataset.wired = '1'; try { panel.open = localStorage.getItem('ALLOT_PLAID_TXN_OPEN') === '1'; } catch(_) {} panel.addEventListener('toggle', () => { try { localStorage.setItem('ALLOT_PLAID_TXN_OPEN', panel.open ? '1' : '0'); } catch(_) {} }); }
         if (sub) sub.textContent = txns.length < PlaidState.total ? `Showing the latest ${txns.length} of ${PlaidState.total}. Money in shows green.` : 'Newest first. Money in shows green.';
         const acctName = {};
         for (const it of items) for (const a of (it.accounts || [])) acctName[a.account_id] = plaidBankLabel_(it, a) + (a.mask ? ' ••' + a.mask : '');
