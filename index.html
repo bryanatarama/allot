@@ -1889,7 +1889,7 @@ body { padding:0; overflow-x: hidden; }
       // ===== Header pills =====
       const whereEl = document.getElementById("where");
       const specEl = document.getElementById("specVersion");
-      const BUILD_STAMP = "v461-pages";
+      const BUILD_STAMP = "v462-pages";
       const SPEC_VERSION = "";
       specEl.textContent = "Spec: " + SPEC_VERSION;
       whereEl.textContent = "Here: " + window.location.href;
@@ -9909,6 +9909,7 @@ document.addEventListener("click", async (e) => {
         PlaidState.total = res.total || 0;
         PlaidState.env = res.env || null;
         PlaidState.hasName = !!res.hasName;
+        PlaidState.maxBanks = Number(res.maxBanks) || 0;
         PlaidState.loadedOnce = true;
         if (!(opts && opts.keepError)) plaidShowError_(null);
         // v459: always re-read the map (another device may have changed it) before this load mutates it.
@@ -9966,10 +9967,14 @@ document.addEventListener("click", async (e) => {
       const nameRow = document.getElementById('plaidNameRow');
       if (nameRow) nameRow.style.display = (PlaidState.hasName && !PlaidState.recheckItemId) ? 'none' : '';
       // v455: demo data active → don't let a real bank get linked onto demo rows.
+      // v462: per-user cap on linked banks (server-enforced too).
       const demo = (typeof loadDemoMode_ === 'function') && loadDemoMode_();
+      const liveBanks = items.filter(it => it.status !== 'revoked' && it.status !== 'unsupported').length;
+      const atCap = PlaidState.maxBanks && liveBanks >= PlaidState.maxBanks;
       const addBtn = document.getElementById('plaidAddBtn');
-      if (addBtn) { addBtn.disabled = !!demo; addBtn.style.opacity = demo ? '.5' : ''; }
+      if (addBtn) { addBtn.disabled = !!(demo || atCap); addBtn.style.opacity = (demo || atCap) ? '.5' : ''; }
       if (demo) plaidAddHint_('You\'re in demo mode. Tap "Make it mine" on Home to clear the example data, then link your real bank here.');
+      else if (atCap) plaidAddHint_(`You've linked ${liveBanks} of ${PlaidState.maxBanks} banks. Remove one to add another.`);
 
       const debtRows = (typeof getDebtCategoryRows_ === 'function') ? (() => { try { return getDebtCategoryRows_() || []; } catch(_) { return []; } })() : [];
       const debtMap = PlaidState.debtMap || {};
@@ -10355,6 +10360,7 @@ document.addEventListener("click", async (e) => {
       }
       if (PlaidState.handler && PlaidState.mode === 'link') return true;
       if (!PlaidState.hasName) { plaidAddHint_(''); return false; }
+      if (PlaidState.maxBanks && PlaidState.items.filter(it => it.status !== 'revoked' && it.status !== 'unsupported').length >= PlaidState.maxBanks) return false;
       try {
         const res = await plaidApi_('plaidLinkToken', {});
         if (!res.ok) { plaidAddHint_(res.error || 'Could not start bank linking.'); return false; }
