@@ -1859,7 +1859,7 @@ body { padding:0; overflow-x: hidden; }
       // ===== Header pills =====
       const whereEl = document.getElementById("where");
       const specEl = document.getElementById("specVersion");
-      const BUILD_STAMP = "v453-pages";
+      const BUILD_STAMP = "v454-pages";
       const SPEC_VERSION = "";
       specEl.textContent = "Spec: " + SPEC_VERSION;
       whereEl.textContent = "Here: " + window.location.href;
@@ -2612,9 +2612,12 @@ function saveDepositHistory_(st) {
   try { localStorage.setItem(LS_KEY_DEPOSIT_HISTORY, JSON.stringify(st)); } catch(e) {}
   workerSet_("depositHistory", st || {}).catch(()=>{});
 }
-function addDepositHistoryEntry_(deposit, breakdown, debtRedirect) {
+function addDepositHistoryEntry_(deposit, breakdown, debtRedirect, forwardFunded) {
   const st = loadDepositHistory_();
   const entry = { postedAt: new Date().toISOString(), deposit, breakdown };
+  // v454: keep the forward-funding answers with the post (synced), so the
+  // trail survives the month rollover that consumes nextMonthPaid.
+  if (forwardFunded && Object.keys(forwardFunded).length) entry.forwardFunded = forwardFunded;
   if (debtRedirect) {
     entry.debtRedirect = {
       target: debtRedirect.target,
@@ -3153,6 +3156,20 @@ function metThisDeposit_(key, target, paidAfter, allocThisDeposit){
       }
       function saveAllocLedger_(arr){
         try { localStorage.setItem(LS_KEY_ALLOC_LEDGER, JSON.stringify(arr || [])); } catch(e){}
+        // v454: the ledger used to be browser-only, so a post made on one device
+        // never showed in another's ledger. Now synced (19th user KV key).
+        workerSet_("allocLedger", arr || []).catch(()=>{});
+      }
+      // Union of server + local rows (by timestamp), newest first, capped.
+      function mergeAllocLedger_(serverArr, localArr){
+        const seen = new Set(); const out = [];
+        for (const e of [...(serverArr || []), ...(localArr || [])]) {
+          const k = String((e && (e.ts || e.time || e.at)) || '') + '|' + String((e && e.deposit) || '');
+          if (seen.has(k)) continue; seen.add(k); out.push(e);
+        }
+        out.sort((a, b) => String((b && (b.ts || b.time || b.at)) || '').localeCompare(String((a && (a.ts || a.time || a.at)) || '')));
+        if (out.length > LEDGER_MAX_ROWS) out.length = LEDGER_MAX_ROWS;
+        return out;
       }
       function addAllocLedgerEntry_(entry){
         const arr = loadAllocLedger_();
@@ -6719,6 +6736,7 @@ function resetPaidMTD_(){
   window._postDepositInFlight = true;
   try {
   normalizePaidMonth_();
+  const _nmpBefore = loadNextMonthPaid_();   // v454: to record what this post forward-funds
 
   const deposit = Number(document.getElementById("engDeposit")?.value || 0) || 0;
 
@@ -7003,7 +7021,9 @@ function resetPaidMTD_(){
   }
   saveDebtRedirect_(debtRedirect);
 
-  addDepositHistoryEntry_(deposit, { Bills: _histTiles[0], Debt: _histTiles[1], Savings: _histTiles[2], Spending: _histTiles[3] }, debtRedirect);
+  const _ffDelta = {};
+  try { const _nmpAfter = loadNextMonthPaid_(); for (const k of Object.keys(_nmpAfter || {})) { const d = round2_((Number(_nmpAfter[k]) || 0) - (Number(_nmpBefore[k]) || 0)); if (d > 0) _ffDelta[k] = d; } } catch(_) {}
+  addDepositHistoryEntry_(deposit, { Bills: _histTiles[0], Debt: _histTiles[1], Savings: _histTiles[2], Spending: _histTiles[3] }, debtRedirect, _ffDelta);
 
   // ✅ Log ledger for Post (single entry)
   recomputeBillsAllocations_(true, { log:true, mode:"post", reason:"postDeposit" });
@@ -8474,7 +8494,7 @@ document.addEventListener("click", async (e) => {
 
       async function syncDepositStateFromKV_() {
         const _s = (p) => p.catch(() => ({ ok: false, state: null }));
-        const [ps, snap, guard, hist, profile, customPcts, manualFunded, nextMonthPaid, billDueDates, billsSplitRatio, demoMode, demoSeed, debtRedir, skipRedist, ffAsked, debtPaid] = await Promise.all([
+        const [ps, snap, guard, hist, profile, customPcts, manualFunded, nextMonthPaid, billDueDates, billsSplitRatio, demoMode, demoSeed, debtRedir, skipRedist, ffAsked, debtPaid, allocLedger] = await Promise.all([
           _s(workerGet_("paidState")),
           _s(workerGet_("postSnapshot")),
           _s(workerGet_("postGuard")),
@@ -8493,6 +8513,7 @@ document.addEventListener("click", async (e) => {
           _s(workerGet_("skipRedistribution")),
           _s(workerGet_("ffAsked")),
           _s(workerGet_("debtPaidState")),
+          _s(workerGet_("allocLedger")),   // v454
         ]);
         // v434: record whether the core read actually reached the worker. A
         // new account legitimately returns ok:true with state:null, so "ok"
@@ -8504,6 +8525,14 @@ document.addEventListener("click", async (e) => {
         if (snap?.ok)               { try { snap.state ? localStorage.setItem(LS_KEY_POST_SNAPSHOT,  JSON.stringify(snap.state))  : localStorage.removeItem(LS_KEY_POST_SNAPSHOT);  synced++; } catch(_){} }
         if (guard?.ok)              { try { guard.state ? localStorage.setItem(LS_KEY_POST_GUARD,     JSON.stringify(guard.state)) : localStorage.removeItem(LS_KEY_POST_GUARD);    synced++; } catch(_){} }
         if (hist?.ok && hist.state) { try { localStorage.setItem(LS_KEY_DEPOSIT_HISTORY, JSON.stringify(hist.state)); synced++; } catch(_){} }
+        // v454: allocation ledger — merge server + local so posts from every device appear.
+        if (allocLedger?.ok) { try {
+          const merged = mergeAllocLedger_(Array.isArray(allocLedger.state) ? allocLedger.state : [], loadAllocLedger_());
+          localStorage.setItem(LS_KEY_ALLOC_LEDGER, JSON.stringify(merged));
+          const serverN = Array.isArray(allocLedger.state) ? allocLedger.state.length : 0;
+          if (merged.length !== serverN) window._allocLedgerPush = merged;   // local had rows the server lacked → push after writes are enabled
+          synced++;
+        } catch(_){} }
         if (profile?.ok && profile.state) { try { localStorage.setItem(LS_KEY_SPLITTER_PROFILE, profile.state); synced++; } catch(_){} }
         if (customPcts?.ok && customPcts.state) {
           try {
@@ -9017,6 +9046,7 @@ document.addEventListener("click", async (e) => {
       // instead of clobbering it with pre-sync local data. If another device already
       // rolled over this month, normalizePaidMonth_ sees the current monthKey and no-ops.
       _kvSyncReady = true;
+      if (window._allocLedgerPush) { try { workerSet_("allocLedger", window._allocLedgerPush).catch(()=>{}); } catch(_){} window._allocLedgerPush = null; }
       try { normalizePaidMonth_(); } catch(_){}
       // v425l: after month rollover, retroactively flag any fully-funded bill.
       // Covers accounts that had 100%-funded bills before the auto-flip existed.
