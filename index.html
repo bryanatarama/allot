@@ -1905,7 +1905,7 @@ body { padding:0; overflow-x: hidden; }
       // ===== Header pills =====
       const whereEl = document.getElementById("where");
       const specEl = document.getElementById("specVersion");
-      const BUILD_STAMP = "v467-pages";
+      const BUILD_STAMP = "v468-pages";
       const SPEC_VERSION = "";
       specEl.textContent = "Spec: " + SPEC_VERSION;
       whereEl.textContent = "Here: " + window.location.href;
@@ -3029,6 +3029,24 @@ function renderDebtLocal_(){
         setTimeout(() => { if (btn.dataset.armed === "1") { btn.dataset.armed = ""; btn.textContent = "✕"; btn.style.width = "24px"; btn.style.padding = "0"; btn.style.color = ""; btn.style.borderColor = ""; } }, 5000);
         return;
       }
+      // v468: second step is a real confirmation dialog (reuses the shared modal).
+      const nameEl = btn.closest("tr")?.querySelector('input[data-role="debtName"]');
+      const rowName = String((nameEl && nameEl.value) || k).trim();
+      const titleEl = document.getElementById("doublePostTitle"), subEl = document.getElementById("doublePostSub"),
+            detEl = document.getElementById("doublePostDetail"), okEl = document.getElementById("doublePostConfirmBtn");
+      const orig = { t: titleEl?.textContent, s: subEl?.textContent, d: detEl?.innerHTML, b: okEl?.textContent };
+      if (titleEl) titleEl.textContent = `Delete "${rowName}"?`;
+      if (subEl)   subEl.textContent   = "This removes the debt row and its balance, APR, minimum and notes. If a bank account was linked to it, the link is cleared (the bank stays connected).";
+      if (detEl)   detEl.innerHTML     = "";
+      if (okEl)    okEl.textContent    = "Delete row";
+      const ok = await new Promise(resolve => {
+        if (window._doublePostResolve) window._doublePostResolve(false);
+        window._doublePostResolve = resolve;
+        document.getElementById("doublePostModal").classList.add("open");
+      });
+      window._doublePostResolve = null;
+      if (titleEl) titleEl.textContent = orig.t; if (subEl) subEl.textContent = orig.s; if (detEl) detEl.innerHTML = orig.d; if (okEl) okEl.textContent = orig.b;
+      if (!ok) { btn.dataset.armed = ""; btn.textContent = "✕"; btn.style.width = "24px"; btn.style.padding = "0"; btn.style.color = ""; btn.style.borderColor = ""; return; }
       btn.disabled = true; btn.textContent = "…";
       try { await removeDebtCategory_(k); } catch(e) { btn.disabled = false; btn.textContent = "✕"; btn.dataset.armed = ""; }
       // Drop any bank link that pointed at the deleted row.
