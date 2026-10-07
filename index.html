@@ -1227,8 +1227,9 @@ body { padding:0; overflow-x: hidden; }
         <div id="setupPromptCard" style="display:none;margin-bottom:20px;padding:20px;background:linear-gradient(135deg,rgba(245,158,11,.12),rgba(245,158,11,.06));border:1.5px solid #78350f;border-radius:16px;text-align:center;">
           <div style="font-size:1.4em;margin-bottom:8px;">👋</div>
           <div style="font-weight:700;color:var(--accent-text);margin-bottom:6px;font-size:.95em;">Start here before your first deposit</div>
-          <div style="font-size:.88em;color:var(--muted);margin-bottom:16px;line-height:1.6;">Add your bills and monthly targets so Allot knows how to split your money. It only takes a minute — and you only do it once.</div>
-          <button id="obGoSetupBtn" type="button" style="width:100%;max-width:280px;padding:14px;font-size:.95em;font-weight:700;border-radius:12px;background:#f59e0b;color:#0c0700;border:none;cursor:pointer;letter-spacing:.02em;">Set Up My Bills →</button>
+          <div style="font-size:.88em;color:var(--muted);margin-bottom:16px;line-height:1.6;">Link your bank and Allot fills in balances, debts, and the bills it finds. Or add your bills and targets by hand. Either way, it only takes a minute.</div>
+          <button id="obGoBankBtn" type="button" style="display:none;width:100%;max-width:280px;padding:14px;font-size:.95em;font-weight:700;border-radius:12px;background:#f59e0b;color:#0c0700;border:none;cursor:pointer;letter-spacing:.02em;">Add a bank account →</button>
+          <button id="obGoSetupBtn" type="button" style="width:100%;max-width:280px;padding:12px;margin-top:8px;font-size:.9em;font-weight:600;border-radius:12px;background:transparent;color:var(--accent-text);border:1px solid #78350f;cursor:pointer;">Set up bills manually</button>
         </div>
 
         <!-- Account tiles (last deposit breakdown) -->
@@ -1344,6 +1345,21 @@ body { padding:0; overflow-x: hidden; }
 
     <!-- Budgeter tab -->
     <section id="tab-budgeter" class="tab-panel" hidden>
+      <!-- v455: recurring charges Plaid found that aren't bills yet. Hidden until there is something to offer. -->
+      <div id="plaidRecurringCard" class="panel" style="display:none;border-color:var(--ok-border);">
+        <div class="tab-header" style="margin-bottom:4px">
+          <div>
+            <h3 style="margin:0">Bills we found</h3>
+            <div class="muted">Recurring charges from your linked accounts. Check the ones that are bills and add them with their monthly amounts.</div>
+          </div>
+          <div class="tab-actions">
+            <span id="plaidRecurringStatus" class="status-pill" style="display:inline-block;min-width:0"></span>
+            <button id="plaidRecurringRefreshBtn" type="button" title="Ask Plaid to recompute recurring charges">↻</button>
+            <button id="plaidRecurringAddBtn" type="button" class="btn-ok" style="font-weight:700">Add selected as bills</button>
+          </div>
+        </div>
+        <div id="plaidRecurringList"></div>
+      </div>
       <!-- Standalone Engine FIRST -->
       <div class="panel">
         <div style="text-align:center;padding:8px 0 4px;">
@@ -1859,7 +1875,7 @@ body { padding:0; overflow-x: hidden; }
       // ===== Header pills =====
       const whereEl = document.getElementById("where");
       const specEl = document.getElementById("specVersion");
-      const BUILD_STAMP = "v454-pages";
+      const BUILD_STAMP = "v455-pages";
       const SPEC_VERSION = "";
       specEl.textContent = "Spec: " + SPEC_VERSION;
       whereEl.textContent = "Here: " + window.location.href;
@@ -9111,9 +9127,9 @@ document.addEventListener("click", async (e) => {
     // "DEMO MONTH" label give context that used to require intro slides.
     const TOUR_STEPS = [
       { tab: 'dashboard', tabLabel: '🏠 Home',   target: '#dashDepositCard',  title: '📥 Post a Deposit',
-        body: 'Enter a paycheck amount here and tap Post Deposit. Allot instantly splits it across your 4 pools. Try it — nothing here is locked in.' },
+        body: 'Enter a paycheck amount here and tap Post Deposit — or, once your bank is linked, tap Post this when a deposit appears here. Allot instantly splits it across your 4 pools. Try it — nothing here is locked in.' },
       { tab: 'dashboard', tabLabel: '🏠 Home',   target: '#dashAccountTiles', title: '🏦 Your 4 Pools',
-        body: 'Bills, Debt, Savings, Spending. Each tile shows what the last deposit routed to that pool. Move that much from your paycheck to the matching real bank account. Tip: long-press any tile to rename it to your bank\'s real name — but leave the defaults for now while you\'re learning.' },
+        body: 'Bills, Debt, Savings, Spending. Each tile shows what the last deposit routed to that pool. Move that much from your paycheck to the matching real bank account. Name your bank accounts after these pools and Allot can match them up once your bank is linked.' },
       { tab: 'dashboard', tabLabel: '🏠 Home',   target: '#dashProfileCard',  title: '⚖️ The Split Profile',
         body: 'This controls how every deposit gets divided. Leave it on Default while you\'re learning — you can switch to Conservative, Survival, or Custom anytime later.' },
       { tab: 'budgeter',  tabLabel: '⚖️ Allot',  target: '#engBillsTable',    title: '📋 Your Bills',
@@ -9123,9 +9139,11 @@ document.addEventListener("click", async (e) => {
       { tab: 'budgeter',  tabLabel: '⚖️ Allot',  target: '#engBillsEditBar',  title: '✏️ Add & Edit Bills',
         body: 'Tap Edit whenever your bills change — add new ones, rename, reorder priority (top = funded first), or delete rows. Targets and paid checkboxes lock while editing so you don\'t tap them by accident. Save commits; Cancel discards.' },
       { tab: 'debt',      tabLabel: '📉 Debt',    target: '#debtTable',        title: '📝 Enter Your Debts',
-        body: 'Each row is one debt — credit card, car loan, student loan, whatever. Fill in Name, Balance, APR (the interest rate), and Min Payment. These four numbers are what Allot uses to route your Debt pool. Tap Edit to add or remove rows.' },
+        body: 'Each row is one debt — credit card, car loan, student loan, whatever. Name, Balance, APR, and Min Payment are what Allot uses to route your Debt pool. Link your bank on the Accounts tab and these fill in by themselves; or tap Edit to enter them by hand.' },
       { tab: 'debt',      tabLabel: '📉 Debt',    target: '#debtKpis',         title: '📉 How Debt Splits Work',
         body: 'Minimums cover first — every debt gets its minimum before extras move. Whatever\'s left is weighted toward high-APR balances hardest, so payoff happens without the guesswork.' },
+      { tab: 'accounts',  tabLabel: '🏦 Accounts', target: '#plaidAddCard',    title: '🏦 Link Your Bank',
+        body: 'Connect your bank through Plaid. Balances and activity fill in, your cards and loans populate the Debt tab, recurring charges are offered as bills, and new deposits show up on Home ready to post. Finish the demo first, then link here.' },
       { tab: 'dashboard', tabLabel: '🏠 Home',   target: '#headerLeftBtns',   title: '💡 Two Handy Buttons',
         // v426e: body is a function so we can adapt copy to demo state. The
         // Make-it-mine banner is only rendered when loadDemoMode_() is true,
@@ -9877,6 +9895,7 @@ document.addEventListener("click", async (e) => {
         }
         plaidRender_();
         plaidInboxLoad_();                              // v452: new syncs may bring new deposits
+        if (PlaidBills.loaded) plaidBillsRender_();
         const linked = await plaidAutoMatchDebts_();   // v442: name-match new accounts to Debt rows
         if (linked) plaidRender_(); else plaidAutoApplyDebts_();
         if (!(opts && opts.skipPrepare)) plaidPrepareLink_();
@@ -9920,6 +9939,11 @@ document.addEventListener("click", async (e) => {
       // Name row: shown until a name is on file (needed for the ownership check).
       const nameRow = document.getElementById('plaidNameRow');
       if (nameRow) nameRow.style.display = PlaidState.hasName ? 'none' : '';
+      // v455: demo data active → don't let a real bank get linked onto demo rows.
+      const demo = (typeof loadDemoMode_ === 'function') && loadDemoMode_();
+      const addBtn = document.getElementById('plaidAddBtn');
+      if (addBtn) { addBtn.disabled = !!demo; addBtn.style.opacity = demo ? '.5' : ''; }
+      if (demo) plaidAddHint_('You\'re in demo mode. Tap "Make it mine" on Home to clear the example data, then link your real bank here.');
 
       const debtRows = (typeof getDebtCategoryRows_ === 'function') ? (() => { try { return getDebtCategoryRows_() || []; } catch(_) { return []; } })() : [];
       const debtMap = PlaidState.debtMap || {};
@@ -9967,13 +9991,13 @@ document.addEventListener("click", async (e) => {
             // dropdown; "Edit Debt links" on the card reveals all dropdowns.
             const matched = !!curRow && !canRename;
             let inner = '';
-            if (editing || !curRow) inner = selectHtml;
+            if (editing || !curRow) inner = selectHtml + (!curRow ? `<button type="button" data-plaid-adddebt="${escapeHtml_(a.account_id)}" style="font-size:.8em" title="Create a Debt row named after this account and link it">＋ Add as Debt row</button>` : '');
             else if (!matched) inner = `<span class="muted" style="font-size:.78em">Fills Debt row <b>${escapeHtml_(curRow.name)}</b></span>`;
             const rename = (curRow && canRename) ? `<button type="button" data-plaid-usebankname="${escapeHtml_(a.account_id)}" title="Rename the Debt row to \"${escapeHtml_(bankLabel)}\" (balances and paid-this-month carry over)" style="font-size:.78em">Use bank name</button>` : '';
             debtSel = (inner || rename) ? `<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:6px">${inner}${rename}</div>` : '';
             if (showDiff) debtSel += `<div class="muted" style="font-size:.75em;margin-top:3px">Bank name: ${escapeHtml_(bankLabel)} · your label differs; balances still sync.</div>`;
           } else if (isLiab) {
-            debtSel = '<div class="muted" style="font-size:.78em;margin-top:4px">Add a Debt category on the Allot tab to auto-fill its balance from this account.</div>';
+            debtSel = `<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:6px"><button type="button" data-plaid-adddebt="${escapeHtml_(a.account_id)}" style="font-size:.8em">＋ Add as Debt row</button><span class="muted" style="font-size:.75em">creates the Debt row with this balance, APR and minimum</span></div>`;
           }
           return `<tr>
             <td>
@@ -10398,7 +10422,7 @@ document.addEventListener("click", async (e) => {
           if (res && res.ok) {
             PlaidState.env = res.env || null;
             const isAdmin = document.body.classList.contains('admin-mode');
-            if (res.env === 'production' || isAdmin) btn.style.display = '';
+            if (res.env === 'production' || isAdmin) { btn.style.display = ''; const ob = document.getElementById('obGoBankBtn'); if (ob) ob.style.display = ''; }
           }
         } catch(_) {}
       };
@@ -10434,6 +10458,7 @@ document.addEventListener("click", async (e) => {
       try { await workerSet_('plaidDeposits', PlaidInbox.decisions); } catch(e) { console.warn('[plaid] deposits save failed:', e); }
     }
     function plaidInboxCandidates_() {
+      if (typeof loadDemoMode_ === 'function' && loadDemoMode_()) return [];   // v455: never post real money into demo data
       const d = PlaidInbox.decisions || { posted: {}, ignored: {}, payers: {} };
       const mk = monthKeyLocal_();                                   // calendar-month app (v397+)
       const firstOfMonth = mk + '-01';
@@ -10543,6 +10568,182 @@ document.addEventListener("click", async (e) => {
       setTimeout(tick, 1500);
     });
 
+
+    // ============================================================
+    // v455: bank-first onboarding helpers
+    //  - "Add as Debt row": create a Debt category + debt item from a linked
+    //    card/loan and link it (no manual typing).
+    //  - "Bills we found": recurring outflow streams (Plaid Recurring
+    //    Transactions add-on) offered as bill rows with monthly targets.
+    //    Decisions in KV key `plaidBills` { added: {stream_id: key}, dismissed: {stream_id: true} }.
+    // ============================================================
+    function plaidFindCategoryRows_() {
+      return Array.isArray(appState.cfgCategories) ? clone2D_(appState.cfgCategories) : [];
+    }
+    // Put [name, target, ''] into the first empty slot (or append). Returns the rows or null if a same-name row exists.
+    function plaidInsertCategoryRow_(rows, name, target) {
+      const key = name.toLowerCase();
+      if (rows.some(r => String((r && r[0]) || '').trim().toLowerCase() === key)) return null;
+      const maxRows = (typeof CategoriesState !== 'undefined' && CategoriesState.maxRows) || 100;
+      let idx = rows.findIndex(r => !String((r && r[0]) || '').trim());
+      if (idx < 0) { if (rows.length >= maxRows) return null; rows.push([name, target, '']); }
+      else rows[idx] = [name, target, ''];
+      return rows;
+    }
+    async function plaidCommitCategories_(rows) {
+      saveCategoriesToStorage_(rows);
+      setCfgCategories_(rows);
+      if (typeof CategoriesState !== 'undefined') { CategoriesState.rows = clone2D_(rows); CategoriesState.dirty = false; CategoriesState.loadedOnce = true; }
+      await workerSet_('categories', { rows });
+      try { if (typeof renderCategories_ === 'function') renderCategories_(); } catch(_) {}
+      try { if (typeof renderEngineBillsSplitTable_ === 'function') renderEngineBillsSplitTable_(); } catch(_) {}
+      try { if (typeof maybeShowSetupPrompt_ === 'function') maybeShowSetupPrompt_(); } catch(_) {}
+    }
+    async function plaidAddDebtRow_(accountId) {
+      if (typeof CategoriesState !== 'undefined' && CategoriesState.dirty) { plaidShowError_('Save or cancel your open category edits on the Allot tab first.'); return; }
+      let it = null, a = null;
+      for (const i of PlaidState.items) { const f = (i.accounts || []).find(x => x.account_id === accountId); if (f) { it = i; a = f; break; } }
+      if (!a) return;
+      const name = plaidBankLabel_(it, a).slice(0, 60);
+      const key = name.toLowerCase();
+      let rows = plaidFindCategoryRows_();
+      const existing = rows.find(r => String((r && r[0]) || '').trim().toLowerCase() === key);
+      if (existing && String(existing[1] || '').trim() !== 'Debt') { plaidShowError_(`"${name}" already exists as a ${existing[1]} category. Rename it or link a different row.`); return; }
+      if (!existing) {
+        rows = plaidInsertCategoryRow_(rows, name, 'Debt');
+        if (!rows) { plaidShowError_('No room for another category.'); return; }
+        await plaidCommitCategories_(rows);
+      }
+      appState.debtItems = appState.debtItems || {};
+      appState.debtItems[key] = Object.assign({ notes: '' }, appState.debtItems[key] || {}, { name });
+      plaidApplyDebtFromAccountKey_(it, a, key);
+      try { saveDebtItemsToStorage_(); await saveDebtItemsServer_(); } catch(e) { console.warn('[plaid] debt save failed:', e); }
+      try { if (typeof renderDebtLocal_ === 'function') renderDebtLocal_(); } catch(_) {}
+      PlaidState.debtMap = PlaidState.debtMap || {};
+      PlaidState.debtMap[accountId] = key;
+      try { await workerSet_('plaidDebtMap', PlaidState.debtMap); } catch(_) {}
+      plaidShowError_(null);
+      plaidRender_();
+    }
+    function plaidApplyDebtFromAccountKey_(it, a, key) {
+      const liab = it.liabilities || {};
+      const L = (liab.credit || []).find(c => c.account_id === a.account_id)
+             || (liab.student || []).find(s => s.account_id === a.account_id)
+             || (liab.mortgage || []).find(m => m.account_id === a.account_id);
+      const bal = a.balances && a.balances.current;
+      const cur = appState.debtItems[key] || {};
+      if (bal !== null && bal !== undefined) cur.balance = String(Math.max(0, Number(bal) || 0).toFixed(2));
+      const apr = L && (L.purchase_apr ?? L.interest_rate_percentage);
+      if (apr !== null && apr !== undefined) cur.apr = String(apr);
+      const min = L && (L.minimum_payment_amount ?? L.next_monthly_payment);
+      if (min !== null && min !== undefined) cur.minPayment = String(Number(min).toFixed(2));
+      appState.debtItems[key] = cur;
+    }
+
+    // ── Bills we found (recurring outflows) ───────────────────
+    const PlaidBills = { streams: [], decisions: null, loaded: false, busy: false, lastInfo: null };
+    const PLAID_FREQ_PER_MONTH = { WEEKLY: 52 / 12, BIWEEKLY: 26 / 12, SEMI_MONTHLY: 2, MONTHLY: 1, ANNUALLY: 1 / 12 };
+    const PLAID_FREQ_LABEL = { WEEKLY: 'weekly', BIWEEKLY: 'every 2 weeks', SEMI_MONTHLY: 'twice a month', MONTHLY: 'monthly', ANNUALLY: 'yearly' };
+    function plaidStreamName_(st) {
+      const n = plaidSmartCase_(String(st.merchant || st.description || 'Recurring charge').replace(/\s+/g, ' ').trim());
+      return n.slice(0, 40);
+    }
+    function plaidStreamMonthly_(st) {
+      const per = PLAID_FREQ_PER_MONTH[st.frequency]; if (!per) return 0;
+      return Math.round((Number(st.average) || 0) * per * 100) / 100;
+    }
+    async function plaidBillsLoadDecisions_() {
+      if (PlaidBills.decisions) return PlaidBills.decisions;
+      let d = null;
+      try { const r = await workerGet_('plaidBills'); d = (r && r.ok && r.state && typeof r.state === 'object') ? r.state : null; } catch(_) {}
+      PlaidBills.decisions = Object.assign({ added: {}, dismissed: {} }, d || {});
+      return PlaidBills.decisions;
+    }
+    async function plaidBillsSaveDecisions_() { try { await workerSet_('plaidBills', PlaidBills.decisions); } catch(_) {} }
+    function plaidBillsCandidates_() {
+      const d = PlaidBills.decisions || { added: {}, dismissed: {} };
+      let rows = []; try { rows = getCfgCategoryRows_() || []; } catch(_) {}
+      const rowTok = rows.map(r => ({ name: r.name, t: plaidTokens_(r.name) }));
+      return PlaidBills.streams.filter(st => {
+        if (d.added[st.stream_id] || d.dismissed[st.stream_id]) return false;
+        if (!st.is_active || st.status === 'TOMBSTONED') return false;
+        if (!PLAID_FREQ_PER_MONTH[st.frequency]) return false;
+        const p = (st.pfc_primary || '') + ' ' + (st.pfc_detailed || '');
+        if (/LOAN_PAYMENTS|TRANSFER_OUT|BANK_FEES|TRANSFER_IN|INCOME/.test(p)) return false;   // card/loan payments & transfers aren't bills
+        const monthly = plaidStreamMonthly_(st);
+        if (monthly < 5) return false;
+        // Already have a row with the same words? (e.g. "Spotify" vs "Spotify USA")
+        const t = plaidTokens_(plaidStreamName_(st)).filter(x => !PLAID_GENERIC.has(x));
+        if (rowTok.some(r => r.t.length && t.length && (r.t.every(x => t.some(y => plaidTokenEq_(x, y))) || t.every(x => r.t.some(y => plaidTokenEq_(x, y)))))) return false;
+        return true;
+      }).sort((a, b) => plaidStreamMonthly_(b) - plaidStreamMonthly_(a));
+    }
+    async function plaidBillsLoad_(refresh) {
+      if (PlaidBills.busy) return;
+      PlaidBills.busy = true;
+      try {
+        await plaidBillsLoadDecisions_();
+        const r = await plaidApi_('plaidRecurring' + (refresh ? '&refresh=1' : ''));
+        if (r && r.ok) { PlaidBills.streams = r.outflows || []; PlaidBills.lastInfo = r.items || []; PlaidBills.loaded = true; }
+      } catch(_) {} finally { PlaidBills.busy = false; }
+      plaidBillsRender_();
+    }
+    function plaidBillsRender_() {
+      const card = document.getElementById('plaidRecurringCard');
+      const list = document.getElementById('plaidRecurringList');
+      if (!card || !list) return;
+      if (typeof loadDemoMode_ === 'function' && loadDemoMode_()) { card.style.display = 'none'; return; }
+      const cands = plaidBillsCandidates_();
+      if (!cands.length) { card.style.display = 'none'; list.innerHTML = ''; return; }
+      card.style.display = '';
+      list.innerHTML = cands.map(st => `
+        <label style="display:flex;align-items:center;gap:10px;padding:8px 0;border-top:1px solid var(--border);cursor:pointer">
+          <input type="checkbox" data-plaid-bill="${escapeHtml_(st.stream_id)}" ${st.status === 'MATURE' ? 'checked' : ''} style="width:18px;height:18px">
+          <div style="flex:1;min-width:160px">
+            <div style="font-weight:700">${escapeHtml_(plaidStreamName_(st))}</div>
+            <div class="muted" style="font-size:.8em">${escapeHtml_(formatMoney_(st.average || 0))} ${escapeHtml_(PLAID_FREQ_LABEL[st.frequency] || '')} · last ${escapeHtml_(st.last_date || '')}${st.status === 'EARLY_DETECTION' ? ' · new, unconfirmed' : ''}</div>
+          </div>
+          <div class="mono" style="white-space:nowrap">${escapeHtml_(formatMoney_(plaidStreamMonthly_(st)))}/mo</div>
+          <button type="button" data-plaid-bill-dismiss="${escapeHtml_(st.stream_id)}" title="Not a bill" style="font-size:.78em">✕</button>
+        </label>`).join('');
+    }
+    async function plaidBillsAddSelected_() {
+      if (typeof CategoriesState !== 'undefined' && CategoriesState.dirty) { alertBillsCard_('Save or cancel your open edits first.'); return; }
+      const ids = [...document.querySelectorAll('input[data-plaid-bill]:checked')].map(i => i.getAttribute('data-plaid-bill'));
+      if (!ids.length) return;
+      let rows = plaidFindCategoryRows_();
+      appState.billsSplit = appState.billsSplit || {};
+      let added = 0;
+      for (const id of ids) {
+        const st = PlaidBills.streams.find(s => s.stream_id === id); if (!st) continue;
+        const name = plaidStreamName_(st); const key = name.toLowerCase();
+        const next = plaidInsertCategoryRow_(rows, name, 'Bills');
+        if (!next) { PlaidBills.decisions.added[id] = key; continue; }   // same-name row exists already
+        rows = next;
+        appState.billsSplit[key] = { monthlyTarget: String(plaidStreamMonthly_(st).toFixed(2)) };
+        PlaidBills.decisions.added[id] = key; added++;
+      }
+      await plaidCommitCategories_(rows);
+      try { saveBillsSplitToStorage_(); await saveBillsSplitTargetsServer_(); } catch(e) { console.warn('[plaid] bills targets save failed:', e); }
+      await plaidBillsSaveDecisions_();
+      plaidBillsRender_();
+      alertBillsCard_(added ? `Added ${added} bill${added === 1 ? '' : 's'}. Adjust targets anytime with Edit.` : 'Those bills already exist.');
+    }
+    function alertBillsCard_(msg) { const el = document.getElementById('plaidRecurringStatus'); if (el) { el.textContent = msg; setTimeout(() => { el.textContent = ''; }, 6000); } }
+
+    document.addEventListener('DOMContentLoaded', () => {
+      document.getElementById('plaidRecurringAddBtn')?.addEventListener('click', plaidBillsAddSelected_);
+      document.getElementById('plaidRecurringRefreshBtn')?.addEventListener('click', () => plaidBillsLoad_(true));
+      document.getElementById('plaidRecurringList')?.addEventListener('click', async e => {
+        const b = e.target.closest('button[data-plaid-bill-dismiss]'); if (!b) return;
+        e.preventDefault();
+        PlaidBills.decisions.dismissed[b.getAttribute('data-plaid-bill-dismiss')] = true;
+        await plaidBillsSaveDecisions_(); plaidBillsRender_();
+      });
+      document.getElementById('tabBtn-budgeter')?.addEventListener('click', () => { if (!PlaidBills.loaded && getAuthToken_()) plaidBillsLoad_(false); });
+      document.getElementById('obGoBankBtn')?.addEventListener('click', () => { try { setActiveTab_('accounts'); } catch(_) {} if (!PlaidState.loadedOnce) plaidLoad_(); });
+    });
+
     // ── Wiring ────────────────────────────────────────────────
     document.addEventListener('DOMContentLoaded', () => {
       plaidGateTab_();
@@ -10566,6 +10767,8 @@ document.addEventListener("click", async (e) => {
           const rm = b.getAttribute('data-plaid-remove');
           const rmc = b.getAttribute('data-plaid-remove-confirm');
           const sb = b.getAttribute('data-plaid-sandbox');
+          const addDebt = b.getAttribute('data-plaid-adddebt');
+          if (addDebt) { b.disabled = true; await plaidAddDebtRow_(addDebt); return; }
           const editLinks = b.getAttribute('data-plaid-editlinks');
           if (editLinks) { PlaidState.editLinks = PlaidState.editLinks || {}; PlaidState.editLinks[editLinks] = !PlaidState.editLinks[editLinks]; plaidRender_(); return; }
           const useName = b.getAttribute('data-plaid-usebankname');
