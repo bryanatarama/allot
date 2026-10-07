@@ -1838,7 +1838,7 @@ body { padding:0; overflow-x: hidden; }
       // ===== Header pills =====
       const whereEl = document.getElementById("where");
       const specEl = document.getElementById("specVersion");
-      const BUILD_STAMP = "v438-pages";
+      const BUILD_STAMP = "v439-pages";
       const SPEC_VERSION = "";
       specEl.textContent = "Spec: " + SPEC_VERSION;
       whereEl.textContent = "Here: " + window.location.href;
@@ -10000,6 +10000,7 @@ document.addEventListener("click", async (e) => {
         onSuccess: async (public_token, metadata) => {
           try { localStorage.removeItem(PLAID_LS_LINK_TOKEN); } catch(_) {}
           const mode = PlaidState.mode, itemId = PlaidState.itemId;
+          let failMsg = '';
           plaidDestroyHandler_();
           plaidSetStatus_('Finishing…');
           try {
@@ -10016,9 +10017,10 @@ document.addEventListener("click", async (e) => {
             if (!res.ok) throw new Error(res.error || 'Could not finish linking.');
             plaidShowError_(null);
           } catch (e) {
-            plaidShowError_(String(e && e.message || e));
+            failMsg = String(e && e.message || e);
           }
           await plaidLoad_();
+          if (failMsg) plaidShowError_(failMsg);   // plaidLoad_ clears the banner; re-show after reload
           // History keeps arriving for a minute or so after linking; re-pull once.
           setTimeout(() => { plaidLoad_({ skipPrepare: true }); }, 20000);
         },

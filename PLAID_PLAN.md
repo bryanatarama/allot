@@ -54,10 +54,10 @@ them manually. (workflow_id: wf_d61e6f13700562e5)
 |------|----------------|-------|-------|
 | Set worker secrets `PLAID_CLIENT_ID` and `PLAID_SECRET` (sandbox) via `npx wrangler secret put …` **from a real terminal** (through the Claude Code `!` prompt there is no TTY and an empty value gets stored) | Nothing works until set; routes return 503 "not configured" (GUIDE-001) | https://dashboard.plaid.com/developers/keys | verified 2026-10-07 (link/token/create succeeds; `plaidStatus` reports well-formed 24-hex / 30-hex values) |
 | `PLAID_TOKEN_KEY` (32-byte AES-GCM key for access tokens at rest) | DATA-001 encryption at rest | generated locally and piped into `wrangler secret put` without being displayed | verified 2026-10-07 (tokens encrypt/decrypt in sandbox link + sync) |
-| Register OAuth redirect URI `https://myallot.money/plaid-oauth` (exact match, no query/fragment) then set `PLAID_REDIRECT_URI` var and redeploy worker | Without it OAuth banks (Chase, BofA, …) silently vanish from Link in production (OAUTH-001/009). Sandbox non-OAuth banks work without it. | https://dashboard.plaid.com/developers/api → Allowed redirect URIs | needs_human (before production) |
-| Confirm Data Transparency Messaging / use-case setup is complete | `INVALID_LINK_CUSTOMIZATION` on link/token/create usually means it isn't (PITFALL-002) | https://dashboard.plaid.com/link | cannot_verify |
-| Company profile + data-security questionnaire | Gates Chase/PNC OAuth in production (OAUTH-008, TASK-006) | https://dashboard.plaid.com/settings/company | cannot_verify |
-| Switch `PLAID_ENV` to `production` and set the production `PLAID_SECRET` | Separate configuration, not a flag flip (TASK-008) | wrangler.toml + secrets | needs_human (after acceptance) |
+| Register OAuth redirect URI `https://myallot.money/plaid-oauth` (exact match, no query/fragment) then set `PLAID_REDIRECT_URI` var and redeploy worker | Without it OAuth banks (Chase, BofA, …) silently vanish from Link in production (OAUTH-001/009). | https://dashboard.plaid.com/developers/api → Allowed redirect URIs | verified 2026-10-07 (dashboard_get_state lists it; Platypus OAuth Bank linked end to end through the redirect) |
+| Confirm Data Transparency Messaging / use-case setup is complete | `INVALID_LINK_CUSTOMIZATION` on link/token/create usually means it isn't (PITFALL-002) | https://dashboard.plaid.com/link | not_applicable for the sandbox build (link/token/create succeeds in sandbox); re-open at production cut-over, cannot be read via the tools (TASK-006) |
+| Company profile + data-security questionnaire | Gates Chase/PNC OAuth in production (OAUTH-008, TASK-006) | https://dashboard.plaid.com/settings/company | not_applicable for the sandbox build; re-open at production cut-over (not readable via the tools) |
+| Switch `PLAID_ENV` to `production` and set the production `PLAID_SECRET` | Separate configuration, not a flag flip (TASK-008) | wrangler.toml + secrets | not_applicable for the sandbox build; this is the production cut-over step (see Production checklist) |
 
 ## Implementation checklist
 
@@ -113,9 +113,25 @@ them manually. (workflow_id: wf_d61e6f13700562e5)
       was unreliable; concurrent syncs are safe (cursor-based, whole-value writes,
       idempotent upserts).
 - [x] Acceptance check round 1 (see below).
-- [ ] Production cut-over (human tasks above): register redirect URI, set
-      `PLAID_REDIRECT_URI`, production secret, `PLAID_ENV=production`, then re-test
-      against an OAuth institution and re-run acceptance.
+- [x] v439 (2026-10-07): state moved from KV to a per-user Durable Object (`PlaidUser`,
+      `[[durable_objects.bindings]] PLAID_USER`, migration `v1-plaid-do`); one-time import
+      of the old KV layout on first access. Link-failure message now survives the reload.
+- [ ] Production cut-over (see checklist below).
+
+## Production checklist (not started)
+
+1. Dashboard: confirm Data Transparency Messaging / use case and company profile +
+   data-security questionnaire (gates Chase/PNC OAuth).
+2. Production credentials: `npx wrangler secret put PLAID_SECRET` with the **Production**
+   secret, from a real terminal.
+3. `wrangler.toml`: `PLAID_ENV = "production"`; redeploy. The redirect URI allowlist is
+   environment-independent in the Dashboard but re-check it.
+4. `index.html`: the Accounts tab becomes visible to all users automatically when
+   `plaidStatus` reports `env: "production"`.
+5. Link a real institution (Chase first, CONV-013), verify OAuth, then re-run
+   `build_check_acceptance`.
+6. Existing sandbox Items are invalid in production: remove them from the Accounts tab
+   before switching (or they will show as errors).
 
 ## Acceptance
 
@@ -125,8 +141,17 @@ them manually. (workflow_id: wf_d61e6f13700562e5)
   production). CHECK-009 failed only because two production-gated tasks remain
   needs_human / cannot_verify by design (TASK-006). Verdict applies to worker version
   deployed 2026-10-07 after the institution-lookup change and index.html v438.
-- Known behaviour: data written by a webhook (Plaid's data center) can take up to
-  ~60 s to appear in the app because Workers KV caches reads at the edge.
+- Round 2 (2026-10-07, sandbox, after the Durable Object move + redirect URI): all 15
+  checks passed. OAuth exercised end to end with Platypus OAuth Bank (ins_127287).
+  Verdict applies to worker deployed 2026-10-07 (DO migration v1-plaid-do) and
+  index.html v439.
+- Storage incident during round 1→2: with state in Workers KV, a Plaid webhook (Plaid's
+  data center) and the browser (another data center) each read a ~60 s-stale cached copy
+  and wrote the whole record back, silently losing the other's update (an OAuth-linked
+  Item was dropped; a synced item regressed to its pre-sync state). Fixed by moving all
+  Plaid state into a per-user Durable Object (`PlaidUser`, SQLite) with every mutation
+  serialized; KV keeps only write-once routing/cache keys. One orphaned sandbox Item
+  may exist at Plaid from the lost link; sandbox Items expire on their own.
 
 ## Maintenance
 
