@@ -17,6 +17,8 @@ them manually. (workflow_id: wf_d61e6f13700562e5)
   - **identity** (used as `/identity/match`) — yes/no "does this account belong to the
     user" signal without storing PII (SELECT-004, IDENT-002). Allot only had
     username+password, so the Accounts tab collects the user's legal name once.
+    Consent-only slot since v441 (see Capital One note); skipped on Items whose
+    /item/get does not list identity.
   - **investments** — brokerage/retirement holdings for a complete picture (SELECT-005).
   - **liabilities** — credit-card and loan balances, APRs, minimums; feeds the Debt tab
     (SELECT-005, LIAB-007).
@@ -27,8 +29,9 @@ them manually. (workflow_id: wf_d61e6f13700562e5)
 - Scope answers: US only; no money movement; no lending decision; verification =
   account ownership only.
 - Link configuration (decided from guidance, not a user question):
-  `products: ["transactions"]`, `required_if_supported_products: ["identity"]`
-  (IDENT-009), `additional_consented_products: ["investments","liabilities"]`
+  `products: ["transactions"]`,
+  `additional_consented_products: ["identity","investments","liabilities"]` (v441; was
+  required_if_supported identity until Capital One bounced card-only Items)
   (LIAB-007/INV-015), `transactions.days_requested: 180`, `webhook` = worker
   `/plaid/webhook`, `redirect_uri` only when `PLAID_REDIRECT_URI` is set (OAUTH-002/005).
 - Platform: web / vanilla JS single-page `index.html` on Cloudflare Pages + Cloudflare
@@ -150,11 +153,18 @@ them manually. (workflow_id: wf_d61e6f13700562e5)
   name typed while a Link handler was already pre-initialised was never sent. Fixed in
   v440 (`plaidSetName` saves the name independently; a "Name didn't match · fix" badge
   opens a Save & re-check flow that calls `plaidIdentityCheck`).
-- Field note: Capital One returned Plaid's ITEM_NOT_SUPPORTED screen ("Account not
-  currently supported") inside Link after OAuth. Per Plaid's docs this is an
-  institution-side restriction (e.g. Capital One does not allow linking credit cards
-  whose payments are past due; guest/limited accounts; unsupported MFA). Nothing in the
-  Link configuration causes it.
+- Capital One root cause (2026-10-07, resolved in v441): Plaid does not support Identity
+  on Capital One credit-card-only Items. (1) With identity in
+  `required_if_supported_products`, Link itself showed ITEM_NOT_SUPPORTED ("Account not
+  currently supported") after OAuth → identity moved to `additional_consented_products`.
+  (2) Linking then succeeded, but the post-link `/identity/match` call put the Item into
+  ITEM_NOT_SUPPORTED at Plaid (ERROR webhook 12 s after link; /item/get confirmed) →
+  the ownership check now runs only when `/item/get` lists identity/identity_match in
+  the Item's available/billed products (ITEM-010); otherwise the badge reads
+  "Owner check n/a". ITEM_NOT_SUPPORTED maps to status `unsupported` (message + Remove;
+  syncs skip it). Relinked Capital One stayed healthy; acceptance round 4 passed.
+- `?api=plaidItemInfo` (v441): /item/get ground truth (error, available/billed/consented
+  products, consent expiry) — first stop when an Item misbehaves.
 - Storage incident during round 1→2: with state in Workers KV, a Plaid webhook (Plaid's
   data center) and the browser (another data center) each read a ~60 s-stale cached copy
   and wrote the whole record back, silently losing the other's update (an OAuth-linked
