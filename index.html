@@ -1191,6 +1191,13 @@ body { padding:0; overflow-x: hidden; }
           <button id="demoMakeItMineBtn" type="button" style="padding:10px 18px;font-size:.9em;font-weight:700;border-radius:10px;background:#f59e0b;color:#0c0700;border:none;cursor:pointer;letter-spacing:.02em;white-space:nowrap;flex-shrink:0;">Make it mine →</button>
         </div>
 
+        <!-- v452: Plaid deposit inbox — inflows seen at the bank that haven't been posted. Hidden until there is something to show. -->
+        <div id="plaidInboxCard" style="display:none;margin:8px 0 14px;padding:14px 16px 4px;background:linear-gradient(135deg,rgba(77,184,150,.12),rgba(77,184,150,.05));border:1.5px solid var(--ok-border);border-radius:16px;">
+          <div style="font-size:.72em;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--ok-text);margin-bottom:2px;">Money arrived</div>
+          <div class="muted" style="font-size:.85em;margin-bottom:4px;">Deposits your bank reported that you haven't posted yet.</div>
+          <div id="plaidInboxList"></div>
+        </div>
+
         <!-- Deposit hero card (mirrors Budgeter tab input) -->
         <div id="dashDepositCard" style="display:flex;flex-direction:column;align-items:center;text-align:center;padding:28px 20px 24px;margin:8px 0 20px;background:linear-gradient(135deg,rgba(245,158,11,.10),rgba(245,158,11,.06));border:1px solid #78350f;border-radius:20px;box-shadow:0 0 0 1px #78350f,0 0 20px rgba(245,158,11,0.08);">
           <div style="font-size:.75em;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:10px;">Deposit Amount</div>
@@ -1852,7 +1859,7 @@ body { padding:0; overflow-x: hidden; }
       // ===== Header pills =====
       const whereEl = document.getElementById("where");
       const specEl = document.getElementById("specVersion");
-      const BUILD_STAMP = "v451-pages";
+      const BUILD_STAMP = "v452-pages";
       const SPEC_VERSION = "";
       specEl.textContent = "Spec: " + SPEC_VERSION;
       whereEl.textContent = "Here: " + window.location.href;
@@ -2618,6 +2625,8 @@ function addDepositHistoryEntry_(deposit, breakdown, debtRedirect) {
   }
   st.entries.push(entry);
   saveDepositHistory_(st);
+  // v452: let the Plaid deposit inbox mark the matching bank inflow as posted.
+  try { if (typeof plaidOnDepositPosted_ === "function") plaidOnDepositPosted_(deposit); } catch(_) {}
 }
 async function postGuardCheckOrThrow_(deposit){
   const mk = monthKeyLocal_();
@@ -9837,6 +9846,7 @@ document.addEventListener("click", async (e) => {
           if (stale.length) { for (const id of stale) delete PlaidState.debtMap[id]; try { await workerSet_('plaidDebtMap', PlaidState.debtMap); } catch(_) {} }
         }
         plaidRender_();
+        plaidInboxLoad_();                              // v452: new syncs may bring new deposits
         const linked = await plaidAutoMatchDebts_();   // v442: name-match new accounts to Debt rows
         if (linked) plaidRender_(); else plaidAutoApplyDebts_();
         if (!(opts && opts.skipPrepare)) plaidPrepareLink_();
@@ -10364,6 +10374,133 @@ document.addEventListener("click", async (e) => {
       };
       setTimeout(tick, 800);
     }
+
+
+    // ============================================================
+    // v452: Deposit inbox — inflows Plaid saw that haven't been posted.
+    // Never auto-posts: "Post this" prefills the amount and runs the normal
+    // Post Deposit flow. Decisions live in KV key `plaidDeposits`:
+    //   { posted: {txnId: {amount, date, postedAt}}, ignored: {txnId: true},
+    //     payers: {payerKey: 'income' | 'not_income'} }
+    // Default rules: income + check deposits always prompt; other transfers
+    // (Venmo-style, "other transfer in") prompt from $100; dividends, interest,
+    // fees, loan disbursements, refunds never prompt. A payer the user posted
+    // once prompts regardless; a payer marked "never" is silent.
+    // ============================================================
+    const PLAID_INBOX_MIN_TRANSFER = 100;
+    const PlaidInbox = { inflows: [], decisions: null, loaded: false, pendingTxn: null, busy: false };
+
+    function plaidPayerKey_(payer) {
+      return String(payer || '').toLowerCase().replace(/[0-9#*]+/g, ' ').replace(/[^a-z ]+/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 32);
+    }
+    async function plaidInboxLoadDecisions_() {
+      if (PlaidInbox.decisions) return PlaidInbox.decisions;
+      let d = null;
+      try { const r = await workerGet_('plaidDeposits'); d = (r && r.ok && r.state && typeof r.state === 'object') ? r.state : null; } catch(_) {}
+      PlaidInbox.decisions = Object.assign({ posted: {}, ignored: {}, payers: {} }, d || {});
+      return PlaidInbox.decisions;
+    }
+    async function plaidInboxSaveDecisions_() {
+      try { await workerSet_('plaidDeposits', PlaidInbox.decisions); } catch(e) { console.warn('[plaid] deposits save failed:', e); }
+    }
+    function plaidInboxCandidates_() {
+      const d = PlaidInbox.decisions || { posted: {}, ignored: {}, payers: {} };
+      const mk = monthKeyLocal_();                                   // calendar-month app (v397+)
+      const firstOfMonth = mk + '-01';
+      const grace = new Date(); grace.setDate(grace.getDate() - 10);
+      const graceDay = grace.toISOString().slice(0, 10);
+      const minDay = firstOfMonth < graceDay ? firstOfMonth : graceDay;
+      return PlaidInbox.inflows.filter(t => {
+        if (t.pending) return false;
+        if (t.date < minDay) return false;
+        if (d.posted[t.id] || d.ignored[t.id]) return false;
+        const payerRule = d.payers[plaidPayerKey_(t.payer)];
+        if (payerRule === 'not_income') return false;
+        if (payerRule === 'income') return true;
+        if (t.kind === 'income' || t.kind === 'deposit') return true;
+        if (t.kind === 'transfer') return t.amount >= PLAID_INBOX_MIN_TRANSFER;
+        return false;
+      });
+    }
+    async function plaidInboxLoad_() {
+      if (PlaidInbox.busy) return;
+      PlaidInbox.busy = true;
+      try {
+        await plaidInboxLoadDecisions_();
+        const r = await plaidApi_('plaidInflows&days=45');
+        if (r && r.ok) { PlaidInbox.inflows = r.inflows || []; PlaidInbox.loaded = true; }
+      } catch(_) {} finally { PlaidInbox.busy = false; }
+      plaidInboxRender_();
+    }
+    function plaidInboxRender_() {
+      const card = document.getElementById('plaidInboxCard');
+      const list = document.getElementById('plaidInboxList');
+      if (!card || !list) return;
+      const cands = plaidInboxCandidates_();
+      if (!cands.length) { card.style.display = 'none'; list.innerHTML = ''; return; }
+      card.style.display = '';
+      list.innerHTML = cands.map(t => `
+        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:10px 0;border-top:1px solid var(--border)">
+          <div style="flex:1;min-width:200px;text-align:left">
+            <div style="font-weight:700;font-size:1.05em">${escapeHtml_(formatMoney_(t.amount))} <span class="muted" style="font-weight:400;font-size:.8em">· ${escapeHtml_(t.date)}</span></div>
+            <div class="muted" style="font-size:.8em">${escapeHtml_(t.payer || (t.kind === 'deposit' ? 'Deposit' : 'Transfer in'))} → ${escapeHtml_(t.account_label)}</div>
+          </div>
+          <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+            <button type="button" class="btn-ok" data-plaid-inbox-post="${escapeHtml_(t.id)}" style="font-weight:700">Post this</button>
+            <button type="button" data-plaid-inbox-skip="${escapeHtml_(t.id)}" title="Hide this one">Skip</button>
+            <button type="button" data-plaid-inbox-never="${escapeHtml_(t.id)}" title="Never ask about this payer again" style="font-size:.78em">Not income</button>
+          </div>
+        </div>`).join('');
+    }
+    function plaidPrefillDeposit_(amount) {
+      const n = Math.round(Number(amount) * 100) / 100;
+      const eng = document.getElementById('engDeposit');
+      if (!eng) return false;
+      eng.value = String(n);
+      eng.dispatchEvent(new Event('input'));
+      const formatted = n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+      for (const id of ['dashDepositDisplay', 'engDepositDisplay']) { const el = document.getElementById(id); if (el) el.value = formatted; }
+      return true;
+    }
+    // Called from addDepositHistoryEntry_ after a successful post (any source).
+    function plaidOnDepositPosted_(deposit) {
+      if (!PlaidInbox.decisions) return;
+      const amt = Math.round(Number(deposit) * 100) / 100;
+      let t = PlaidInbox.pendingTxn && Math.abs(PlaidInbox.pendingTxn.amount - amt) < 0.01 ? PlaidInbox.pendingTxn : null;
+      if (!t) t = plaidInboxCandidates_().find(c => Math.abs(c.amount - amt) < 0.01) || null;   // manual post of a known inflow
+      PlaidInbox.pendingTxn = null;
+      if (!t) return;
+      PlaidInbox.decisions.posted[t.id] = { amount: t.amount, date: t.date, postedAt: new Date().toISOString() };
+      const pk = plaidPayerKey_(t.payer);
+      if (pk && PlaidInbox.decisions.payers[pk] !== 'not_income') PlaidInbox.decisions.payers[pk] = 'income';
+      plaidInboxSaveDecisions_();
+      plaidInboxRender_();
+    }
+    document.addEventListener('DOMContentLoaded', () => {
+      const list = document.getElementById('plaidInboxList');
+      if (list) list.addEventListener('click', async e => {
+        const b = e.target.closest('button'); if (!b) return;
+        const post = b.getAttribute('data-plaid-inbox-post'), skip = b.getAttribute('data-plaid-inbox-skip'), never = b.getAttribute('data-plaid-inbox-never');
+        const t = PlaidInbox.inflows.find(x => x.id === (post || skip || never)); if (!t) return;
+        if (post) {
+          if (!plaidPrefillDeposit_(t.amount)) return;
+          PlaidInbox.pendingTxn = t;
+          try { setActiveTab_('dashboard'); } catch(_) {}
+          document.getElementById('dashPostBtn')?.click();          // normal flow: confirm modal, guards, prompts
+          return;
+        }
+        if (skip) { PlaidInbox.decisions.ignored[t.id] = true; }
+        if (never) { PlaidInbox.decisions.ignored[t.id] = true; const pk = plaidPayerKey_(t.payer); if (pk) PlaidInbox.decisions.payers[pk] = 'not_income'; }
+        await plaidInboxSaveDecisions_(); plaidInboxRender_();
+      });
+      // Load once the session is ready and Plaid is configured with at least one bank.
+      let tries = 0;
+      const tick = async () => {
+        if (!getAuthToken_()) { if (++tries < 600) setTimeout(tick, 1000); return; }
+        try { const st = await plaidApi_('plaidStatus'); if (st && st.ok) plaidInboxLoad_(); } catch(_) {}
+      };
+      setTimeout(tick, 1500);
+    });
 
     // ── Wiring ────────────────────────────────────────────────
     document.addEventListener('DOMContentLoaded', () => {
