@@ -1632,8 +1632,10 @@ body { padding:0; overflow-x: hidden; }
 
         <div id="plaidAddCard" style="margin:8px 0 16px;padding:20px;background:linear-gradient(135deg,rgba(245,158,11,.12),rgba(245,158,11,.06));border:1.5px solid #78350f;border-radius:16px;text-align:center;">
           <div style="font-weight:700;color:var(--accent-text);margin-bottom:6px;font-size:.95em;">Add a bank account</div>
-          <div style="font-size:.88em;color:var(--muted);margin-bottom:10px;line-height:1.6;">Connect checking, savings, credit cards, loans, or investments. Allot never sees your bank login, the connection uses bank-level encryption, and you can unlink anytime.</div>
-          <div style="font-size:.8em;color:var(--muted);margin:0 auto 14px;max-width:560px;line-height:1.5;">Linked accounts use the names your bank or card company provides. Credit cards and loans link to your Debt rows automatically when the names match; if you created Debt rows with different names first, pick the row from the dropdown on each account or tap <b>Use bank name</b>.</div>
+          <div style="max-width:480px;margin:0 auto 14px;text-align:center;">
+            <div style="font-size:.9em;color:var(--muted);line-height:1.6;">Connect securely through <b>Plaid</b>, instantly. Allot never sees your bank login, and you can unlink anytime.</div>
+            <div style="font-size:.8em;color:var(--muted);line-height:1.5;margin-top:8px;">Accounts keep the names your bank gives them. Debt rows you made earlier can be linked from each account's dropdown.</div>
+          </div>
           <div id="plaidNameRow" style="display:none;max-width:320px;margin:0 auto 12px;text-align:left;">
             <label for="plaidNameInput" style="display:block;font-size:.8em;color:var(--muted);margin-bottom:4px;">Your full name, as it appears on your bank account</label>
             <div style="display:flex;gap:8px;align-items:center">
@@ -1843,7 +1845,7 @@ body { padding:0; overflow-x: hidden; }
       // ===== Header pills =====
       const whereEl = document.getElementById("where");
       const specEl = document.getElementById("specVersion");
-      const BUILD_STAMP = "v444-pages";
+      const BUILD_STAMP = "v445-pages";
       const SPEC_VERSION = "";
       specEl.textContent = "Spec: " + SPEC_VERSION;
       whereEl.textContent = "Here: " + window.location.href;
