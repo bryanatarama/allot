@@ -92,7 +92,14 @@
       .cell-input { width:100%; box-sizing:border-box; padding:6px 8px; border-radius:10px; border:1px solid var(--border); background: var(--btn2); color: var(--text); }
       .cell-input[readonly]{ opacity: .85; cursor: default; }
       .cell-invalid { outline:2px solid #b91c1c; background:#1a0d10; }
+      /* v460: Plaid panels on phones — headers stack instead of squeezing the title. */
       @media (max-width: 700px) {
+        #tab-accounts > .panel > .tab-header, #plaidRecurringCard > .tab-header, .plaid-card-head {
+          flex-direction: column; align-items: stretch; gap: 8px;
+        }
+        .plaid-card-head .tab-actions { justify-content: flex-start; }
+        #plaidInboxList > div > div:last-child { width: 100%; }
+      }
         #tab-debt .table-wrap { overflow: visible; border: none; background: transparent; border-radius: 0; }
         #debtTable { display: block; }
         #debtTable thead { display: none; }
@@ -1878,7 +1885,7 @@ body { padding:0; overflow-x: hidden; }
       // ===== Header pills =====
       const whereEl = document.getElementById("where");
       const specEl = document.getElementById("specVersion");
-      const BUILD_STAMP = "v459-pages";
+      const BUILD_STAMP = "v460-pages";
       const SPEC_VERSION = "";
       specEl.textContent = "Spec: " + SPEC_VERSION;
       whereEl.textContent = "Here: " + window.location.href;
@@ -10039,7 +10046,7 @@ document.addEventListener("click", async (e) => {
           <button type="button" data-plaid-sandbox="fire_webhook" data-item="${escapeHtml_(it.item_id)}" title="Sandbox: ask Plaid to send a new-transactions webhook" style="font-size:.78em">Sandbox: fire webhook</button>` : '';
 
         return `<div class="dash-card" style="margin-bottom:12px;padding:12px 14px;">
-          <div class="tab-header" style="margin-bottom:6px;align-items:center">
+          <div class="tab-header plaid-card-head" style="margin-bottom:6px;align-items:center">
             <div>
               <div style="font-weight:700;display:flex;align-items:center;gap:8px">${it.institution_logo ? `<img src="${escapeHtml_(it.institution_logo)}" alt="" style="width:22px;height:22px;border-radius:6px;background:${escapeHtml_(it.institution_color || 'transparent')}">` : ''}${escapeHtml_(it.institution_name || 'Bank')}</div>
               <div class="muted" style="font-size:.8em">${it.last_sync_at ? 'Synced ' + plaidFmtDate_(it.last_sync_at) : 'Not synced yet'}</div>
