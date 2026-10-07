@@ -1128,6 +1128,8 @@ body { padding:0; overflow-x: hidden; }
     #dashDepositWrap:focus-within { border-color: rgba(245,158,11,.8) !important; }
     #engDepositWrap:focus-within   { border-color: rgba(245,158,11,.8) !important; }
     </style>
+    <!-- v436: Plaid Link SDK — must load from Plaid's CDN (cannot be bundled/self-hosted). -->
+    <script src="https://cdn.plaid.com/link/v2/stable/link-initialize.js"></script>
   </head>
 
   
@@ -1160,7 +1162,9 @@ body { padding:0; overflow-x: hidden; }
       <button id="tabBtn-budgeter" type="button" data-tab="budgeter"><span class="tab-icon"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M10.5 6H20.25M10.5 6C10.5 6.82843 9.82843 7.5 9 7.5C8.17157 7.5 7.5 6.82843 7.5 6M10.5 6C10.5 5.17157 9.82843 4.5 9 4.5C8.17157 4.5 7.5 5.17157 7.5 6M3.75 6H7.5M10.5 18H20.25M10.5 18C10.5 18.8284 9.82843 19.5 9 19.5C8.17157 19.5 7.5 18.8284 7.5 18M10.5 18C10.5 17.1716 9.82843 16.5 9 16.5C8.17157 16.5 7.5 17.1716 7.5 18M3.75 18H7.5M16.5 12H20.25M16.5 12C16.5 12.8284 15.8284 13.5 15 13.5C14.1716 13.5 13.5 12.8284 13.5 12M16.5 12C16.5 11.1716 15.8284 10.5 15 10.5C14.1716 10.5 13.5 11.1716 13.5 12M3.75 12H13.5"/></svg></span><span class="tab-label">Allot</span></button>
       <button id="tabBtn-expenseCategories" type="button" data-tab="expenseCategories" style="display:none"><span class="tab-icon"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 6.75h12M8.25 12h12m-12 5.25h12M3.75 6.75h.007v.008H3.75V6.75zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zM3.75 12h.007v.008H3.75V12zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm-.375 5.25h.007v.008H3.75v-.008zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0z"/></svg></span><span class="tab-label">Categories</span></button>
       <button id="tabBtn-debt" type="button" data-tab="debt"><span class="tab-icon"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 6L9 12.75l4.286-4.286c2.035 1.553 3.592 3.766 4.306 6.43l.776 2.898m0 0l3.182-5.511m-3.182 5.511l-5.511-3.182"/></svg></span><span class="tab-label">Debt</span></button>
-      <!-- v426b: Accounts tab removed. Rename the 4 pools by long-pressing a
+      <button id="tabBtn-accounts" type="button" data-tab="accounts" style="display:none"><span class="tab-icon"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 21v-8.25M15.75 21v-8.25M8.25 21v-8.25M3 9l9-6 9 6m-1.5 12V10.332A48.36 48.36 0 0 0 12 9.75c-2.551 0-5.056.2-7.5.582V21M3 21h18M12 6.75h.008v.008H12V6.75Z"/></svg></span><span class="tab-label">Accounts</span></button>
+      <!-- v426b: (old pool-rename) Accounts tab removed; v436 re-added "Accounts" for Plaid bank linking.
+           Old note: Rename the 4 pools by long-pressing a
            tile on Home; opens #renamePoolModal. -->
       <button id="tabBtn-config" type="button" data-tab="config"><span class="tab-icon"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.325.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 0 1 1.37.49l1.296 2.247a1.125 1.125 0 0 1-.26 1.431l-1.003.827c-.293.241-.438.613-.43.992a7.723 7.723 0 0 1 0 .255c-.008.378.137.75.43.991l1.004.827c.424.35.534.955.26 1.43l-1.298 2.247a1.125 1.125 0 0 1-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.47 6.47 0 0 1-.22.128c-.331.183-.581.495-.644.869l-.213 1.281c-.09.543-.56.94-1.11.94h-2.594c-.55 0-1.019-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 0 1-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 0 1-1.369-.49l-1.297-2.247a1.125 1.125 0 0 1 .26-1.431l1.004-.827c.292-.24.437-.613.43-.991a6.932 6.932 0 0 1 0-.255c.007-.38-.138-.751-.43-.992l-1.004-.827a1.125 1.125 0 0 1-.26-1.43l1.297-2.247a1.125 1.125 0 0 1 1.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.086.22-.128.332-.183.582-.495.644-.869l.214-1.28Z"/><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z"/></svg></span><span class="tab-label">Config</span></button>
     </div>
@@ -1610,6 +1614,52 @@ body { padding:0; overflow-x: hidden; }
   </div>
 </section>
 
+    <!-- v436: Accounts tab — Plaid bank linking (Connected Accounts) -->
+    <section id="tab-accounts" class="tab-panel" hidden>
+      <div class="panel">
+        <div class="tab-header">
+          <div>
+            <h3 style="margin:0">Connected Accounts</h3>
+            <div class="muted">See real balances and activity from your bank, instantly.</div>
+          </div>
+          <div class="tab-actions">
+            <span id="plaidStatus" class="status-pill">—</span>
+            <button id="plaidRefreshBtn" type="button" title="Pull the latest data Plaid has for your banks">↻ Refresh</button>
+          </div>
+        </div>
+        <div id="plaidError" class="error" style="display:none"></div>
+
+        <div id="plaidAddCard" style="margin:8px 0 16px;padding:20px;background:linear-gradient(135deg,rgba(245,158,11,.12),rgba(245,158,11,.06));border:1.5px solid #78350f;border-radius:16px;text-align:center;">
+          <div style="font-weight:700;color:var(--accent-text);margin-bottom:6px;font-size:.95em;">Add a bank account</div>
+          <div style="font-size:.88em;color:var(--muted);margin-bottom:14px;line-height:1.6;">Connect checking, savings, credit cards, loans, or investments. Allot never sees your bank login, the connection uses bank-level encryption, and you can unlink anytime.</div>
+          <div id="plaidNameRow" style="display:none;max-width:320px;margin:0 auto 12px;text-align:left;">
+            <label for="plaidNameInput" style="display:block;font-size:.8em;color:var(--muted);margin-bottom:4px;">Your full name, as it appears on your bank account</label>
+            <input id="plaidNameInput" class="cell-input" type="text" autocomplete="name" maxlength="120" placeholder="e.g. Jane Q. Public" />
+            <div class="muted" style="font-size:.75em;margin-top:4px;">Used once to confirm the linked account is yours. Not shown anywhere.</div>
+          </div>
+          <button id="plaidAddBtn" type="button" style="width:100%;max-width:320px;padding:14px;font-size:.95em;font-weight:700;border-radius:12px;background:#f59e0b;color:#0c0700;border:none;cursor:pointer;letter-spacing:.02em;">Add a bank account →</button>
+          <div id="plaidAddHint" class="muted" style="font-size:.78em;margin-top:8px;"></div>
+        </div>
+
+        <div id="plaidItems"></div>
+      </div>
+
+      <div class="panel" id="plaidTxnPanel" style="display:none">
+        <div class="tab-header" style="margin-bottom:8px">
+          <div>
+            <h3 style="margin:0">Recent Activity</h3>
+            <div class="muted" id="plaidTxnSub">Newest first. Money in shows green.</div>
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table class="grid" id="plaidTxnTable">
+            <thead><tr><th style="width:92px">Date</th><th>Description</th><th style="width:140px">Category</th><th class="mono" style="width:110px;text-align:right">Amount</th></tr></thead>
+            <tbody id="plaidTxnTbody"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
     <section id="tab-config" class="tab-panel" hidden>
 
   <div class="panel">
@@ -1788,7 +1838,7 @@ body { padding:0; overflow-x: hidden; }
       // ===== Header pills =====
       const whereEl = document.getElementById("where");
       const specEl = document.getElementById("specVersion");
-      const BUILD_STAMP = "v435-pages";
+      const BUILD_STAMP = "v436-pages";
       const SPEC_VERSION = "";
       specEl.textContent = "Spec: " + SPEC_VERSION;
       whereEl.textContent = "Here: " + window.location.href;
@@ -9673,6 +9723,475 @@ document.addEventListener("click", async (e) => {
       btn.textContent = "Send";
       btn.disabled = false;
     }
+
+    // ============================================================
+    // v436: Plaid bank linking — Accounts tab ("Connected Accounts").
+    //
+    // Flow: worker mints a link_token → Plaid Link opens here → onSuccess
+    // hands us a public_token → worker exchanges it and keeps the access
+    // token server-side. The browser never sees access tokens. Only the
+    // link_token is kept client-side, and only so an OAuth bank redirect
+    // (myallot.money/plaid-oauth) can resume the same Link session.
+    // ============================================================
+    const PLAID_LS_LINK_TOKEN = "ALLOT_PLAID_LINK_TOKEN_V1";
+    const PLAID_OAUTH_PATH = "/plaid-oauth";
+    const PlaidState = {
+      items: [], txns: [], total: 0, env: null, hasName: false,
+      handler: null, linkToken: null, mode: null, itemId: null,
+      loading: false, loadedOnce: false, debtMap: null, pendingRemove: null,
+    };
+
+    async function plaidApi_(api, body, method) {
+      const opts = { method: method || (body ? 'POST' : 'GET'), headers: { 'Authorization': 'Bearer ' + getAuthToken_() } };
+      if (body) { opts.headers['Content-Type'] = 'application/json'; opts.body = JSON.stringify(body); }
+      const r = await fetch(WORKER_URL + '?api=' + api, opts);
+      if (r.status === 401) _handleWorkerStatus_(r.status);
+      let data = null; try { data = await r.json(); } catch(_) {}
+      if (!data) data = { ok: false, error: 'Worker request failed: ' + r.status };
+      return data;
+    }
+
+    function plaidSetStatus_(text, kind) {
+      const el = document.getElementById('plaidStatus');
+      if (!el) return;
+      el.textContent = text;
+      el.className = 'status-pill' + (kind === 'ok' ? ' status-ok' : kind === 'warn' ? ' status-warn' : '');
+    }
+    function plaidShowError_(msg) {
+      const el = document.getElementById('plaidError');
+      if (!el) return;
+      if (!msg) { el.style.display = 'none'; el.textContent = ''; return; }
+      el.textContent = msg; el.style.display = '';
+    }
+    function plaidFmtDate_(ts) {
+      if (!ts) return '';
+      try { return new Date(ts).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }); } catch(_) { return ''; }
+    }
+    function plaidMoney_(n, cur) {
+      if (n === null || n === undefined || isNaN(Number(n))) return '—';
+      const s = formatMoney_(Math.abs(Number(n)));
+      return (Number(n) < 0 ? '-' : '') + s + (cur && cur !== 'USD' ? ' ' + cur : '');
+    }
+    function plaidCategoryLabel_(t) {
+      const p = t.pfc_detailed || t.pfc_primary || '';
+      return p.replace(/^[A-Z_]+?_(?=[A-Z])/, '').replace(/_/g, ' ').toLowerCase().replace(/\b\w/g, c => c.toUpperCase());
+    }
+
+    // ── Load + render ─────────────────────────────────────────
+    async function plaidLoad_(opts) {
+      if (PlaidState.loading) return;
+      PlaidState.loading = true;
+      plaidSetStatus_('Loading…');
+      try {
+        const res = await plaidApi_('plaidItems');
+        if (!res.ok) {
+          if (res.error && /not configured/i.test(res.error)) { plaidSetStatus_('Unavailable', 'warn'); plaidShowError_('Bank linking is not switched on for this server yet.'); return; }
+          throw new Error(res.error || 'Load failed');
+        }
+        PlaidState.items = res.items || [];
+        PlaidState.txns = res.transactions || [];
+        PlaidState.total = res.total || 0;
+        PlaidState.env = res.env || null;
+        PlaidState.hasName = !!res.hasName;
+        PlaidState.loadedOnce = true;
+        plaidShowError_(null);
+        if (PlaidState.debtMap === null) {
+          try { const m = await workerGet_('plaidDebtMap'); PlaidState.debtMap = (m && m.ok && m.state && typeof m.state === 'object') ? m.state : {}; } catch(_) { PlaidState.debtMap = {}; }
+        }
+        plaidRender_();
+        plaidAutoApplyDebts_();
+        if (!(opts && opts.skipPrepare)) plaidPrepareLink_();
+      } catch (e) {
+        plaidSetStatus_('Error', 'warn');
+        plaidShowError_(String(e && e.message || e));
+      } finally {
+        PlaidState.loading = false;
+      }
+    }
+
+    function plaidStatusBadge_(it) {
+      if (it.status === 'login_required') return '<span class="status-pill status-warn">Needs reconnect</span>';
+      if (it.status === 'pending_disconnect') return '<span class="status-pill status-warn">Reconnect soon</span>';
+      if (it.status === 'revoked') return '<span class="status-pill status-warn">Disconnected</span>';
+      return '<span class="status-pill status-ok">Connected</span>';
+    }
+    function plaidIdentityBadge_(it) {
+      const id = it.identity || {};
+      if (id.status === 'matched') return '<span class="status-pill status-ok" title="The name on this account matched the name you gave Allot">Ownership verified</span>';
+      if (id.status === 'mismatch') return '<span class="status-pill status-warn" title="The name on this account did not match the name you gave Allot">Name didn\'t match</span>';
+      if (id.status === 'pending') return '<span class="status-pill">Checking owner…</span>';
+      return '';
+    }
+    function plaidImportBadge_(it) {
+      const s = it.sync || {};
+      if (s.historical_update_complete) return '';
+      if (s.initial_update_complete) return '<span class="muted" style="font-size:.8em">Still importing older history…</span>';
+      return '<span class="muted" style="font-size:.8em">Importing transactions… this takes a minute.</span>';
+    }
+
+    function plaidRender_() {
+      const wrap = document.getElementById('plaidItems');
+      if (!wrap) return;
+      const items = PlaidState.items;
+      const n = items.length;
+      plaidSetStatus_(n ? `${n} bank${n === 1 ? '' : 's'} connected` + (PlaidState.env === 'sandbox' ? ' · sandbox' : '') : (PlaidState.env === 'sandbox' ? 'No banks yet · sandbox' : 'No banks yet'), n ? 'ok' : '');
+
+      // Name row: shown until a name is on file (needed for the ownership check).
+      const nameRow = document.getElementById('plaidNameRow');
+      if (nameRow) nameRow.style.display = PlaidState.hasName ? 'none' : '';
+
+      const debtRows = (typeof getDebtCategoryRows_ === 'function') ? (() => { try { return getDebtCategoryRows_() || []; } catch(_) { return []; } })() : [];
+      const debtMap = PlaidState.debtMap || {};
+
+      wrap.innerHTML = items.map(it => {
+        const accts = it.accounts || [];
+        const liab = it.liabilities || {};
+        const liabByAcct = {};
+        for (const c of (liab.credit || [])) liabByAcct[c.account_id] = { kind: 'credit', apr: c.purchase_apr, min: c.minimum_payment_amount, due: c.next_payment_due_date, overdue: c.is_overdue };
+        for (const s of (liab.student || [])) liabByAcct[s.account_id] = { kind: 'student', apr: s.interest_rate_percentage, min: s.minimum_payment_amount, due: s.next_payment_due_date };
+        for (const m of (liab.mortgage || [])) liabByAcct[m.account_id] = { kind: 'mortgage', apr: m.interest_rate_percentage, min: m.next_monthly_payment, due: m.next_payment_due_date };
+        const holdByAcct = {};
+        for (const h of ((it.holdings && it.holdings.accounts) || [])) holdByAcct[h.account_id] = h.value;
+
+        const rows = accts.map(a => {
+          const b = a.balances || {};
+          const isLiab = a.type === 'credit' || a.type === 'loan';
+          const bal = (a.type === 'investment' && holdByAcct[a.account_id] !== undefined) ? holdByAcct[a.account_id] : b.current;
+          const L = liabByAcct[a.account_id];
+          let detail = '';
+          if (L) {
+            const bits = [];
+            if (L.apr !== null && L.apr !== undefined) bits.push(`APR ${Number(L.apr).toFixed(2)}%`);
+            if (L.min !== null && L.min !== undefined) bits.push(`Min ${plaidMoney_(L.min)}`);
+            if (L.due) bits.push(`Due ${L.due}`);
+            if (L.overdue) bits.push('<b style="color:var(--danger-text)">Overdue</b>');
+            detail = bits.join(' · ');
+          }
+          let debtSel = '';
+          if (isLiab && debtRows.length) {
+            const cur = debtMap[a.account_id] || '';
+            debtSel = `<select class="cell-input" data-plaid-debtmap="${escapeHtml_(a.account_id)}" style="margin-top:6px;font-size:.85em;max-width:260px">
+              <option value="">Not linked to a Debt row</option>
+              ${debtRows.map(r => `<option value="${escapeHtml_(r.key)}"${r.key === cur ? ' selected' : ''}>Fills Debt → ${escapeHtml_(r.name)}</option>`).join('')}
+            </select>`;
+          } else if (isLiab) {
+            debtSel = '<div class="muted" style="font-size:.78em;margin-top:4px">Add a Debt category on the Allot tab to auto-fill its balance from this account.</div>';
+          }
+          return `<tr>
+            <td>
+              <div><b>${escapeHtml_(a.name || a.official_name || 'Account')}</b> <span class="muted mono">${a.mask ? '••' + escapeHtml_(a.mask) : ''}</span></div>
+              <div class="muted" style="font-size:.8em">${escapeHtml_((a.subtype || a.type || '').replace(/_/g, ' '))}${detail ? ' · ' + detail : ''}</div>
+              ${debtSel}
+            </td>
+            <td class="mono" style="text-align:right;white-space:nowrap">
+              <div${isLiab ? ' title="Amount owed"' : ''}>${plaidMoney_(bal, b.iso_currency_code)}</div>
+              ${(!isLiab && b.available !== null && b.available !== undefined && b.available !== b.current) ? `<div class="muted" style="font-size:.78em">${plaidMoney_(b.available, b.iso_currency_code)} avail.</div>` : ''}
+            </td>
+          </tr>`;
+        }).join('');
+
+        const err = it.error && it.error.display_message ? `<div class="error" style="margin:8px 0">${escapeHtml_(it.error.display_message)}</div>`
+          : (it.status === 'login_required' ? '<div class="error" style="margin:8px 0">Your bank needs you to sign in again before Allot can keep syncing.</div>'
+          : it.status === 'pending_disconnect' ? '<div class="error" style="margin:8px 0">Your bank will drop this connection within a week unless you reconnect.</div>'
+          : it.status === 'revoked' ? '<div class="error" style="margin:8px 0">Access was revoked at the bank. Remove this connection and add it again.</div>' : '');
+        const needsRelink = it.status === 'login_required' || it.status === 'pending_disconnect' || it.new_accounts_available;
+        const removing = PlaidState.pendingRemove === it.item_id;
+        const sandboxTools = PlaidState.env === 'sandbox' ? `
+          <button type="button" data-plaid-sandbox="reset_login" data-item="${escapeHtml_(it.item_id)}" title="Sandbox: force the bank to require re-login" style="font-size:.78em">Sandbox: break login</button>
+          <button type="button" data-plaid-sandbox="fire_webhook" data-item="${escapeHtml_(it.item_id)}" title="Sandbox: ask Plaid to send a new-transactions webhook" style="font-size:.78em">Sandbox: fire webhook</button>` : '';
+
+        return `<div class="dash-card" style="margin-bottom:12px;padding:12px 14px;">
+          <div class="tab-header" style="margin-bottom:6px;align-items:center">
+            <div>
+              <div style="font-weight:700">${escapeHtml_(it.institution_name || 'Bank')}</div>
+              <div class="muted" style="font-size:.8em">${it.last_sync_at ? 'Synced ' + plaidFmtDate_(it.last_sync_at) : 'Not synced yet'}</div>
+            </div>
+            <div class="tab-actions">${plaidStatusBadge_(it)} ${plaidIdentityBadge_(it)}</div>
+          </div>
+          ${err}
+          <div class="table-wrap"><table class="grid"><tbody>${rows || '<tr><td class="muted">No accounts returned yet.</td></tr>'}</tbody></table></div>
+          <div style="margin-top:6px">${plaidImportBadge_(it)}${it.new_accounts_available ? ' <span class="muted" style="font-size:.8em">New accounts are available at this bank — reconnect to add them.</span>' : ''}</div>
+          <div class="tab-actions" style="margin-top:10px">
+            ${needsRelink ? `<button type="button" class="btn-ok" data-plaid-relink="${escapeHtml_(it.item_id)}">Reconnect</button>` : ''}
+            <button type="button" data-plaid-sync="${escapeHtml_(it.item_id)}">Refresh</button>
+            ${removing
+              ? `<button type="button" class="btn-danger" data-plaid-remove-confirm="${escapeHtml_(it.item_id)}">Confirm remove</button><button type="button" data-plaid-remove-cancel="1">Keep</button>`
+              : `<button type="button" data-plaid-remove="${escapeHtml_(it.item_id)}">Remove</button>`}
+            ${sandboxTools}
+          </div>
+        </div>`;
+      }).join('');
+
+      if (!n) wrap.innerHTML = `<div class="muted" style="text-align:center;padding:12px 0 4px;font-size:.9em">No banks connected yet.</div>`;
+
+      // Transactions
+      const panel = document.getElementById('plaidTxnPanel');
+      const tbody = document.getElementById('plaidTxnTbody');
+      const sub = document.getElementById('plaidTxnSub');
+      if (panel && tbody) {
+        const txns = PlaidState.txns;
+        panel.style.display = txns.length ? '' : 'none';
+        if (sub) sub.textContent = txns.length < PlaidState.total ? `Showing the latest ${txns.length} of ${PlaidState.total}. Money in shows green.` : 'Newest first. Money in shows green.';
+        const acctName = {};
+        for (const it of items) for (const a of (it.accounts || [])) acctName[a.account_id] = (a.name || '') + (a.mask ? ' ••' + a.mask : '');
+        tbody.innerHTML = txns.map(t => {
+          const inflow = Number(t.amount) < 0;
+          return `<tr${t.pending ? ' style="opacity:.65"' : ''}>
+            <td class="mono" style="white-space:nowrap">${escapeHtml_(t.date || '')}</td>
+            <td><div>${escapeHtml_(t.merchant || t.name || '—')}${t.pending ? ' <span class="muted" style="font-size:.75em">pending</span>' : ''}</div><div class="muted" style="font-size:.75em">${escapeHtml_(acctName[t.account_id] || '')}</div></td>
+            <td class="muted" style="font-size:.85em">${escapeHtml_(plaidCategoryLabel_(t))}</td>
+            <td class="mono" style="text-align:right;white-space:nowrap;${inflow ? 'color:var(--ok-text)' : ''}">${inflow ? '+' : ''}${plaidMoney_(Math.abs(Number(t.amount)), t.currency)}</td>
+          </tr>`;
+        }).join('');
+      }
+    }
+
+    // ── Liabilities → Debt tab auto-fill ──────────────────────
+    function plaidApplyDebtFromAccount_(it, a) {
+      const key = (PlaidState.debtMap || {})[a.account_id];
+      if (!key || typeof appState === 'undefined') return false;
+      const liab = it.liabilities || {};
+      const L = (liab.credit || []).find(c => c.account_id === a.account_id)
+             || (liab.student || []).find(s => s.account_id === a.account_id)
+             || (liab.mortgage || []).find(m => m.account_id === a.account_id);
+      const bal = a.balances && a.balances.current;
+      if (bal === null || bal === undefined) return false;
+      appState.debtItems = appState.debtItems || {};
+      const cur = appState.debtItems[key] || {};
+      const next = Object.assign({}, cur, { balance: String(Math.max(0, Number(bal) || 0).toFixed(2)) });
+      const apr = L && (L.purchase_apr ?? L.interest_rate_percentage);
+      if (apr !== null && apr !== undefined) next.apr = String(apr);
+      const min = L && (L.minimum_payment_amount ?? L.next_monthly_payment);
+      if (min !== null && min !== undefined) next.minPayment = String(Number(min).toFixed(2));
+      const changed = JSON.stringify(next) !== JSON.stringify(cur);
+      appState.debtItems[key] = next;
+      return changed;
+    }
+    async function plaidAutoApplyDebts_() {
+      const map = PlaidState.debtMap || {};
+      if (!Object.keys(map).length) return;
+      if (typeof DebtState !== 'undefined' && DebtState.dirty) return;  // don't clobber unsaved edits
+      let changed = false;
+      for (const it of PlaidState.items) for (const a of (it.accounts || [])) if (map[a.account_id]) changed = plaidApplyDebtFromAccount_(it, a) || changed;
+      if (!changed) return;
+      try { saveDebtItemsToStorage_(); } catch(_) {}
+      try { await saveDebtItemsServer_(); } catch(e) { console.warn('[plaid] debt autofill save failed:', e); }
+      try { if (typeof renderDebtLocal_ === 'function') renderDebtLocal_(); } catch(_) {}
+      try { if (typeof updateDebtComputedInPlace_ === 'function') updateDebtComputedInPlace_(); } catch(_) {}
+    }
+    async function plaidSetDebtMap_(accountId, key) {
+      PlaidState.debtMap = PlaidState.debtMap || {};
+      if (key) PlaidState.debtMap[accountId] = key; else delete PlaidState.debtMap[accountId];
+      try { await workerSet_('plaidDebtMap', PlaidState.debtMap); } catch(e) { console.warn('[plaid] debt map save failed:', e); }
+      await plaidAutoApplyDebts_();
+    }
+
+    // ── Link handler lifecycle ────────────────────────────────
+    function plaidDestroyHandler_() {
+      try { if (PlaidState.handler) PlaidState.handler.destroy(); } catch(_) {}
+      PlaidState.handler = null; PlaidState.linkToken = null; PlaidState.mode = null; PlaidState.itemId = null;
+    }
+
+    function plaidHandlerConfig_(token, extra) {
+      return Object.assign({
+        token,
+        onSuccess: async (public_token, metadata) => {
+          try { localStorage.removeItem(PLAID_LS_LINK_TOKEN); } catch(_) {}
+          const mode = PlaidState.mode, itemId = PlaidState.itemId;
+          plaidDestroyHandler_();
+          plaidSetStatus_('Finishing…');
+          try {
+            let res;
+            if (mode === 'update') {
+              res = await plaidApi_('plaidRelinked', { item_id: itemId });
+            } else {
+              res = await plaidApi_('plaidExchange', { public_token, metadata: {
+                institution: metadata && metadata.institution || null,
+                accounts: (metadata && metadata.accounts || []).map(a => ({ id: a.id, name: a.name, mask: a.mask, type: a.type, subtype: a.subtype })),
+                link_session_id: metadata && metadata.link_session_id || null,
+              } });
+            }
+            if (!res.ok) throw new Error(res.error || 'Could not finish linking.');
+            plaidShowError_(null);
+          } catch (e) {
+            plaidShowError_(String(e && e.message || e));
+          }
+          await plaidLoad_();
+          // History keeps arriving for a minute or so after linking; re-pull once.
+          setTimeout(() => { plaidLoad_({ skipPrepare: true }); }, 20000);
+        },
+        onExit: (err, metadata) => {
+          try { localStorage.removeItem(PLAID_LS_LINK_TOKEN); } catch(_) {}
+          const sid = metadata && metadata.link_session_id;
+          if (err) {
+            console.warn('[plaid] link exit', err.error_type, err.error_code, 'link_session_id=' + sid, 'request_id=' + (metadata && metadata.request_id));
+            plaidShowError_(err.display_message || 'Something went wrong while connecting. Please try again.');
+          } else {
+            console.log('[plaid] link closed by user link_session_id=' + sid);
+          }
+          // Handler is single-use once opened; mint a fresh one for the next try.
+          plaidDestroyHandler_();
+          plaidPrepareLink_();
+          plaidRender_();
+        },
+        onEvent: (name, metadata) => {
+          if (name === 'OPEN' || name === 'HANDOFF' || name === 'EXIT' || name === 'ERROR' || name === 'OPEN_OAUTH' || name === 'SELECT_INSTITUTION') {
+            console.log('[plaid] event', name, metadata && metadata.institution_id || '', metadata && metadata.error_code || '', 'link_session_id=' + (metadata && metadata.link_session_id));
+          }
+        },
+      }, extra || {});
+    }
+
+    // Pre-initialise Link so the button opens instantly (needs a name on file
+    // first — the token request also saves it).
+    async function plaidPrepareLink_(legalName) {
+      if (!window.Plaid) { plaidAddHint_('Bank linking script failed to load. Check your connection and refresh.'); return false; }
+      if (PlaidState.handler && PlaidState.mode === 'link') return true;
+      if (!PlaidState.hasName && !legalName) { plaidAddHint_(''); return false; }
+      try {
+        const res = await plaidApi_('plaidLinkToken', legalName ? { legalName } : {});
+        if (!res.ok) { plaidAddHint_(res.error || 'Could not start bank linking.'); return false; }
+        if (legalName) PlaidState.hasName = true;
+        plaidDestroyHandler_();
+        PlaidState.linkToken = res.link_token; PlaidState.mode = 'link'; PlaidState.itemId = null;
+        PlaidState.handler = window.Plaid.create(plaidHandlerConfig_(res.link_token));
+        plaidAddHint_('');
+        return true;
+      } catch (e) {
+        plaidAddHint_(String(e && e.message || e));
+        return false;
+      }
+    }
+    function plaidAddHint_(msg) { const el = document.getElementById('plaidAddHint'); if (el) el.textContent = msg || ''; }
+
+    async function plaidOnAddClick_() {
+      const btn = document.getElementById('plaidAddBtn');
+      const nameInput = document.getElementById('plaidNameInput');
+      let legalName = '';
+      if (!PlaidState.hasName) {
+        legalName = String(nameInput && nameInput.value || '').trim();
+        if (legalName.length < 2) { plaidAddHint_('Enter your full name first so we can confirm the account is yours.'); nameInput && nameInput.focus(); return; }
+      }
+      btn.disabled = true;
+      try {
+        const ok = await plaidPrepareLink_(legalName || undefined);
+        if (!ok || !PlaidState.handler) return;
+        try { localStorage.setItem(PLAID_LS_LINK_TOKEN, PlaidState.linkToken); } catch(_) {}
+        const nameRow = document.getElementById('plaidNameRow');
+        if (nameRow && PlaidState.hasName) nameRow.style.display = 'none';
+        PlaidState.handler.open();
+      } finally {
+        btn.disabled = false;
+      }
+    }
+
+    async function plaidRelink_(itemId) {
+      if (!window.Plaid) { plaidShowError_('Bank linking script failed to load.'); return; }
+      plaidSetStatus_('Starting reconnect…');
+      const res = await plaidApi_('plaidLinkToken', { item_id: itemId });
+      if (!res.ok) { plaidShowError_(res.error || 'Could not start reconnect.'); plaidRender_(); return; }
+      plaidDestroyHandler_();
+      PlaidState.linkToken = res.link_token; PlaidState.mode = 'update'; PlaidState.itemId = itemId;
+      PlaidState.handler = window.Plaid.create(plaidHandlerConfig_(res.link_token));
+      try { localStorage.setItem(PLAID_LS_LINK_TOKEN, res.link_token); sessionStorage.setItem(PLAID_LS_LINK_TOKEN + ':mode', 'update:' + itemId); } catch(_) {}
+      PlaidState.handler.open();
+    }
+
+    // OAuth banks bounce back to /plaid-oauth?oauth_state_id=…: resume the SAME
+    // session with the saved link_token, no user gesture required.
+    function plaidMaybeResumeOAuth_() {
+      if (window.location.pathname !== PLAID_OAUTH_PATH) return false;
+      let token = null, modeStr = '';
+      try { token = localStorage.getItem(PLAID_LS_LINK_TOKEN); modeStr = sessionStorage.getItem(PLAID_LS_LINK_TOKEN + ':mode') || ''; } catch(_) {}
+      const receivedRedirectUri = window.location.href;
+      try { window.history.replaceState({}, '', '/'); } catch(_) {}
+      if (!token || !window.Plaid) { plaidShowError_('Your bank sent you back, but the linking session had expired. Please try again.'); return true; }
+      if (modeStr.startsWith('update:')) { PlaidState.mode = 'update'; PlaidState.itemId = modeStr.slice(7); } else { PlaidState.mode = 'link'; }
+      try { sessionStorage.removeItem(PLAID_LS_LINK_TOKEN + ':mode'); } catch(_) {}
+      PlaidState.linkToken = token;
+      PlaidState.handler = window.Plaid.create(plaidHandlerConfig_(token, { receivedRedirectUri }));
+      PlaidState.handler.open();
+      return true;
+    }
+
+    // The Accounts tab stays hidden until the worker reports Plaid is
+    // configured. While PLAID_ENV is sandbox only the owner (admin mode) sees
+    // it, so other users never meet a tab full of fake banks.
+    function plaidGateTab_() {
+      const btn = document.getElementById('tabBtn-accounts');
+      if (!btn) return;
+      let tries = 0;
+      const tick = async () => {
+        if (!getAuthToken_()) { if (++tries < 600) setTimeout(tick, 1000); return; }
+        try {
+          const res = await plaidApi_('plaidStatus');
+          if (res && res.ok) {
+            PlaidState.env = res.env || null;
+            const isAdmin = document.body.classList.contains('admin-mode');
+            if (res.env === 'production' || isAdmin) btn.style.display = '';
+          }
+        } catch(_) {}
+      };
+      setTimeout(tick, 800);
+    }
+
+    // ── Wiring ────────────────────────────────────────────────
+    document.addEventListener('DOMContentLoaded', () => {
+      plaidGateTab_();
+      const tabBtn = document.getElementById('tabBtn-accounts');
+      if (tabBtn) tabBtn.addEventListener('click', () => { if (!PlaidState.loadedOnce) plaidLoad_(); });
+      document.getElementById('plaidAddBtn')?.addEventListener('click', plaidOnAddClick_);
+      document.getElementById('plaidNameInput')?.addEventListener('keydown', e => { if (e.key === 'Enter') plaidOnAddClick_(); });
+      document.getElementById('plaidRefreshBtn')?.addEventListener('click', async () => {
+        plaidSetStatus_('Refreshing…');
+        const res = await plaidApi_('plaidSync', {});
+        if (!res.ok) plaidShowError_(res.error || 'Refresh failed.');
+        await plaidLoad_({ skipPrepare: true });
+      });
+      const wrap = document.getElementById('plaidItems');
+      if (wrap) {
+        wrap.addEventListener('click', async e => {
+          const b = e.target.closest('button'); if (!b) return;
+          const relink = b.getAttribute('data-plaid-relink');
+          const sync = b.getAttribute('data-plaid-sync');
+          const rm = b.getAttribute('data-plaid-remove');
+          const rmc = b.getAttribute('data-plaid-remove-confirm');
+          const sb = b.getAttribute('data-plaid-sandbox');
+          if (relink) return plaidRelink_(relink);
+          if (sync) { b.disabled = true; b.textContent = 'Refreshing…'; const r = await plaidApi_('plaidSync', { item_id: sync }); if (!r.ok) plaidShowError_(r.error || 'Refresh failed.'); return plaidLoad_({ skipPrepare: true }); }
+          if (rm) { PlaidState.pendingRemove = rm; plaidRender_(); setTimeout(() => { if (PlaidState.pendingRemove === rm) { PlaidState.pendingRemove = null; plaidRender_(); } }, 6000); return; }
+          if (b.hasAttribute('data-plaid-remove-cancel')) { PlaidState.pendingRemove = null; return plaidRender_(); }
+          if (rmc) {
+            PlaidState.pendingRemove = null; b.disabled = true; b.textContent = 'Removing…';
+            const r = await plaidApi_('plaidRemove', { item_id: rmc });
+            if (!r.ok) plaidShowError_(r.error || 'Could not remove.');
+            for (const k of Object.keys(PlaidState.debtMap || {})) { /* keep map entries; harmless if the account is gone */ }
+            return plaidLoad_({ skipPrepare: true });
+          }
+          if (sb) {
+            b.disabled = true;
+            const r = await plaidApi_('plaidSandbox', { item_id: b.getAttribute('data-item'), action: sb });
+            if (!r.ok) plaidShowError_('Sandbox action failed: ' + (r.error || ''));
+            // Give Plaid a moment to deliver the webhook before re-reading.
+            setTimeout(() => plaidLoad_({ skipPrepare: true }), sb === 'fire_webhook' ? 4000 : 1500);
+            return;
+          }
+        });
+        wrap.addEventListener('change', e => {
+          const sel = e.target.closest('select[data-plaid-debtmap]'); if (!sel) return;
+          plaidSetDebtMap_(sel.getAttribute('data-plaid-debtmap'), sel.value);
+        });
+      }
+      // OAuth return lands here before auth has settled; wait for the session.
+      if (window.location.pathname === PLAID_OAUTH_PATH) {
+        const tryResume = (n) => {
+          if (getAuthToken_()) { try { setActiveTab_('accounts'); } catch(_) {} plaidLoad_({ skipPrepare: true }); plaidMaybeResumeOAuth_(); }
+          else if (n < 40) setTimeout(() => tryResume(n + 1), 250);
+          else { try { window.history.replaceState({}, '', '/'); } catch(_) {} }
+        };
+        setTimeout(() => tryResume(0), 300);
+      }
+    });
 
     </script>
 

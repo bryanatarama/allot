@@ -11,6 +11,8 @@ Personal budgeting web app. Live at **myallot.money**. Repo: github.com/bryanata
 3. Code:
    - `~/budgeter/index.html` — the frontend runtime (in this repo)
    - `~/budgeter/worker/worker.js` — Cloudflare Worker (gitignored — has inline Discord webhooks. Deploy with `cd ~/budgeter/worker && npx wrangler deploy`)
+   - `~/budgeter/worker/plaid.js` — Plaid bank-linking module imported by worker.js (gitignored with worker/). `worker/package.json` pulls in `jose`; run `npm install` in worker/ on a fresh machine before deploying.
+   - `~/budgeter/PLAID_PLAN.md` — durable state of the Plaid integration (scope, human tasks, how to test). **Before changing any Plaid-touching code, consult the Plaid MCP `build_guidance`, and re-run `build_check_acceptance` before calling the change done.**
    - `~/budgeter/ideas-app/index.html` — separate mini-app deployed to `budgeter-ideas.pages.dev` (also gitignored)
 
 ## Architecture (don't relearn this each session)
