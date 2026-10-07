@@ -1577,6 +1577,7 @@ body { padding:0; overflow-x: hidden; }
     </div>
 
     <div id="debtError" class="error" style="display:none"></div>
+    <div id="debtPlaidNote" style="display:none;margin:8px 0;padding:10px 12px;border:1px solid var(--warn-border);background:var(--warn-bg);color:var(--warn-text);border-radius:8px;font-size:.88em;line-height:1.5"></div>
     <div id="debtDiag" class="dev-only"></div>
 
     <div id="debtKpis" class="split-tiles" style="margin:10px 0 14px;"></div>
@@ -1631,7 +1632,8 @@ body { padding:0; overflow-x: hidden; }
 
         <div id="plaidAddCard" style="margin:8px 0 16px;padding:20px;background:linear-gradient(135deg,rgba(245,158,11,.12),rgba(245,158,11,.06));border:1.5px solid #78350f;border-radius:16px;text-align:center;">
           <div style="font-weight:700;color:var(--accent-text);margin-bottom:6px;font-size:.95em;">Add a bank account</div>
-          <div style="font-size:.88em;color:var(--muted);margin-bottom:14px;line-height:1.6;">Connect checking, savings, credit cards, loans, or investments. Allot never sees your bank login, the connection uses bank-level encryption, and you can unlink anytime.</div>
+          <div style="font-size:.88em;color:var(--muted);margin-bottom:10px;line-height:1.6;">Connect checking, savings, credit cards, loans, or investments. Allot never sees your bank login, the connection uses bank-level encryption, and you can unlink anytime.</div>
+          <div style="font-size:.8em;color:var(--muted);margin:0 auto 14px;max-width:560px;line-height:1.5;">Linked accounts use the names your bank or card company provides. Credit cards and loans link to your Debt rows automatically when the names match; if you created Debt rows with different names first, pick the row from the dropdown on each account or tap <b>Use bank name</b>.</div>
           <div id="plaidNameRow" style="display:none;max-width:320px;margin:0 auto 12px;text-align:left;">
             <label for="plaidNameInput" style="display:block;font-size:.8em;color:var(--muted);margin-bottom:4px;">Your full name, as it appears on your bank account</label>
             <div style="display:flex;gap:8px;align-items:center">
@@ -1841,7 +1843,7 @@ body { padding:0; overflow-x: hidden; }
       // ===== Header pills =====
       const whereEl = document.getElementById("where");
       const specEl = document.getElementById("specVersion");
-      const BUILD_STAMP = "v443-pages";
+      const BUILD_STAMP = "v444-pages";
       const SPEC_VERSION = "";
       specEl.textContent = "Spec: " + SPEC_VERSION;
       whereEl.textContent = "Here: " + window.location.href;
@@ -2393,6 +2395,8 @@ async function renameDebt_(oldKey, newName){
       saveDebtItemsServer_(),
     ]);
   } catch(_){}
+  // v444: a linked bank account follows the row to its new name.
+  try { if (newKey !== oldKey && typeof plaidRemapDebtKey_ === "function") await plaidRemapDebtKey_(oldKey, newKey); } catch(_){}
 
   if (typeof renderDebtLocal_ === "function") renderDebtLocal_();
   if (typeof renderCategories_ === "function") { try { renderCategories_(); } catch(_){} }
@@ -2968,7 +2972,21 @@ function renderDebtLocal_(){
         inp.classList.add("cell-invalid");
         inp.title = res.error;
         setTimeout(() => { inp.classList.remove("cell-invalid"); inp.title = "Tap to rename"; }, 3500);
+        return;
       }
+      // v444: if this row is linked to a bank account, say so — the label now differs
+      // from what the bank calls it (the link itself is kept).
+      try {
+        if (typeof plaidBankLabelForDebtKey_ === "function") {
+          const bank = await plaidBankLabelForDebtKey_(next.toLowerCase());
+          const note = document.getElementById("debtPlaidNote");
+          if (bank && note && bank.toLowerCase() !== next.toLowerCase()) {
+            note.textContent = `"${next}" is linked to ${bank}. Your label now differs from the bank's name; balances still sync from the bank. To match the bank's name, use "Use bank name" on the Accounts tab.`;
+            note.style.display = "";
+            clearTimeout(window._debtPlaidNoteT); window._debtPlaidNoteT = setTimeout(() => { note.style.display = "none"; }, 12000);
+          }
+        }
+      } catch(_) {}
     });
   });
 
@@ -9896,7 +9914,8 @@ document.addEventListener("click", async (e) => {
               </select>
               ${canRename ? `<button type="button" data-plaid-usebankname="${escapeHtml_(a.account_id)}" title="Rename the Debt row to \"${escapeHtml_(bankLabel)}\" (balances and paid-this-month carry over)" style="font-size:.78em">Use bank name</button>` : ''}
               ${auto ? '<span class="muted" style="font-size:.75em">auto-linked by name</span>' : ''}
-            </div>`;
+            </div>
+            ${canRename ? `<div class="muted" style="font-size:.75em;margin-top:3px">Bank name: ${escapeHtml_(bankLabel)} · your label differs; balances still sync.</div>` : ''}`;
           } else if (isLiab) {
             debtSel = '<div class="muted" style="font-size:.78em;margin-top:4px">Add a Debt category on the Allot tab to auto-fill its balance from this account.</div>';
           }
@@ -10090,6 +10109,28 @@ document.addEventListener("click", async (e) => {
       try { await workerSet_('plaidDebtMap', PlaidState.debtMap); } catch(e) { console.warn('[plaid] debt map save failed:', e); }
       await plaidAutoApplyDebts_();
       return props.length;
+    }
+    // Keep a bank-account link when its Debt row is renamed elsewhere (Debt tab).
+    async function plaidRemapDebtKey_(oldKey, newKey) {
+      if (PlaidState.debtMap === null || PlaidState.debtMap === undefined) {
+        try { const m = await workerGet_('plaidDebtMap'); PlaidState.debtMap = (m && m.ok && m.state && typeof m.state === 'object') ? m.state : {}; } catch(_) { return; }
+      }
+      let changed = false;
+      for (const [id, k] of Object.entries(PlaidState.debtMap)) if (k === oldKey) { PlaidState.debtMap[id] = newKey; changed = true; }
+      if (changed) { try { await workerSet_('plaidDebtMap', PlaidState.debtMap); } catch(_) {} }
+    }
+    // "Capital One QuicksilverOne" for the account linked to a Debt row key, or null.
+    async function plaidBankLabelForDebtKey_(key) {
+      if (PlaidState.debtMap === null || PlaidState.debtMap === undefined) {
+        try { const m = await workerGet_('plaidDebtMap'); PlaidState.debtMap = (m && m.ok && m.state && typeof m.state === 'object') ? m.state : {}; } catch(_) { return null; }
+      }
+      const id = Object.keys(PlaidState.debtMap).find(a => PlaidState.debtMap[a] === key);
+      if (!id) return null;
+      if (!PlaidState.items.length) {
+        try { const r = await plaidApi_('plaidItems'); if (r && r.ok) { PlaidState.items = r.items || []; PlaidState.txns = r.transactions || []; PlaidState.total = r.total || 0; PlaidState.env = r.env || null; PlaidState.hasName = !!r.hasName; } } catch(_) { return null; }
+      }
+      for (const it of PlaidState.items) { const a = (it.accounts || []).find(x => x.account_id === id); if (a) return ((it.institution_name || '') + ' ' + (a.name || '')).replace(/\s+/g, ' ').trim(); }
+      return null;
     }
     // Rename the linked Debt row to the bank's own label ("Capital One QuicksilverOne").
     async function plaidUseBankName_(accountId) {
