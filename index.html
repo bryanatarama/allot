@@ -1852,7 +1852,7 @@ body { padding:0; overflow-x: hidden; }
       // ===== Header pills =====
       const whereEl = document.getElementById("where");
       const specEl = document.getElementById("specVersion");
-      const BUILD_STAMP = "v450-pages";
+      const BUILD_STAMP = "v451-pages";
       const SPEC_VERSION = "";
       specEl.textContent = "Spec: " + SPEC_VERSION;
       whereEl.textContent = "Here: " + window.location.href;
@@ -9917,20 +9917,21 @@ document.addEventListener("click", async (e) => {
             const canRename = !!curRow && curRow.name.trim().toLowerCase() !== bankLabel.toLowerCase();   // any textual difference → offer the exact bank form
             const showDiff = !!curRow && !plaidLabelsEquivalent_(curRow.name, bankLabel);                // only a real mismatch gets the warning line
             const auto = PlaidState.autoLinked && PlaidState.autoLinked[a.account_id] && cur;
-            const editing = !!(PlaidState.editLink && PlaidState.editLink[a.account_id]);
+            const editing = !!(PlaidState.editLinks && PlaidState.editLinks[it.item_id]);
             const selectHtml = `<select class="cell-input" data-plaid-debtmap="${escapeHtml_(a.account_id)}" style="font-size:.85em;max-width:260px;width:auto">
                 <option value="">Not linked to a Debt row</option>
                 ${debtRows.map(r => `<option value="${escapeHtml_(r.key)}"${r.key === cur ? ' selected' : ''}>Fills Debt → ${escapeHtml_(r.name)}</option>`).join('')}
               </select>`;
-            // v450: a linked account shows a compact line; the dropdown only appears
-            // when unlinked or after tapping Change.
-            debtSel = `<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:6px">
-              ${(curRow && !editing)
-                ? `<span class="muted" style="font-size:.78em">✓ Fills Debt row <b>${escapeHtml_(curRow.name)}</b>${auto ? ' (auto-linked)' : ''}</span><button type="button" data-plaid-changelink="${escapeHtml_(a.account_id)}" style="font-size:.75em;padding:2px 8px">Change</button>`
-                : selectHtml}
-              ${canRename ? `<button type="button" data-plaid-usebankname="${escapeHtml_(a.account_id)}" title="Rename the Debt row to \"${escapeHtml_(bankLabel)}\" (balances and paid-this-month carry over)" style="font-size:.78em">Use bank name</button>` : ''}
-            </div>
-            ${showDiff ? `<div class="muted" style="font-size:.75em;margin-top:3px">Bank name: ${escapeHtml_(bankLabel)} · your label differs; balances still sync.</div>` : ''}`;
+            // v451: nothing is shown for a linked account whose Debt row matches its
+            // name. A differently-named row is named; an unlinked account gets the
+            // dropdown; "Edit Debt links" on the card reveals all dropdowns.
+            const matched = !!curRow && !canRename;
+            let inner = '';
+            if (editing || !curRow) inner = selectHtml;
+            else if (!matched) inner = `<span class="muted" style="font-size:.78em">Fills Debt row <b>${escapeHtml_(curRow.name)}</b></span>`;
+            const rename = (curRow && canRename) ? `<button type="button" data-plaid-usebankname="${escapeHtml_(a.account_id)}" title="Rename the Debt row to \"${escapeHtml_(bankLabel)}\" (balances and paid-this-month carry over)" style="font-size:.78em">Use bank name</button>` : '';
+            debtSel = (inner || rename) ? `<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:6px">${inner}${rename}</div>` : '';
+            if (showDiff) debtSel += `<div class="muted" style="font-size:.75em;margin-top:3px">Bank name: ${escapeHtml_(bankLabel)} · your label differs; balances still sync.</div>`;
           } else if (isLiab) {
             debtSel = '<div class="muted" style="font-size:.78em;margin-top:4px">Add a Debt category on the Allot tab to auto-fill its balance from this account.</div>';
           }
@@ -9972,6 +9973,7 @@ document.addEventListener("click", async (e) => {
           <div class="tab-actions" style="margin-top:10px">
             ${needsRelink ? `<button type="button" class="btn-ok" data-plaid-relink="${escapeHtml_(it.item_id)}">Reconnect</button>` : ''}
             <button type="button" data-plaid-sync="${escapeHtml_(it.item_id)}">Refresh</button>
+            ${accts.some(a => a.type === 'credit' || a.type === 'loan') ? `<button type="button" data-plaid-editlinks="${escapeHtml_(it.item_id)}">${(PlaidState.editLinks && PlaidState.editLinks[it.item_id]) ? 'Done' : 'Edit Debt links'}</button>` : ''}
             ${removing
               ? `<button type="button" class="btn-danger" data-plaid-remove-confirm="${escapeHtml_(it.item_id)}">Confirm remove</button><button type="button" data-plaid-remove-cancel="1">Keep</button>`
               : `<button type="button" data-plaid-remove="${escapeHtml_(it.item_id)}">Remove</button>`}
@@ -10386,8 +10388,8 @@ document.addEventListener("click", async (e) => {
           const rm = b.getAttribute('data-plaid-remove');
           const rmc = b.getAttribute('data-plaid-remove-confirm');
           const sb = b.getAttribute('data-plaid-sandbox');
-          const changeLink = b.getAttribute('data-plaid-changelink');
-          if (changeLink) { PlaidState.editLink = PlaidState.editLink || {}; PlaidState.editLink[changeLink] = true; plaidRender_(); const sel = document.querySelector(`select[data-plaid-debtmap="${changeLink}"]`); sel && sel.focus(); return; }
+          const editLinks = b.getAttribute('data-plaid-editlinks');
+          if (editLinks) { PlaidState.editLinks = PlaidState.editLinks || {}; PlaidState.editLinks[editLinks] = !PlaidState.editLinks[editLinks]; plaidRender_(); return; }
           const useName = b.getAttribute('data-plaid-usebankname');
           if (useName) { b.disabled = true; await plaidUseBankName_(useName); return; }
           const recheck = b.getAttribute('data-plaid-recheck');
@@ -10423,7 +10425,6 @@ document.addEventListener("click", async (e) => {
         wrap.addEventListener('change', e => {
           const sel = e.target.closest('select[data-plaid-debtmap]'); if (!sel) return;
           const id = sel.getAttribute('data-plaid-debtmap');
-          if (PlaidState.editLink) delete PlaidState.editLink[id];
           plaidSetDebtMap_(id, sel.value).then(() => plaidRender_());
         });
       }
