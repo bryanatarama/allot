@@ -1852,7 +1852,7 @@ body { padding:0; overflow-x: hidden; }
       // ===== Header pills =====
       const whereEl = document.getElementById("where");
       const specEl = document.getElementById("specVersion");
-      const BUILD_STAMP = "v447-pages";
+      const BUILD_STAMP = "v448-pages";
       const SPEC_VERSION = "";
       specEl.textContent = "Spec: " + SPEC_VERSION;
       whereEl.textContent = "Here: " + window.location.href;
@@ -2989,7 +2989,7 @@ function renderDebtLocal_(){
         if (typeof plaidBankLabelForDebtKey_ === "function") {
           const bank = await plaidBankLabelForDebtKey_(next.toLowerCase());
           const note = document.getElementById("debtPlaidNote");
-          if (bank && note && bank.toLowerCase() !== next.toLowerCase()) {
+          if (bank && note && !plaidLabelsEquivalent_(next, bank)) {
             note.textContent = `"${next}" is linked to ${bank}. Your label now differs from the bank's name; balances still sync from the bank. To match the bank's name, use "Use bank name" on the Accounts tab.`;
             note.style.display = "";
             clearTimeout(window._debtPlaidNoteT); window._debtPlaidNoteT = setTimeout(() => { note.style.display = "none"; }, 12000);
@@ -9913,8 +9913,8 @@ document.addEventListener("click", async (e) => {
             const raw = debtMap[a.account_id] || '';
             const cur = raw === PLAID_NOLINK ? '' : raw;
             const curRow = debtRows.find(r => r.key === cur);
-            const bankLabel = ((it.institution_name || '') + ' ' + (a.name || '')).replace(/\s+/g, ' ').trim();
-            const canRename = !!curRow && curRow.name.toLowerCase() !== bankLabel.toLowerCase();
+            const bankLabel = plaidBankLabel_(it, a);
+            const canRename = !!curRow && !plaidLabelsEquivalent_(curRow.name, bankLabel);
             const auto = PlaidState.autoLinked && PlaidState.autoLinked[a.account_id] && cur;
             debtSel = `<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-top:6px">
               <select class="cell-input" data-plaid-debtmap="${escapeHtml_(a.account_id)}" style="font-size:.85em;max-width:260px;width:auto">
@@ -9930,7 +9930,7 @@ document.addEventListener("click", async (e) => {
           }
           return `<tr>
             <td>
-              <div><b>${escapeHtml_(a.name || a.official_name || 'Account')}</b> <span class="muted mono">${a.mask ? '••' + escapeHtml_(a.mask) : ''}</span></div>
+              <div><b>${escapeHtml_(plaidBankLabel_(it, a) || 'Account')}</b> <span class="muted mono">${a.mask ? '••' + escapeHtml_(a.mask) : ''}</span></div>
               <div class="muted" style="font-size:.8em">${escapeHtml_((a.subtype || a.type || '').replace(/_/g, ' '))}${detail ? ' · ' + detail : ''}</div>
               ${debtSel}
             </td>
@@ -9985,7 +9985,7 @@ document.addEventListener("click", async (e) => {
         panel.style.display = txns.length ? '' : 'none';
         if (sub) sub.textContent = txns.length < PlaidState.total ? `Showing the latest ${txns.length} of ${PlaidState.total}. Money in shows green.` : 'Newest first. Money in shows green.';
         const acctName = {};
-        for (const it of items) for (const a of (it.accounts || [])) acctName[a.account_id] = (a.name || '') + (a.mask ? ' ••' + a.mask : '');
+        for (const it of items) for (const a of (it.accounts || [])) acctName[a.account_id] = plaidBankLabel_(it, a) + (a.mask ? ' ••' + a.mask : '');
         tbody.innerHTML = txns.map(t => {
           const inflow = Number(t.amount) < 0;
           return `<tr${t.pending ? ' style="opacity:.65"' : ''}>
@@ -10061,6 +10061,23 @@ document.addEventListener("click", async (e) => {
     // 0..1: how well a Debt row name describes a bank account. Every word of the
     // row must appear in institution+account name (fuzzy); leftover account words
     // lower the score, except generic ones (visa, card, line, of, credit…).
+    // Canonical label for an account: "{Bank} {Account}", with ALL-CAPS bank names title-cased.
+    const PLAID_INST_FILLER = new Set(['credit','union','bank','federal','fcu','cu','na','n','a','financial','services','inc','corp','company','co','the','of']);
+    function plaidSmartCase_(name) {
+      const n = String(name || '').trim();
+      if (!n) return '';
+      if (n === n.toUpperCase() && /[A-Z]/.test(n)) return n.toLowerCase().replace(/\b([a-z])/g, c => c.toUpperCase());
+      return n;
+    }
+    function plaidBankLabel_(it, a) {
+      return ((it.institution_name || '') + ' ' + plaidSmartCase_(a.name || a.official_name || '')).replace(/\s+/g, ' ').trim();
+    }
+    // "Patelco Overdraft" ≈ "Patelco Credit Union Overdraft": same words once case and
+    // institution filler words are ignored.
+    function plaidLabelsEquivalent_(rowName, bankLabel) {
+      const norm = str => plaidTokens_(str).filter(t => !PLAID_INST_FILLER.has(t)).join(' ');
+      return norm(rowName) === norm(bankLabel);
+    }
     const PLAID_GENERIC = new Set(['visa','mastercard','amex','card','credit','account','acct','line','of','the','and','loan','rewards','platinum','signature','world','elite','preferred','cash','plus','one']);
     function plaidDebtMatchScore_(rowName, it, a) {
       const rowT = plaidTokens_(rowName);
@@ -10138,7 +10155,7 @@ document.addEventListener("click", async (e) => {
       if (!PlaidState.items.length) {
         try { const r = await plaidApi_('plaidItems'); if (r && r.ok) { PlaidState.items = r.items || []; PlaidState.txns = r.transactions || []; PlaidState.total = r.total || 0; PlaidState.env = r.env || null; PlaidState.hasName = !!r.hasName; } } catch(_) { return null; }
       }
-      for (const it of PlaidState.items) { const a = (it.accounts || []).find(x => x.account_id === id); if (a) return ((it.institution_name || '') + ' ' + (a.name || '')).replace(/\s+/g, ' ').trim(); }
+      for (const it of PlaidState.items) { const a = (it.accounts || []).find(x => x.account_id === id); if (a) return plaidBankLabel_(it, a); }
       return null;
     }
     // Rename the linked Debt row to the bank's own label ("Capital One QuicksilverOne").
@@ -10148,7 +10165,7 @@ document.addEventListener("click", async (e) => {
       let it = null, a = null;
       for (const i of PlaidState.items) { const f = (i.accounts || []).find(x => x.account_id === accountId); if (f) { it = i; a = f; break; } }
       if (!a) return;
-      const newName = ((it.institution_name || '') + ' ' + (a.name || '')).replace(/\s+/g, ' ').trim().slice(0, 60);
+      const newName = plaidBankLabel_(it, a).slice(0, 60);
       if (!newName) return;
       if (newName.toLowerCase() === key) return;
       const r = await renameDebt_(key, newName);
