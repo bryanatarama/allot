@@ -1875,7 +1875,7 @@ body { padding:0; overflow-x: hidden; }
       // ===== Header pills =====
       const whereEl = document.getElementById("where");
       const specEl = document.getElementById("specVersion");
-      const BUILD_STAMP = "v455-pages";
+      const BUILD_STAMP = "v456-pages";
       const SPEC_VERSION = "";
       specEl.textContent = "Spec: " + SPEC_VERSION;
       whereEl.textContent = "Here: " + window.location.href;
@@ -10675,6 +10675,9 @@ document.addEventListener("click", async (e) => {
         // Already have a row with the same words? (e.g. "Spotify" vs "Spotify USA")
         const t = plaidTokens_(plaidStreamName_(st)).filter(x => !PLAID_GENERIC.has(x));
         if (rowTok.some(r => r.t.length && t.length && (r.t.every(x => t.some(y => plaidTokenEq_(x, y))) || t.every(x => r.t.some(y => plaidTokenEq_(x, y)))))) return false;
+        // Or a Bills row whose monthly target is within 5% (or $2) of this charge — same bill, different name.
+        const covered = rows.some(r => { if (String(r.targetAccount || '') !== 'Bills') return false; const tgt = Number(appState.billsSplit?.[r.key]?.monthlyTarget || 0) || 0; return tgt > 0 && Math.abs(tgt - monthly) <= Math.max(2, tgt * 0.05); });
+        if (covered) return false;
         return true;
       }).sort((a, b) => plaidStreamMonthly_(b) - plaidStreamMonthly_(a));
     }
