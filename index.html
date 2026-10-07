@@ -1838,7 +1838,7 @@ body { padding:0; overflow-x: hidden; }
       // ===== Header pills =====
       const whereEl = document.getElementById("where");
       const specEl = document.getElementById("specVersion");
-      const BUILD_STAMP = "v436-pages";
+      const BUILD_STAMP = "v438-pages";
       const SPEC_VERSION = "";
       specEl.textContent = "Spec: " + SPEC_VERSION;
       whereEl.textContent = "Here: " + window.location.href;
@@ -9773,8 +9773,10 @@ document.addEventListener("click", async (e) => {
       return (Number(n) < 0 ? '-' : '') + s + (cur && cur !== 'USD' ? ' ' + cur : '');
     }
     function plaidCategoryLabel_(t) {
-      const p = t.pfc_detailed || t.pfc_primary || '';
-      return p.replace(/^[A-Z_]+?_(?=[A-Z])/, '').replace(/_/g, ' ').toLowerCase().replace(/\b\w/g, c => c.toUpperCase());
+      const prim = t.pfc_primary || '';
+      let p = t.pfc_detailed || prim;
+      if (prim && p.startsWith(prim + '_')) p = p.slice(prim.length + 1);   // FOOD_AND_DRINK_COFFEE → COFFEE
+      return p.replace(/_/g, ' ').toLowerCase().replace(/\b\w/g, c => c.toUpperCase());
     }
 
     // ── Load + render ─────────────────────────────────────────
@@ -9890,10 +9892,10 @@ document.addEventListener("click", async (e) => {
           </tr>`;
         }).join('');
 
-        const err = it.error && it.error.display_message ? `<div class="error" style="margin:8px 0">${escapeHtml_(it.error.display_message)}</div>`
-          : (it.status === 'login_required' ? '<div class="error" style="margin:8px 0">Your bank needs you to sign in again before Allot can keep syncing.</div>'
-          : it.status === 'pending_disconnect' ? '<div class="error" style="margin:8px 0">Your bank will drop this connection within a week unless you reconnect.</div>'
-          : it.status === 'revoked' ? '<div class="error" style="margin:8px 0">Access was revoked at the bank. Remove this connection and add it again.</div>' : '');
+        const err = it.error && it.error.display_message ? `<div class="error" style="margin:8px 0;display:block">${escapeHtml_(it.error.display_message)}</div>`
+          : (it.status === 'login_required' ? '<div class="error" style="margin:8px 0;display:block">Your bank needs you to sign in again before Allot can keep syncing.</div>'
+          : it.status === 'pending_disconnect' ? '<div class="error" style="margin:8px 0;display:block">Your bank will drop this connection within a week unless you reconnect.</div>'
+          : it.status === 'revoked' ? '<div class="error" style="margin:8px 0;display:block">Access was revoked at the bank. Remove this connection and add it again.</div>' : '');
         const needsRelink = it.status === 'login_required' || it.status === 'pending_disconnect' || it.new_accounts_available;
         const removing = PlaidState.pendingRemove === it.item_id;
         const sandboxTools = PlaidState.env === 'sandbox' ? `
@@ -9903,7 +9905,7 @@ document.addEventListener("click", async (e) => {
         return `<div class="dash-card" style="margin-bottom:12px;padding:12px 14px;">
           <div class="tab-header" style="margin-bottom:6px;align-items:center">
             <div>
-              <div style="font-weight:700">${escapeHtml_(it.institution_name || 'Bank')}</div>
+              <div style="font-weight:700;display:flex;align-items:center;gap:8px">${it.institution_logo ? `<img src="${escapeHtml_(it.institution_logo)}" alt="" style="width:22px;height:22px;border-radius:6px;background:${escapeHtml_(it.institution_color || 'transparent')}">` : ''}${escapeHtml_(it.institution_name || 'Bank')}</div>
               <div class="muted" style="font-size:.8em">${it.last_sync_at ? 'Synced ' + plaidFmtDate_(it.last_sync_at) : 'Not synced yet'}</div>
             </div>
             <div class="tab-actions">${plaidStatusBadge_(it)} ${plaidIdentityBadge_(it)}</div>

@@ -52,8 +52,8 @@ them manually. (workflow_id: wf_d61e6f13700562e5)
 
 | Task | Why it matters | Where | State |
 |------|----------------|-------|-------|
-| Set worker secrets `PLAID_CLIENT_ID` and `PLAID_SECRET` (sandbox secret first) via `cd ~/budgeter/worker && npx wrangler secret put …` | Nothing works until set; routes return 503 "not configured" (GUIDE-001) | https://dashboard.plaid.com/developers/keys | needs_human |
-| `PLAID_TOKEN_KEY` (32-byte AES-GCM key for access tokens at rest) | DATA-001 encryption at rest | generated locally and piped into `wrangler secret put` without being displayed | reported_done (2026-10-07) |
+| Set worker secrets `PLAID_CLIENT_ID` and `PLAID_SECRET` (sandbox) via `npx wrangler secret put …` **from a real terminal** (through the Claude Code `!` prompt there is no TTY and an empty value gets stored) | Nothing works until set; routes return 503 "not configured" (GUIDE-001) | https://dashboard.plaid.com/developers/keys | verified 2026-10-07 (link/token/create succeeds; `plaidStatus` reports well-formed 24-hex / 30-hex values) |
+| `PLAID_TOKEN_KEY` (32-byte AES-GCM key for access tokens at rest) | DATA-001 encryption at rest | generated locally and piped into `wrangler secret put` without being displayed | verified 2026-10-07 (tokens encrypt/decrypt in sandbox link + sync) |
 | Register OAuth redirect URI `https://myallot.money/plaid-oauth` (exact match, no query/fragment) then set `PLAID_REDIRECT_URI` var and redeploy worker | Without it OAuth banks (Chase, BofA, …) silently vanish from Link in production (OAUTH-001/009). Sandbox non-OAuth banks work without it. | https://dashboard.plaid.com/developers/api → Allowed redirect URIs | needs_human (before production) |
 | Confirm Data Transparency Messaging / use-case setup is complete | `INVALID_LINK_CUSTOMIZATION` on link/token/create usually means it isn't (PITFALL-002) | https://dashboard.plaid.com/link | cannot_verify |
 | Company profile + data-security questionnaire | Gates Chase/PNC OAuth in production (OAUTH-008, TASK-006) | https://dashboard.plaid.com/settings/company | cannot_verify |
@@ -99,14 +99,34 @@ them manually. (workflow_id: wf_d61e6f13700562e5)
 - [x] Liabilities → Debt tab: per-account "Fills Debt → <category>" mapping stored in
       KV key `plaidDebtMap`; balances/APR/min auto-applied on load unless the Debt tab
       has unsaved edits.
-- [ ] Sandbox end-to-end test (link First Platypus Bank user_good/pass_good, see
-      transactions, fire webhook, break login → Reconnect, remove).
-- [ ] Acceptance check (`build_check_acceptance`).
-- [ ] Production cut-over (human tasks above).
+- [x] Sandbox end-to-end test 2026-10-07 (Patelco Credit Union sandbox, user_good):
+      link → 2 accounts, 49 txns, historical complete, identity match score 100;
+      `/sandbox/item/fire_webhook` → receiver verified JWT, synced (last_sync advanced);
+      `/sandbox/item/reset_login` → card "Needs reconnect" → Reconnect (update mode,
+      no re-exchange) → Connected; Remove → `/item/remove` + purge. Second data shape:
+      all 14 account types → liabilities (credit/student/mortgage), 13 holdings,
+      institution logo/color; "Fills Debt" mapping applied balance/APR/min to a Debt
+      row and was restored.
+- [x] GUIDE-017: institution name/logo/color now come from `/institutions/get_by_id`
+      at link time and on full syncs.
+- [x] Removed the KV-based per-item sync lock: KV reads are edge-cached (~60 s) so it
+      was unreliable; concurrent syncs are safe (cursor-based, whole-value writes,
+      idempotent upserts).
+- [x] Acceptance check round 1 (see below).
+- [ ] Production cut-over (human tasks above): register redirect URI, set
+      `PLAID_REDIRECT_URI`, production secret, `PLAID_ENV=production`, then re-test
+      against an OAuth institution and re-run acceptance.
 
 ## Acceptance
 
-- Round 0: not yet run.
+- Round 1 (2026-10-07, sandbox): CHECK-001/002/003/004/005/006/008/010/011/012/013/
+  014/015 passed with evidence. CHECK-007 failed (OAuth redirect URI not yet registered
+  or passed — sandbox test used a non-OAuth institution; needs_human before
+  production). CHECK-009 failed only because two production-gated tasks remain
+  needs_human / cannot_verify by design (TASK-006). Verdict applies to worker version
+  deployed 2026-10-07 after the institution-lookup change and index.html v438.
+- Known behaviour: data written by a webhook (Plaid's data center) can take up to
+  ~60 s to appear in the app because Workers KV caches reads at the edge.
 
 ## Maintenance
 
@@ -148,7 +168,6 @@ changes invalidate it.
 
 ## Open questions
 
-- Should the Accounts tab be visible to all users while `PLAID_ENV` is sandbox, or
-  admin-only until production? (Current build: tab visible to everyone once the worker
-  has Plaid secrets.)
+- Accounts tab visibility: current build shows it to everyone only when
+  `PLAID_ENV=production`; in sandbox only admin mode (owner, not previewing) sees it.
 - Next pass: match incoming deposits to "Post Deposit", and bill payments to Paid state.
