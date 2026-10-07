@@ -1690,6 +1690,18 @@ body { padding:0; overflow-x: hidden; }
           <div id="plaidAddHint" class="muted" style="font-size:.78em;margin-top:8px;"></div>
         </div>
 
+        <!-- v463: early-access bank limit + request-more ping -->
+        <div id="plaidLimitCard" style="display:none;margin:-6px 0 14px;padding:10px 14px;border:1px dashed var(--border);border-radius:12px;font-size:.85em;color:var(--muted);line-height:1.5">
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap">
+            <div><b style="color:var(--text)">Early access:</b> up to <span id="plaidLimitMax">3</span> linked banks per account for now (<span id="plaidLimitCount">0</span> used). Need more?</div>
+            <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+              <input id="plaidLimitNote" class="cell-input" type="text" maxlength="200" placeholder="Which bank? (optional)" style="width:200px;font-size:.9em">
+              <button id="plaidLimitAskBtn" type="button">Request more</button>
+            </div>
+          </div>
+          <div id="plaidLimitStatus" style="margin-top:4px;font-size:.9em"></div>
+        </div>
+
         <div id="plaidItems"></div>
       </div>
 
@@ -1889,7 +1901,7 @@ body { padding:0; overflow-x: hidden; }
       // ===== Header pills =====
       const whereEl = document.getElementById("where");
       const specEl = document.getElementById("specVersion");
-      const BUILD_STAMP = "v462-pages";
+      const BUILD_STAMP = "v463-pages";
       const SPEC_VERSION = "";
       specEl.textContent = "Spec: " + SPEC_VERSION;
       whereEl.textContent = "Here: " + window.location.href;
@@ -9974,7 +9986,15 @@ document.addEventListener("click", async (e) => {
       const addBtn = document.getElementById('plaidAddBtn');
       if (addBtn) { addBtn.disabled = !!(demo || atCap); addBtn.style.opacity = (demo || atCap) ? '.5' : ''; }
       if (demo) plaidAddHint_('You\'re in demo mode. Tap "Make it mine" on Home to clear the example data, then link your real bank here.');
-      else if (atCap) plaidAddHint_(`You've linked ${liveBanks} of ${PlaidState.maxBanks} banks. Remove one to add another.`);
+      else if (atCap) plaidAddHint_(`You've linked ${liveBanks} of ${PlaidState.maxBanks} banks. Remove one, or request more below.`);
+      const lim = document.getElementById('plaidLimitCard');
+      if (lim) {
+        lim.style.display = (PlaidState.maxBanks && !demo) ? '' : 'none';
+        const mx = document.getElementById('plaidLimitMax'), ct = document.getElementById('plaidLimitCount');
+        if (mx) mx.textContent = String(PlaidState.maxBanks); if (ct) ct.textContent = String(liveBanks);
+        lim.style.borderColor = atCap ? 'var(--warn-border)' : 'var(--border)';
+        if (!lim.dataset.checked) { lim.dataset.checked = '1'; plaidApi_('plaidRequestMoreStatus').then(r => { if (r && r.ok && r.requestedAt) plaidLimitShowRequested_(r.requestedAt); }).catch(() => {}); }
+      }
 
       const debtRows = (typeof getDebtCategoryRows_ === 'function') ? (() => { try { return getDebtCategoryRows_() || []; } catch(_) { return []; } })() : [];
       const debtMap = PlaidState.debtMap || {};
@@ -10818,9 +10838,25 @@ document.addEventListener("click", async (e) => {
       document.getElementById('obGoBankBtn')?.addEventListener('click', () => { try { setActiveTab_('accounts'); } catch(_) {} if (!PlaidState.loadedOnce) plaidLoad_(); });
     });
 
+    function plaidLimitShowRequested_(iso) {
+      const st = document.getElementById('plaidLimitStatus'); const b = document.getElementById('plaidLimitAskBtn'); const n = document.getElementById('plaidLimitNote');
+      if (st) { st.textContent = 'Request sent ' + plaidFmtDate_(iso) + ' — Bryan will take a look. You can ask again tomorrow.'; st.style.color = 'var(--ok-text)'; }
+      if (b) b.disabled = true; if (n) n.disabled = true;
+    }
+    async function plaidRequestMore_() {
+      const b = document.getElementById('plaidLimitAskBtn'); const n = document.getElementById('plaidLimitNote'); const st = document.getElementById('plaidLimitStatus');
+      if (b) b.disabled = true;
+      try {
+        const r = await plaidApi_('plaidRequestMore', { note: n ? n.value : '' });
+        if (r && r.ok) plaidLimitShowRequested_(r.requestedAt);
+        else { if (st) { st.textContent = (r && r.error) || 'Could not send the request.'; st.style.color = 'var(--danger-text)'; } if (b) b.disabled = false; }
+      } catch(_) { if (st) st.textContent = 'Network error. Try again.'; if (b) b.disabled = false; }
+    }
+
     // ── Wiring ────────────────────────────────────────────────
     document.addEventListener('DOMContentLoaded', () => {
       plaidGateTab_();
+      document.getElementById('plaidLimitAskBtn')?.addEventListener('click', plaidRequestMore_);
       const tabBtn = document.getElementById('tabBtn-accounts');
       if (tabBtn) tabBtn.addEventListener('click', () => { if (!PlaidState.loadedOnce) plaidLoad_(); });
       document.getElementById('plaidAddBtn')?.addEventListener('click', plaidOnAddClick_);
