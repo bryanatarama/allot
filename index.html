@@ -1667,6 +1667,7 @@ body { padding:0; overflow-x: hidden; }
           </div>
         </div>
         <div id="plaidError" class="error" style="display:none"></div>
+        <div id="plaidNotice" style="display:none;margin:8px 0;padding:10px 12px;border:1px solid var(--warn-border);background:var(--warn-bg);color:var(--warn-text);border-radius:8px;font-size:.88em;line-height:1.5;gap:10px;align-items:center;flex-wrap:wrap"></div>
 
         <div id="plaidAddCard" style="margin:8px 0 16px;padding:20px;background:linear-gradient(135deg,rgba(245,158,11,.12),rgba(245,158,11,.06));border:1.5px solid #78350f;border-radius:16px;text-align:center;">
           <div style="font-weight:700;color:var(--accent-text);margin-bottom:6px;font-size:.95em;">Add a bank account</div>
@@ -1904,7 +1905,7 @@ body { padding:0; overflow-x: hidden; }
       // ===== Header pills =====
       const whereEl = document.getElementById("where");
       const specEl = document.getElementById("specVersion");
-      const BUILD_STAMP = "v466-pages";
+      const BUILD_STAMP = "v467-pages";
       const SPEC_VERSION = "";
       specEl.textContent = "Spec: " + SPEC_VERSION;
       whereEl.textContent = "Here: " + window.location.href;
@@ -2933,7 +2934,7 @@ function renderDebtLocal_(){
     if (!(balanceNum > 0)) tr.classList.add("debt-paid-off");
 
     tr.innerHTML = `
-      <td class="mono"><input class="cell-input mono" data-role="debtName" data-k="${escapeHtml_(r.key)}" type="text" maxlength="60" value="${escapeHtml_(r.name)}" title="Tap to rename"></td>
+      <td class="mono" style="white-space:nowrap"><input class="cell-input mono" data-role="debtName" data-k="${escapeHtml_(r.key)}" type="text" maxlength="60" value="${escapeHtml_(r.name)}" title="Tap to rename" style="width:calc(100% - 30px);display:inline-block;vertical-align:middle"><button type="button" class="debt-row-del" data-role="debtDelete" data-k="${escapeHtml_(r.key)}" title="Delete this debt row" style="width:24px;height:24px;margin-left:4px;padding:0;border-radius:6px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;vertical-align:middle;font-size:.9em">✕</button></td>
       <td><input class="cell-input mono" data-k="${escapeHtml_(r.key)}" data-f="balance" type="text" inputmode="decimal" value="${escapeHtml_(formatMoneyInput_(String(it.balance ?? "")))}"></td>
       <td><input class="cell-input mono" data-k="${escapeHtml_(r.key)}" data-f="apr" type="text" inputmode="decimal" value="${escapeHtml_(formatAprInput_(String(it.apr ?? "")))}"></td>
       <td><input class="cell-input mono" data-k="${escapeHtml_(r.key)}" data-f="minPayment" type="text" inputmode="decimal" value="${escapeHtml_(formatMoneyInput_(String(it.minPayment ?? "")))}"></td>
@@ -3018,6 +3019,22 @@ function renderDebtLocal_(){
 
 
 
+
+  // v467: delete a debt row from the Debt tab (two taps: ✕ then "Delete?").
+  debtTbody.querySelectorAll('button[data-role="debtDelete"]').forEach(btn => {
+    btn.addEventListener("click", async () => {
+      const k = btn.getAttribute("data-k"); if (!k) return;
+      if (btn.dataset.armed !== "1") {
+        btn.dataset.armed = "1"; btn.textContent = "Delete?"; btn.style.width = "auto"; btn.style.padding = "0 8px"; btn.style.color = "var(--danger-text)"; btn.style.borderColor = "var(--danger-border)";
+        setTimeout(() => { if (btn.dataset.armed === "1") { btn.dataset.armed = ""; btn.textContent = "✕"; btn.style.width = "24px"; btn.style.padding = "0"; btn.style.color = ""; btn.style.borderColor = ""; } }, 5000);
+        return;
+      }
+      btn.disabled = true; btn.textContent = "…";
+      try { await removeDebtCategory_(k); } catch(e) { btn.disabled = false; btn.textContent = "✕"; btn.dataset.armed = ""; }
+      // Drop any bank link that pointed at the deleted row.
+      try { if (typeof PlaidState !== "undefined" && PlaidState.debtMap) { let ch = false; for (const [id, v] of Object.entries(PlaidState.debtMap)) if (v === k) { delete PlaidState.debtMap[id]; ch = true; } if (ch) workerSet_("plaidDebtMap", PlaidState.debtMap).catch(()=>{}); } } catch(_) {}
+    });
+  });
 
   // v435: debt names are editable inline. Commit on blur / Enter, Escape reverts.
   // Name doubles as the debt's key, so renameDebt_ migrates every keyed store.
@@ -10045,7 +10062,19 @@ document.addEventListener("click", async (e) => {
             // dropdown; "Edit Debt links" on the card reveals all dropdowns.
             const matched = !!curRow && !canRename;
             let inner = '';
-            if (editing || !curRow) inner = selectHtml + (!curRow ? `<button type="button" data-plaid-adddebt="${escapeHtml_(a.account_id)}" style="font-size:.8em" title="Create a Debt row named after this account and link it">＋ Add as Debt row</button>` : '');
+            if (editing || !curRow) {
+              // v467: rows not linked to any account are offered first; "add new" is the fallback.
+              const takenKeys = new Set(Object.values(debtMap).filter(v => v && v !== PLAID_NOLINK));
+              const freeRows = debtRows.filter(r => !takenKeys.has(r.key));
+              const sel = (!curRow && freeRows.length)
+                ? `<select class="cell-input" data-plaid-debtmap="${escapeHtml_(a.account_id)}" style="font-size:.85em;max-width:260px;width:auto">
+                    <option value="">Link to an existing Debt row…</option>
+                    ${freeRows.map(r => `<option value="${escapeHtml_(r.key)}">${escapeHtml_(r.name)}</option>`).join('')}
+                    ${debtRows.length > freeRows.length ? `<optgroup label="Already linked to another account">${debtRows.filter(r => takenKeys.has(r.key)).map(r => `<option value="${escapeHtml_(r.key)}">${escapeHtml_(r.name)}</option>`).join('')}</optgroup>` : ''}
+                  </select>`
+                : selectHtml;
+              inner = sel + (!curRow ? `<button type="button" data-plaid-adddebt="${escapeHtml_(a.account_id)}" style="font-size:.8em" title="Create a new Debt row named after this account and link it">${freeRows.length ? 'or add as new row' : '＋ Add as Debt row'}</button>` : '');
+            }
             else if (!matched) inner = `<span class="muted" style="font-size:.78em">Fills Debt row <b>${escapeHtml_(curRow.name)}</b></span>`;
             const rename = (curRow && canRename) ? `<button type="button" data-plaid-usebankname="${escapeHtml_(a.account_id)}" title="Rename the Debt row to \"${escapeHtml_(bankLabel)}\" (balances and paid-this-month carry over)" style="font-size:.78em">Use bank name</button>` : '';
             debtSel = (inner || rename) ? `<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:6px">${inner}${rename}</div>` : '';
@@ -10305,9 +10334,21 @@ document.addEventListener("click", async (e) => {
       plaidRender_();
     }
 
+    function plaidOfferRemoveRow_(key) {
+      let rows = []; try { rows = getDebtCategoryRows_() || []; } catch(_) {}
+      const row = rows.find(r => r.key === key); if (!row) return;
+      const el = document.getElementById('plaidNotice'); if (!el) return;
+      el.innerHTML = `<span>"${escapeHtml_(row.name)}" is no longer linked to a bank account. Remove that Debt row?</span>
+        <button type="button" class="btn-danger" data-plaid-removerow="${escapeHtml_(key)}" style="font-size:.85em">Remove row</button>
+        <button type="button" data-plaid-keeprow="1" style="font-size:.85em">Keep it</button>`;
+      el.style.display = 'flex';
+    }
     async function plaidSetDebtMap_(accountId, key) {
       PlaidState.debtMap = PlaidState.debtMap || {};
+      const prevKey = PlaidState.debtMap[accountId];
       if (key) PlaidState.debtMap[accountId] = key; else PlaidState.debtMap[accountId] = PLAID_NOLINK;   // remember the opt-out
+      // v467: if the previous row is now orphaned, offer to remove it (fixes "duplicate row" dead end).
+      if (prevKey && prevKey !== PLAID_NOLINK && prevKey !== key && !Object.values(PlaidState.debtMap).includes(prevKey)) setTimeout(() => plaidOfferRemoveRow_(prevKey), 0);
       try { await workerSet_('plaidDebtMap', PlaidState.debtMap); } catch(e) { console.warn('[plaid] debt map save failed:', e); }
       await plaidAutoApplyDebts_();
     }
@@ -10860,6 +10901,19 @@ document.addEventListener("click", async (e) => {
     document.addEventListener('DOMContentLoaded', () => {
       plaidGateTab_();
       document.getElementById('plaidLimitAskBtn')?.addEventListener('click', plaidRequestMore_);
+      document.getElementById('plaidNotice')?.addEventListener('click', async e => {
+        const b = e.target.closest('button'); if (!b) return;
+        const el = document.getElementById('plaidNotice');
+        const rm = b.getAttribute('data-plaid-removerow');
+        if (rm) {
+          b.disabled = true; b.textContent = 'Removing…';
+          try { await removeDebtCategory_(rm); } catch(err) { plaidShowError_('Could not remove the row: ' + (err && err.message || err)); }
+          el.style.display = 'none'; el.innerHTML = '';
+          plaidRender_();
+          return;
+        }
+        if (b.hasAttribute('data-plaid-keeprow')) { el.style.display = 'none'; el.innerHTML = ''; }
+      });
       const tabBtn = document.getElementById('tabBtn-accounts');
       if (tabBtn) tabBtn.addEventListener('click', () => { if (!PlaidState.loadedOnce) plaidLoad_(); });
       document.getElementById('plaidAddBtn')?.addEventListener('click', plaidOnAddClick_);
