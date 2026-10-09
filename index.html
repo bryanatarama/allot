@@ -1905,7 +1905,7 @@ body { padding:0; overflow-x: hidden; }
       // ===== Header pills =====
       const whereEl = document.getElementById("where");
       const specEl = document.getElementById("specVersion");
-      const BUILD_STAMP = "v469-pages";
+      const BUILD_STAMP = "v470-pages";
       const SPEC_VERSION = "";
       specEl.textContent = "Spec: " + SPEC_VERSION;
       whereEl.textContent = "Here: " + window.location.href;
@@ -4027,10 +4027,9 @@ dashPreviewTbody.appendChild(tr);
           let paidCell;
           if (r.alreadyPaid) {
             const nmAmt = Number(nextMonthPaid[r.key] || 0) || 0;
-            const subLabel = nmAmt > 0
-              ? `→ ${escapeHtml_(nextMonthName)}`
-              : `skip`;
-            paidCell = `<td class="mono paid-cell"><span class="paid-word">Paid</span><span class="paid-sub">${subLabel}</span></td>`;
+            paidCell = nmAmt > 0
+              ? `<td class="mono paid-cell"><span class="paid-word">✓ Funded</span><span class="paid-sub">→ ${escapeHtml_(nextMonthName)}</span></td>`
+              : `<td class="mono paid-cell"><span class="paid-word">✓ Funded</span></td>`;
           } else {
             paidCell = `<td class="mono">${escapeHtml_(formatMoney_(r.paidMTD))}</td>`;
           }
@@ -4750,21 +4749,21 @@ if (amtTd) {
   }
 
   // Render amount + optional badge
-  const manualFundedAmts = loadManualFunded_();
-  const isAlreadyPaid = !!(manualFundedAmts[key]);
-  // v469: "→ next month" means the bill is actually forward-funded, i.e. has a
-  // nextMonthPaid entry — NOT merely that it has a current-month allocation
-  // (amt > 0). The old `amt > 0` check made any paid-this-month bill falsely
-  // render "→ <next month>". Match the Dashboard table logic (nextMonthPaid[key]).
+  // v470: a bill is "Funded" (goal met) when its allocation reaches target —
+  // derived live, not a manual flag. "→ next month" only when the bill is
+  // actually forward-funded (has a nextMonthPaid entry), not merely funded.
+  const fundedSet = loadManualFunded_();
+  const isGoalMet = !!(fundedSet[key]);
   const nextMonthPaidAmts = loadNextMonthPaid_();
-  const isNextMonth = !!(isAlreadyPaid && (Number(nextMonthPaidAmts[key] || 0) || 0) > 0);
-  if (isAlreadyPaid) {
+  const isNextMonth = !!(isGoalMet && (Number(nextMonthPaidAmts[key] || 0) || 0) > 0);
+  if (isGoalMet) {
     amtTd.classList.add("paid-cell");
-    const subLabel = isNextMonth ? `→ ${escapeHtml_(getNextMonthLabel_())}` : `skip`;
-    amtTd.innerHTML = `<span class="paid-word">Paid</span><span class="paid-sub">${subLabel}</span>`;
+    amtTd.innerHTML = isNextMonth
+      ? `<span class="paid-word">✓ Funded</span><span class="paid-sub">→ ${escapeHtml_(getNextMonthLabel_())}</span>`
+      : `<span class="paid-word">✓ Funded</span>`;
   } else if (showBadge) {
     amtTd.classList.add("paid-cell");
-    amtTd.innerHTML = `<span class="paid-word">Paid</span>`;
+    amtTd.innerHTML = `<span class="paid-word">✓ Funded</span>`;
   } else {
     amtTd.classList.remove("paid-cell");
     amtTd.innerHTML = `<span class="mono">${escapeHtml_(formatMoney_(amt))}</span>`;
@@ -5141,37 +5140,33 @@ function resetPaidMTD_(){
         return { target: t, toSavings: amt, toSpending: 0 };
       }
 
+      // v470: "funded" is now DERIVED, not a stored/toggled flag. A bill is
+      // "funded" (goal met) when its paid-this-month amount reaches its monthly
+      // target. The old manual "Paid?" checkbox + auto-flip are gone — the app
+      // allocates money, it doesn't pay bills, so funding ≠ paying. This can no
+      // longer be set on an unfunded bill or stick on a funded one; it always
+      // reflects reality and resets automatically when paidByKey resets (the 1st).
+      // Returns the set of fully-funded bill keys so every existing caller works.
       function loadManualFunded_() {
-        // Calendar-month reset: when the month rolls over, ALL manual-funded
-        // flags drop, regardless of a bill's due-date cycle. Keeps the June
-        // dashboard truly fresh ($0 paid, 0% funded) on the 1st instead of
-        // carrying car/insurance/internet into the new month just because
-        // their cycles haven't crossed their due dates yet.
         try {
-          const raw = localStorage.getItem(MANUAL_FUNDED_LS_KEY);
-          if (!raw) return {};
-          const obj = JSON.parse(raw);
-          if (obj.monthKey !== monthKeyLocal_()) return {};
-          const flags = obj.flags || {};
+          const paidByKey = (loadPaidState_().paidByKey) || {};
+          const cats = (typeof getCfgCategoryRows_ === "function") ? getCfgCategoryRows_() : [];
           const result = {};
-          Object.entries(flags).forEach(([key, val]) => { if (val) result[key] = val; });
+          for (const c of cats) {
+            const key = c && c.key;
+            if (!key) continue;
+            const target = Number(appState.billsSplit?.[key]?.monthlyTarget || 0) || 0;
+            if (!(target > 0)) continue;
+            const paid = Number(paidByKey[key] || 0) || 0;
+            if (paid + 0.005 >= target) result[key] = true;
+          }
           return result;
         } catch(e) { return {}; }
       }
 
-      function saveManualFunded_(flags) {
-        try {
-          const dueDates = loadBillDueDates_();
-          const cycleStartByBill = {};
-          Object.keys(flags || {}).forEach(key => {
-            const dueDay = dueDates[key];
-            if (dueDay && dueDay !== 1) cycleStartByBill[key] = billCycleStart_(dueDay);
-          });
-          const obj = { monthKey: monthKeyLocal_(), flags: flags || {}, cycleStartByBill };
-          localStorage.setItem(MANUAL_FUNDED_LS_KEY, JSON.stringify(obj));
-          workerSet_("manualFunded", obj).catch(()=>{});
-        } catch(e) {}
-      }
+      // v470: funded state is derived (see loadManualFunded_), so there is
+      // nothing to persist. Kept as a no-op so existing callers don't break.
+      function saveManualFunded_(_flags) { /* no-op: funded is derived from paidByKey */ }
 
       function loadNextMonthPaid_() {
         try {
@@ -5285,37 +5280,11 @@ function resetPaidMTD_(){
         try { renderEngineBillsSplitTable_(); } catch(_){}
       }
 
-      // v425l: mark any bill with paidByKey >= monthlyTarget as manualFunded.
-      // Runs after postDeposit_ so bills that just filled visually check
-      // themselves and behave as done. Idempotent — only sets true, doesn't
-      // touch already-flagged bills. Re-renders the tables so the UI reflects
-      // the new state without a manual reload.
-      function autoFlipFullyFundedBills_() {
-        try {
-          const paidState = loadPaidState_();
-          const paidByKey = paidState.paidByKey || {};
-          const mf = loadManualFunded_();
-          const cats = getCfgCategoryRows_();
-          let changed = false;
-          for (const c of cats) {
-            const key = c.key;
-            if (!key || mf[key]) continue;
-            const target = Number(appState.billsSplit?.[key]?.monthlyTarget || 0) || 0;
-            if (!(target > 0)) continue;
-            const paid = Number(paidByKey[key] || 0) || 0;
-            if (paid + 0.005 >= target) {
-              mf[key] = true;
-              changed = true;
-            }
-          }
-          if (changed) {
-            saveManualFunded_(mf);
-            try { renderEngineBillsSplitTable_(); } catch(_){}
-            try { renderDashboardAppTables_(); } catch(_){}
-            try { renderAppSummaryTable_(); } catch(_){}
-          }
-        } catch(_){}
-      }
+      // v470: removed. "Funded" is now derived from paidByKey >= target
+      // (see loadManualFunded_), so there is no stored flag to auto-flip — a
+      // fully-funded bill simply reads as "Funded" without ever being marked
+      // "paid". Kept as a no-op for any lingering caller.
+      function autoFlipFullyFundedBills_() { /* no-op: funded is derived */ }
 
       // ============================================================
       // v424: Demo Mode + Onboarding rework (phase 1)
@@ -6112,8 +6081,8 @@ function resetPaidMTD_(){
         if (subEl)   subEl.innerHTML = `These bills hit their monthly target last deposit. Do you want to fund them toward <strong>${escapeHtml_(nextLabel)}</strong> or skip?`;
         return showManualFundedModal_(metRows).then(choices => {
           // Restore default title/sub for the manual-funded path
-          if (titleEl) titleEl.textContent = "Funding for Next Month";
-          if (subEl)   subEl.innerHTML = `These bills are marked as <strong>already paid this month</strong>. Choose whether to fund them toward next month or skip.`;
+          if (titleEl) titleEl.textContent = "Fully Funded for This Month";
+          if (subEl)   subEl.innerHTML = `These bills are <strong>fully funded for this month</strong>. Fund them toward next month, or redirect the money to Debt / Savings / Spending?`;
           return choices;
         });
       }
@@ -6125,8 +6094,8 @@ function resetPaidMTD_(){
         if (titleEl) titleEl.textContent = "Due Date Passed";
         if (subEl)   subEl.innerHTML = `These bills' due dates have already passed this cycle. Fund them toward <strong>${escapeHtml_(nextLabel)}</strong> or skip and use that money for other categories.`;
         return showManualFundedModal_(rows).then(choices => {
-          if (titleEl) titleEl.textContent = "Funding for Next Month";
-          if (subEl)   subEl.innerHTML = `These bills are marked as <strong>already paid this month</strong>. Choose whether to fund them toward next month or skip.`;
+          if (titleEl) titleEl.textContent = "Fully Funded for This Month";
+          if (subEl)   subEl.innerHTML = `These bills are <strong>fully funded for this month</strong>. Fund them toward next month, or redirect the money to Debt / Savings / Spending?`;
           return choices;
         });
       }
@@ -6736,54 +6705,10 @@ function resetPaidMTD_(){
             tr.appendChild(td);
           }
 
-          // Already Paid? checkbox
-          {
-            const td = document.createElement("td");
-            td.dataset.role = "paid";
-            td.style.textAlign = "center";
-            const flags = loadManualFunded_();
-            const cb = document.createElement("input");
-            cb.type = "checkbox";
-            cb.title = "Check if you already paid this bill this month. Funding will target next month instead.";
-            cb.checked = !!flags[key];
-            cb.style.cssText = "width:32px;height:32px;cursor:pointer;accent-color:var(--accent);flex-shrink:0;";
-            cb.addEventListener("change", async () => {
-              // When CHECKING the box, if this bill already has allocation
-              // from a post snapshot this month, offer the user the choice to
-              // redirect that money. Unchecking just clears the flag.
-              if (cb.checked) {
-                const snap = loadPostSnapshot_();
-                const alloc = Number(snap?.allocsByKey?.[key] || 0) || 0;
-                const sameMonth = !!(snap && snap.monthKey === monthKeyLocal_());
-                if (sameMonth && alloc > 0.005) {
-                  const underfundedBills = getUnderfundedBills_(key);
-                  const result = await showRedirectPaidModal_({
-                    name: categoryName,
-                    alloc,
-                    underfundedBills,
-                  });
-                  if (result.choice === "cancel") {
-                    cb.checked = false;
-                    return;
-                  }
-                  try { applyPaidRedirect_(key, alloc, result); } catch(_){}
-                }
-              }
-              const cur = loadManualFunded_();
-              if (cb.checked) {
-                cur[key] = true;
-                tr.classList.add("already-paid-row");
-              } else {
-                delete cur[key];
-                tr.classList.remove("already-paid-row");
-              }
-              saveManualFunded_(cur);
-              recomputeBillsAllocationsDebounced_();
-            });
-            if (cb.checked) tr.classList.add("already-paid-row");
-            td.appendChild(cb);
-            tr.appendChild(td);
-          }
+          // v470: the "Paid?" checkbox is removed. The app allocates money, it
+          // doesn't pay bills — a bill is "Funded" when its allocation reaches
+          // the target (shown in the Allocated cell), derived live from
+          // paidByKey. There is no manual paid flag to toggle anymore.
 
           engOutTbody.appendChild(tr);
         }
@@ -11428,8 +11353,8 @@ document.addEventListener("click", async (e) => {
 
   <div id="manualFundedModal" role="dialog" aria-modal="true" aria-labelledby="mfModalTitle">
     <div class="modal-box">
-      <h3 id="mfModalTitle">Funding for Next Month</h3>
-      <p id="mfModalSub" style="color:var(--muted);font-size:.9em;margin:0 0 14px">These bills are marked as <strong>already paid this month</strong>. Choose whether to fund them toward next month or skip.</p>
+      <h3 id="mfModalTitle">Fully Funded for This Month</h3>
+      <p id="mfModalSub" style="color:var(--muted);font-size:.9em;margin:0 0 14px">These bills are <strong>fully funded for this month</strong>. Fund them toward next month, or redirect the money to Debt / Savings / Spending?</p>
       <div id="mfModalRows"></div>
       <div class="modal-footer">
         <button id="mfModalConfirmBtn" class="btn">Confirm All &amp; Post</button>
