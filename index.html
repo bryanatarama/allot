@@ -1905,7 +1905,7 @@ body { padding:0; overflow-x: hidden; }
       // ===== Header pills =====
       const whereEl = document.getElementById("where");
       const specEl = document.getElementById("specVersion");
-      const BUILD_STAMP = "v468-pages";
+      const BUILD_STAMP = "v469-pages";
       const SPEC_VERSION = "";
       specEl.textContent = "Spec: " + SPEC_VERSION;
       whereEl.textContent = "Here: " + window.location.href;
@@ -4752,7 +4752,12 @@ if (amtTd) {
   // Render amount + optional badge
   const manualFundedAmts = loadManualFunded_();
   const isAlreadyPaid = !!(manualFundedAmts[key]);
-  const isNextMonth = !!(isAlreadyPaid && amt > 0);
+  // v469: "→ next month" means the bill is actually forward-funded, i.e. has a
+  // nextMonthPaid entry — NOT merely that it has a current-month allocation
+  // (amt > 0). The old `amt > 0` check made any paid-this-month bill falsely
+  // render "→ <next month>". Match the Dashboard table logic (nextMonthPaid[key]).
+  const nextMonthPaidAmts = loadNextMonthPaid_();
+  const isNextMonth = !!(isAlreadyPaid && (Number(nextMonthPaidAmts[key] || 0) || 0) > 0);
   if (isAlreadyPaid) {
     amtTd.classList.add("paid-cell");
     const subLabel = isNextMonth ? `→ ${escapeHtml_(getNextMonthLabel_())}` : `skip`;
