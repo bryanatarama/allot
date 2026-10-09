@@ -25,7 +25,7 @@ Code syncs through GitHub only. Docs sync through `~/Dropbox/allot-docs/`. Nothi
 4. If the session touches the Worker or Plaid: `cd worker && npx wrangler deployments list | tail`. `worker/` is gitignored, so a deploy from the other machine will NOT be in your local files — ask Bryan before editing if the cloud deploy is newer than your local `worker/*.js`.
 5. Read the reference doc's newest changelog entries so you know what the other machine shipped.
 
-When you finish: bump BUILD_STAMP, deploy, stamp + annotate the reference doc, commit, push. Verify the stamp line actually changed — on Windows the `$HOME/Dropbox` path in `push-pages.sh` may not resolve and the stamp step silently skips.
+When you finish: bump BUILD_STAMP, deploy, stamp + annotate the reference doc, commit, push. If you edited this `CLAUDE.md`, copy it to `~/Dropbox/allot-docs/CLAUDE.md` so the mirror matches (`cp CLAUDE.md ~/Dropbox/allot-docs/CLAUDE.md`) — committing the repo copy alone leaves the Dropbox mirror stale until the other machine's session-start step 3 catches it. Verify the stamp line actually changed — on Windows the `$HOME/Dropbox` path in `push-pages.sh` may not resolve and the stamp step silently skips.
 
 ## Architecture (don't relearn this each session)
 - **The runtime is the single `index.html`** (~9k lines, vanilla JS) served via Cloudflare Pages.
