@@ -413,6 +413,9 @@
       /* Config tab hidden in public mode */
       #tabBtn-config { display: none; }
       body.admin-mode #tabBtn-config { display: flex; }   /* v464: same column layout as the other tabs */
+      /* v471: Daily Budget tab — bryanatarama only while Bryan tests it (class set in _refreshAdminMode) */
+      #tabBtn-daily { display: none; }
+      body.db-owner #tabBtn-daily { display: flex; }
       details.diag summary { cursor:pointer; user-select:none; color: var(--muted); margin-bottom: 8px; }
       .btn-danger{ background: var(--danger-bg); border-color: var(--danger-border); color: var(--danger-text); }
       .btn-ok{ background: var(--ok-bg); border-color: var(--ok-border); color: var(--ok-text); }
@@ -1174,6 +1177,7 @@ body { padding:0; overflow-x: hidden; }
     <!-- Bottom tab bar — outside header so position:fixed works -->
     <div class="nav">
       <button id="tabBtn-dashboard" class="active" type="button" data-tab="dashboard"><span class="tab-icon"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 12L11.2045 3.04549C11.6438 2.60615 12.3562 2.60615 12.7955 3.04549L21.75 12M4.5 9.75V19.875C4.5 20.4963 5.00368 21 5.625 21H9.75V16.125C9.75 15.5037 10.2537 15 10.875 15H13.125C13.7463 15 14.25 15.5037 14.25 16.125V21H18.375C18.9963 21 19.5 20.4963 19.5 19.875V9.75M8.25 21H16.5"/></svg></span><span class="tab-label">Home</span></button>
+      <button id="tabBtn-daily" type="button" data-tab="daily"><span class="tab-icon"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 0 1 2.25-2.25h13.5A2.25 2.25 0 0 1 21 7.5v11.25m-18 0A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75m-18 0v-7.5A2.25 2.25 0 0 1 5.25 9h13.5A2.25 2.25 0 0 1 21 11.25v7.5"/></svg></span><span class="tab-label">Daily</span></button>
       <button id="tabBtn-budgeter" type="button" data-tab="budgeter"><span class="tab-icon"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M10.5 6H20.25M10.5 6C10.5 6.82843 9.82843 7.5 9 7.5C8.17157 7.5 7.5 6.82843 7.5 6M10.5 6C10.5 5.17157 9.82843 4.5 9 4.5C8.17157 4.5 7.5 5.17157 7.5 6M3.75 6H7.5M10.5 18H20.25M10.5 18C10.5 18.8284 9.82843 19.5 9 19.5C8.17157 19.5 7.5 18.8284 7.5 18M10.5 18C10.5 17.1716 9.82843 16.5 9 16.5C8.17157 16.5 7.5 17.1716 7.5 18M3.75 18H7.5M16.5 12H20.25M16.5 12C16.5 12.8284 15.8284 13.5 15 13.5C14.1716 13.5 13.5 12.8284 13.5 12M16.5 12C16.5 11.1716 15.8284 10.5 15 10.5C14.1716 10.5 13.5 11.1716 13.5 12M3.75 12H13.5"/></svg></span><span class="tab-label">Allot</span></button>
       <button id="tabBtn-expenseCategories" type="button" data-tab="expenseCategories" style="display:none"><span class="tab-icon"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 6.75h12M8.25 12h12m-12 5.25h12M3.75 6.75h.007v.008H3.75V6.75zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zM3.75 12h.007v.008H3.75V12zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm-.375 5.25h.007v.008H3.75v-.008zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0z"/></svg></span><span class="tab-label">Categories</span></button>
       <button id="tabBtn-debt" type="button" data-tab="debt"><span class="tab-icon"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 6L9 12.75l4.286-4.286c2.035 1.553 3.592 3.766 4.306 6.43l.776 2.898m0 0l3.182-5.511m-3.182 5.511l-5.511-3.182"/></svg></span><span class="tab-label">Debt</span></button>
@@ -1653,6 +1657,11 @@ body { padding:0; overflow-x: hidden; }
   </div>
 </section>
 
+    <!-- v471: Daily Budget tab (admin-only test build) — rendered by dbRender_() -->
+    <section id="tab-daily" class="tab-panel" hidden>
+      <div id="dailyRoot"></div>
+    </section>
+
     <!-- v436: Accounts tab — Plaid bank linking (Connected Accounts) -->
     <section id="tab-accounts" class="tab-panel" hidden>
       <div class="panel">
@@ -1905,7 +1914,7 @@ body { padding:0; overflow-x: hidden; }
       // ===== Header pills =====
       const whereEl = document.getElementById("where");
       const specEl = document.getElementById("specVersion");
-      const BUILD_STAMP = "v470-pages";
+      const BUILD_STAMP = "v471-pages";
       const SPEC_VERSION = "";
       specEl.textContent = "Spec: " + SPEC_VERSION;
       whereEl.textContent = "Here: " + window.location.href;
@@ -1918,6 +1927,8 @@ body { padding:0; overflow-x: hidden; }
         const isOwner = (s?.username || '').toLowerCase() === 'bryanatarama';
         const previewingAsUser = localStorage.getItem('BUDGETER_PREVIEW_AS_USER') === '1';
         if (isOwner && !previewingAsUser) document.body.classList.add("admin-mode");
+        // v471: Daily Budget is gated on the bryanatarama login itself — not admin-mode, which ?admin=1 also turns on.
+        document.body.classList.toggle("db-owner", isOwner && !previewingAsUser);
         // Show floating banner when previewing so the user can always exit
         const banner = document.getElementById('previewBanner');
         if (banner) {
@@ -3590,7 +3601,7 @@ function debtWeight_(row) {
       // Tabs
       // ============================================================
     // CHANGE this line (add "debt")
-const TAB_IDS = ["dashboard", "accounts", "expenseCategories", "budgeter", "debt", "config"];
+const TAB_IDS = ["dashboard", "daily", "accounts", "expenseCategories", "budgeter", "debt", "config"];
 
 
       function showUnsavedModal_() {
@@ -3613,6 +3624,7 @@ const TAB_IDS = ["dashboard", "accounts", "expenseCategories", "budgeter", "debt
         try {
           if (tabId === 'accounts' && typeof PlaidState !== 'undefined' && !PlaidState.loadedOnce && getAuthToken_()) plaidLoad_();
           if (tabId === 'budgeter' && typeof PlaidBills !== 'undefined' && !PlaidBills.loaded && getAuthToken_()) plaidBillsLoad_(false);
+          if (tabId === 'daily' && typeof dbLoad_ === 'function') { dbWire_(); dbLoad_(); }
         } catch(_) {}
       }
 
@@ -10933,6 +10945,463 @@ document.addEventListener("click", async (e) => {
         setTimeout(() => tryResume(0), 300);
       }
     });
+
+    // ============================================================
+    // v471: Daily Budget (admin-only test build). Spec: allot-daily-budget-spec.md.
+    //  Classifies Plaid transactions (transfers, debt payments, income, bills,
+    //  base, daily…), then tracks a per-paycheck cap and a day-type daily budget
+    //  with a live "left today". Bank charges never touch paidByKey (v470:
+    //  funding ≠ paying). State: KV key `dailyBudgetV1`
+    //  { settings, days, overrides, rules, capOverride, periodStarts, spendingAcct }.
+    // ============================================================
+    // @@DB_CLASSIFIER_START
+    const DB_DEFAULTS = { cap: 1300, heavyCap: 1400, heavyDays: 10, show: 70, shop: 45, off: 50, tour: 50, base: 450, lowBalance: 150, bigPurchase: 150, paceAlert: 100 };
+    const DB_DAY_TYPES = ['off', 'show', 'shop', 'tour'];
+    const DB_CLASS_LABEL = {
+      DAILY: 'Daily', BASE: 'Base', BILL: 'Bill', REIMBURSABLE: 'Reimbursable', UNTAGGED: 'Needs a tag',
+      ONE_OFF: 'One-off (Savings)', EXCLUDED: 'Excluded', TRANSFER: 'Transfer', OVERDRAFT_DRAW: 'Overdraft draw',
+      DEBT_PAYMENT: 'Debt payment', PAYROLL: 'Payroll', REIMBURSEMENT: 'Reimbursement', OTHER_INCOME: 'Other income',
+      MISC_CREDIT: 'Misc credit', REFUND: 'Refund',
+    };
+    const DB_DAILY_SUBS = ['Dining', 'Dog', 'Rideshare', 'Parking', 'Entertainment', 'Shopping', 'Personal care', 'Medical', 'Other'];
+    const DB_BASE_SUBS = ['Groceries', 'Gas', 'Household'];
+
+    // Bill rows matched by description (spec §4.5). `max` = only below this amount.
+    const DB_BILL_RULES = [
+      { re: /\bflex\b|flexible financ/i, bill: a => a < 60 ? 'Flex fees' : 'Rent' },
+      { re: /\btoyota\b/i, bill: 'Car' },
+      { re: /liberty mutual/i, bill: 'Car insurance' },
+      { re: /t-?mobile/i, bill: 'Phone' },
+      { re: /xfinity|comcast/i, bill: 'Internet' },
+      { re: /pg&e|pgande|pacific gas/i, bill: 'Utilities' },
+      { re: /lemonade/i, bill: 'Renters insurance' },
+      { re: /spotify/i, bill: 'Subscriptions', sub: 'Spotify' },
+      { re: /disney ?(plus|\+)/i, bill: 'Subscriptions', sub: 'Disney+' },
+      { re: /youtube ?premium|youtubepremium/i, bill: 'Subscriptions', sub: 'YouTube Premium' },
+      { re: /\btwitch\b/i, bill: 'Subscriptions', sub: 'Twitch' },
+      { re: /google ?workspac/i, bill: 'Subscriptions', sub: 'Google Workspace' },
+      { re: /\bgoogle\b/i, max: 5, bill: 'Subscriptions', sub: 'Google' },
+      { re: /anthropic|claude\.ai/i, bill: 'Subscriptions', sub: 'Anthropic' },
+      { re: /\bwaves\b/i, bill: 'Subscriptions', sub: 'Waves' },
+      { re: /amazon prime/i, max: 20, bill: 'Subscriptions', sub: 'Amazon Prime' },
+      { re: /tinder/i, bill: 'Subscriptions', sub: 'Tinder' },
+      { re: /capital one member fee|plus checking monthly fee|finance charge/i, bill: 'Fees' },
+    ];
+    const DB_BASE_RULES = [
+      { re: /smart ?& ?final|safeway|nob hill|chapala|trader joe|whole foods|grocery outlet|lucky supermarket|costco/i, sub: 'Groceries' },
+      { re: /chevron|exxon|\bshell\b|\blove'?s\b|\bpilot\b|\barco\b|valero/i, sub: 'Gas' },
+      { re: /\btarget\b|walgreens|\bcvs\b/i, sub: 'Household' },
+    ];
+    const DB_DAILY_RULES = [
+      { re: /\bwag!?\b|wag group|pet food express|vetsource|\bvca\b|\brover\b|petco|petsmart/i, sub: 'Dog' },
+      { re: /uber\s*eats|doordash|\bdd \*|grubhub|starbucks|peet'?s|philz|coffee/i, sub: 'Dining' },
+      { re: /\blyft\b|\buber\b|\bcurb\b/i, sub: 'Rideshare' },
+      { re: /spothero|parkmobile|parking|\bgara(ge)?\b|impark/i, sub: 'Parking' },
+      { re: /stitch ?fix|tiktok shop|\bapple\b|\bsteam\b|kindle/i, sub: 'Shopping' },
+      { re: /payrange|laundr|barber/i, sub: 'Personal care' },
+    ];
+
+    function dbDay_(t) { return t.authorized_date || t.date || ''; }
+    function dbDesc_(t) { return t.orig || t.name || t.merchant || ''; }
+    function dbMerchantKey_(t) {
+      const s = (t.merchant || t.name || t.orig || '').toLowerCase().replace(/[^a-z& ]+/g, ' ').replace(/\s+/g, ' ').trim();
+      return s.split(' ').slice(0, 3).join(' ');
+    }
+    function dbAddDays_(day, n) {
+      const d = new Date(day + 'T12:00:00'); d.setDate(d.getDate() + n);
+      return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+    }
+    function dbDayDiff_(a, b) { return Math.round((new Date(b + 'T12:00:00') - new Date(a + 'T12:00:00')) / 864e5); }
+
+    // Equal-and-opposite moves between two linked accounts within 3 days → transfer ids (spec §4.2).
+    function dbPairTransfers_(txns) {
+      const out = new Set();
+      const ins = txns.filter(t => t.amount < 0);
+      for (const t of txns) {
+        if (!(t.amount > 0) || out.has(t.id)) continue;
+        const m = ins.find(u => !out.has(u.id) && u.account_id !== t.account_id && Math.abs(u.amount + t.amount) < 0.005 && Math.abs(dbDayDiff_(dbDay_(u), dbDay_(t))) <= 3);
+        if (m) { out.add(t.id); out.add(m.id); }
+      }
+      return out;
+    }
+
+    // One transaction → { cls, sub, bill, suggest, ask, src }. First match wins (spec §4).
+    // ctx: { overrides, rules, paired:Set, acctType:{account_id:type}, bigPurchase }
+    function dbClassify_(t, ctx) {
+      ctx = ctx || {};
+      const ov = ctx.overrides && ctx.overrides[t.id];
+      if (ov && ov.cls) return { ...ov, src: 'you' };
+      const a = Number(t.amount) || 0, out = a > 0;
+      const lines = [t.orig, t.name].filter(Boolean);
+      const starts = re => lines.some(s => re.test(s));
+      const text = [t.orig, t.name, t.merchant].filter(Boolean).join(' | ');
+      const has = re => re.test(text);
+      const prim = t.pfc_primary || '', det = t.pfc_detailed || '';
+      const acctType = (ctx.acctType || {})[t.account_id] || '';
+
+      // §4.2 overdraft draw (before generic Loan transfers)
+      if (starts(/^From Loan \*+[\w*]*-01\b/i)) return { cls: 'OVERDRAFT_DRAW', src: 'rule' };
+      // §4.3 explicit card / loan payments
+      if (has(/capital one (mobile|autopay|online) pymt|payment to capital one/i) || starts(/^To Loan \*+[\w*]*-(35|01)\b/i)) return { cls: 'DEBT_PAYMENT', src: 'rule' };
+      // §4.2 explicit internal moves
+      if (starts(/^(To|From) (Share|Loan) \*+/i) || has(/transfer to rocket money|deposit to buy a home goal/i)) return { cls: 'TRANSFER', src: 'rule' };
+      // §4.4 income
+      if (!out) {
+        if (has(/ach deposit:?\s*clair global corc/i)) return { cls: 'PAYROLL', src: 'rule' };
+        if (has(/clair global deposit|cgc disburse/i)) return { cls: 'REIMBURSEMENT', src: 'rule' };
+        if (has(/new c\.?a\.?p\.?s/i)) return { cls: 'OTHER_INCOME', ask: 'w2_1099', src: 'rule' };
+        if (has(/\bdividend\b|atm fee rebate|cash ?back reward/i)) return { cls: 'MISC_CREDIT', src: 'rule' };
+      }
+      // §4.10 learned merchant rules
+      const rk = dbMerchantKey_(t), rule = rk && ctx.rules && ctx.rules[rk];
+      if (rule && rule.cls) return { ...rule, src: 'merchant rule' };
+      // §4.5 bills
+      if (out) {
+        for (const r of DB_BILL_RULES) {
+          if (r.max && a >= r.max) continue;
+          if (has(r.re)) return { cls: 'BILL', bill: typeof r.bill === 'function' ? r.bill(a) : r.bill, sub: r.sub, src: 'rule' };
+        }
+      }
+      // §4.9 person-to-person
+      if (out && has(/\bvenmo\b|\bzelle\b/i)) return { cls: 'UNTAGGED', ask: 'p2p', src: 'rule' };
+      // §4.2 / §4.3 generic transfers and payments
+      if (ctx.paired && ctx.paired.has(t.id)) return { cls: 'TRANSFER', src: 'paired' };
+      if (prim === 'LOAN_PAYMENTS' || (!out && (acctType === 'credit' || acctType === 'loan') && /^TRANSFER_IN|^LOAN_PAYMENTS/.test(prim))) return { cls: 'DEBT_PAYMENT', src: 'plaid' };
+      if (prim === 'TRANSFER_IN' || prim === 'TRANSFER_OUT') return { cls: 'TRANSFER', src: 'plaid' };
+      // remaining inflows
+      if (!out) {
+        if (prim === 'INCOME') return /DIVIDENDS|INTEREST/.test(det) ? { cls: 'MISC_CREDIT', src: 'plaid' } : { cls: 'OTHER_INCOME', ask: 'w2_1099', src: 'plaid' };
+        if (t.merchant) {
+          const b = dbSpendBucket_(t, text, prim, det, 1);
+          return { cls: 'REFUND', sub: b.cls + ':' + b.sub, src: 'plaid' };
+        }
+        return { cls: 'MISC_CREDIT', src: 'plaid' };
+      }
+      if (prim === 'BANK_FEES') return { cls: 'BILL', bill: 'Fees', src: 'plaid' };
+      // §4.6 / §4.7 spending
+      const b = dbSpendBucket_(t, text, prim, det, a);
+      const r = { cls: b.cls, sub: b.sub, src: b.src };
+      if (b.cls === 'DAILY') {
+        const reimb = (b.sub === 'Parking' && /gara|garage|conv(e)?ntion/i.test(text)) || (b.sub === 'Rideshare' && a > 50)
+          || det === 'TRAVEL_FLIGHTS' || /airline|airways|southwest|united air|delta air|alaska air|jetblue/i.test(text)
+          || det === 'TRAVEL_LODGING' || /hotel|marriott|hilton|hyatt/i.test(text);
+        if (reimb) r.suggest = 'REIMBURSABLE';
+        if (a > (ctx.bigPurchase || DB_DEFAULTS.bigPurchase)) { r.cls = 'UNTAGGED'; r.ask = 'big'; }
+      }
+      return r;
+    }
+    function dbSpendBucket_(t, text, prim, det, a) {
+      if (/amazon|amzn/i.test(text) && !/prime|kindle/i.test(text)) return { cls: 'BASE', sub: 'Household', src: 'rule' };
+      for (const r of DB_BASE_RULES) if (r.re.test(text)) return { cls: 'BASE', sub: r.sub, src: 'rule' };
+      for (const r of DB_DAILY_RULES) if (r.re.test(text)) return { cls: 'DAILY', sub: r.sub, src: 'rule' };
+      if (det === 'FOOD_AND_DRINK_GROCERIES') return { cls: 'BASE', sub: 'Groceries', src: 'plaid' };
+      if (det === 'TRANSPORTATION_GAS') return { cls: 'BASE', sub: 'Gas', src: 'plaid' };
+      if (prim === 'HOME_IMPROVEMENT' || /GENERAL_MERCHANDISE_(SUPERSTORES|DISCOUNT_STORES)/.test(det)) return { cls: 'BASE', sub: 'Household', src: 'plaid' };
+      if (prim === 'FOOD_AND_DRINK') return { cls: 'DAILY', sub: 'Dining', src: 'plaid' };
+      if (det === 'TRANSPORTATION_PARKING') return { cls: 'DAILY', sub: 'Parking', src: 'plaid' };
+      if (det === 'TRANSPORTATION_TAXIS_AND_RIDE_SHARES') return { cls: 'DAILY', sub: 'Rideshare', src: 'plaid' };
+      if (prim === 'ENTERTAINMENT') return { cls: 'DAILY', sub: 'Entertainment', src: 'plaid' };
+      if (prim === 'GENERAL_MERCHANDISE') return { cls: 'DAILY', sub: 'Shopping', src: 'plaid' };
+      if (prim === 'PERSONAL_CARE') return { cls: 'DAILY', sub: 'Personal care', src: 'plaid' };
+      if (prim === 'MEDICAL') return { cls: 'DAILY', sub: 'Medical', src: 'plaid' };
+      return { cls: 'DAILY', sub: 'Other', src: 'plaid' };
+    }
+
+    // Pay periods (spec §6): start on each PAYROLL date (or a manual start), end the day before the next.
+    function dbPeriods_(rows, manualStarts, today) {
+      const starts = new Set((manualStarts || []).filter(Boolean));
+      for (const r of rows) if (r.c.cls === 'PAYROLL') starts.add(dbDay_(r.t));
+      const list = [...starts].filter(d => d <= today).sort();
+      return list.map((s, i) => ({ start: s, end: list[i + 1] ? dbAddDays_(list[i + 1], -1) : null }));
+    }
+
+    // Numbers for one period (spec §6). `days` = {date: type}; s = settings.
+    function dbPeriodStats_(rows, period, days, s, today, capOverride) {
+      const end = period.end || today;
+      const lastPlanned = period.end || dbAddDays_(period.start, 13);
+      const inP = d => d >= period.start && d <= end;
+      const typeOf = d => days[d] || 'off';
+      const budgetOf = d => Number(s[typeOf(d)]) || 0;
+      let daily = 0, base = 0, todaySpent = 0, untagged = 0, untaggedN = 0;
+      const byBaseSub = {}, byDailySub = {};
+      for (const { t, c } of rows) {
+        const d = dbDay_(t); if (!inP(d)) continue;
+        const a = Number(t.amount) || 0;
+        let cls = c.cls, sub = c.sub;
+        if (cls === 'REFUND') { [cls, sub] = String(c.sub || 'DAILY:Other').split(':'); }   // refunds offset their category
+        else if (!(a > 0)) continue;
+        if (cls === 'DAILY') { daily += a; byDailySub[sub || 'Other'] = (byDailySub[sub || 'Other'] || 0) + a; if (d === today) todaySpent += a; }
+        else if (cls === 'BASE') { base += a; byBaseSub[sub || 'Household'] = (byBaseSub[sub || 'Household'] || 0) + a; }
+        else if (cls === 'UNTAGGED') { untagged += a; untaggedN++; }
+      }
+      let heavy = 0;
+      for (let d = period.start; d <= lastPlanned; d = dbAddDays_(d, 1)) if (typeOf(d) === 'show' || typeOf(d) === 'shop') heavy++;
+      const cap = Number(capOverride) > 0 ? Number(capOverride) : (heavy >= s.heavyDays ? s.heavyCap : s.cap);
+      let allowed = 0;
+      for (let d = period.start; d <= (end < today ? end : today); d = dbAddDays_(d, 1)) allowed += budgetOf(d);
+      const todayBudget = budgetOf(today);
+      const todayLeft = todayBudget - todaySpent;
+      const pct = todayBudget > 0 ? todaySpent / todayBudget : (todaySpent > 0 ? 2 : 0);
+      return {
+        start: period.start, end: period.end, lastPlanned, cap, heavy, heavyCapApplies: !(Number(capOverride) > 0) && heavy >= s.heavyDays,
+        daily, base, periodSpent: daily + base, periodLeft: cap - daily - base, baseLeft: s.base - base,
+        allowedSoFar: allowed, pace: allowed - daily, byBaseSub, byDailySub, untagged, untaggedN,
+        todayType: typeOf(today), todaySet: !!days[today], todayBudget, todaySpent, todayLeft,
+        todayStatus: pct >= 1 && todaySpent > 0 ? 'over' : pct >= 0.8 ? 'warning' : 'ok',
+      };
+    }
+    // @@DB_CLASSIFIER_END
+
+    const DB_KV_KEY = 'dailyBudgetV1';
+    const DB_LS_KEY = 'ALLOT_DAILY_BUDGET_V1';
+    const DbState = { data: null, txns: [], accounts: [], rows: [], loading: false, loaded: false, error: null, viewStart: null, saveT: null, rulePrompt: null };
+
+    function dbToday_() { const d = new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
+    function dbEnabled_() {
+      // bryanatarama only (not ?admin=1); the worker enforces the same on plaidTxns.
+      let u = ''; try { u = (JSON.parse(localStorage.getItem(LS_KEY_SESSION) || 'null')?.username || '').toLowerCase(); } catch(_) {}
+      return u === 'bryanatarama' && document.body.classList.contains('db-owner');
+    }
+    function dbBlank_() { return { settings: { ...DB_DEFAULTS }, days: {}, overrides: {}, rules: {}, capOverride: {}, periodStarts: [], spendingAcct: null, dismissed: {} }; }
+    function dbNormalize_(d) {
+      const b = dbBlank_();
+      if (!d || typeof d !== 'object') return b;
+      return { ...b, ...d, settings: { ...DB_DEFAULTS, ...(d.settings || {}) } };
+    }
+    function dbSave_() {
+      try { localStorage.setItem(DB_LS_KEY, JSON.stringify(DbState.data)); } catch(_) {}
+      clearTimeout(DbState.saveT);
+      DbState.saveT = setTimeout(() => { workerSet_(DB_KV_KEY, DbState.data).catch(e => console.warn('[daily] save failed', e)); }, 600);
+    }
+    function dbMoney_(n) { return formatMoney_(Math.round(Number(n) * 100) / 100); }
+    function dbFmtDay_(d, opts) { try { return new Date(d + 'T12:00:00').toLocaleDateString(undefined, opts || { month: 'short', day: 'numeric' }); } catch(_) { return d; } }
+
+    async function dbLoad_(force) {
+      if (!dbEnabled_() || DbState.loading || !getAuthToken_()) return;
+      if (DbState.loaded && !force) { dbRender_(); return; }
+      DbState.loading = true; DbState.error = null; dbRender_();
+      try {
+        if (!DbState.data) {
+          let local = null; try { local = JSON.parse(localStorage.getItem(DB_LS_KEY) || 'null'); } catch(_) {}
+          let remote = null; try { const r = await workerGet_(DB_KV_KEY); remote = r && r.ok ? r.state : null; } catch(_) {}
+          DbState.data = dbNormalize_(remote || local);
+        }
+        const since = dbAddDays_(dbToday_(), -75);
+        const r = await plaidApi_('plaidTxns&since=' + since);
+        if (!r || !r.ok) throw new Error((r && r.error) || 'Could not load transactions.');
+        DbState.txns = r.transactions || [];
+        DbState.accounts = r.accounts || [];
+        DbState.loaded = true;
+      } catch (e) { DbState.error = String(e && e.message || e); }
+      DbState.loading = false;
+      dbRender_();
+    }
+
+    function dbClassifyAll_() {
+      const d = DbState.data, acctType = {};
+      for (const a of DbState.accounts) acctType[a.account_id] = a.type;
+      const ctx = { overrides: d.overrides, rules: d.rules, paired: dbPairTransfers_(DbState.txns), acctType, bigPurchase: d.settings.bigPurchase };
+      DbState.rows = DbState.txns.map(t => ({ t, c: dbClassify_(t, ctx) }));
+    }
+
+    function dbAlerts_(st, isCurrent) {
+      const s = DbState.data.settings, out = [];
+      if (isCurrent) {
+        if (st.todayStatus === 'over') out.push({ kind: 'bad', msg: `${dbMoney_(-st.todayLeft)} over today. You're ${st.pace >= 0 ? 'still ' + dbMoney_(st.pace) + ' under' : dbMoney_(-st.pace) + ' over'} pace this paycheck.` });
+        else if (st.todayStatus === 'warning') out.push({ kind: 'warn', msg: `${dbMoney_(st.todayLeft)} left today.` });
+        if (st.pace < -s.paceAlert) out.push({ kind: 'bad', msg: `You're ${dbMoney_(-st.pace)} over your daily pace this paycheck.` });
+        const sp = DbState.accounts.find(a => a.account_id === DbState.data.spendingAcct);
+        const bal = sp && sp.balances ? (sp.balances.available ?? sp.balances.current) : null;
+        if (bal !== null && bal !== undefined && bal < s.lowBalance) out.push({ kind: 'bad', msg: `Spending is low (${dbMoney_(bal)}). Overdraft protection kicks in at $0.` });
+      }
+      const end = st.end || dbToday_();
+      for (const { t, c } of DbState.rows) {
+        const d = dbDay_(t);
+        if (c.cls === 'OVERDRAFT_DRAW' && d >= st.start && d <= end) out.push({ kind: 'bad', msg: `Overdraft protection covered ${dbMoney_(Math.abs(t.amount))} on ${dbFmtDay_(d)}${t.merchant ? ' at ' + t.merchant : ''}.` });
+      }
+      const mk = dbToday_().slice(0, 7), subs = {};
+      for (const { t, c } of DbState.rows) if (c.cls === 'BILL' && c.sub && dbDay_(t).slice(0, 7) === mk && t.amount > 0) subs[c.sub] = (subs[c.sub] || 0) + 1;
+      if (isCurrent) for (const [k, n] of Object.entries(subs)) if (n > 1) out.push({ kind: 'warn', msg: `${k} charged ${n} times this month.` });
+      return out;
+    }
+
+    function dbOptionHtml_(c) {
+      const cur = c.cls === 'DAILY' || c.cls === 'BASE' ? c.cls + ':' + (c.sub || '') : c.cls;
+      const opt = (v, l) => `<option value="${escapeHtml_(v)}"${v === cur ? ' selected' : ''}>${escapeHtml_(l)}</option>`;
+      let h = '<optgroup label="Daily">' + DB_DAILY_SUBS.map(x => opt('DAILY:' + x, 'Daily · ' + x)).join('') + '</optgroup>';
+      h += '<optgroup label="Base ($' + DbState.data.settings.base + ')">' + DB_BASE_SUBS.map(x => opt('BASE:' + x, 'Base · ' + x)).join('') + '</optgroup>';
+      h += '<optgroup label="Not spending">' + ['BILL', 'REIMBURSABLE', 'ONE_OFF', 'EXCLUDED', 'TRANSFER', 'DEBT_PAYMENT', 'OVERDRAFT_DRAW', 'UNTAGGED'].map(k => opt(k, DB_CLASS_LABEL[k])).join('') + '</optgroup>';
+      h += '<optgroup label="Money in">' + ['PAYROLL', 'REIMBURSEMENT', 'OTHER_INCOME', 'MISC_CREDIT', 'REFUND'].map(k => opt(k, DB_CLASS_LABEL[k])).join('') + '</optgroup>';
+      if (!/^(DAILY|BASE):/.test(cur) && !DB_CLASS_LABEL[cur]) h += opt(cur, cur);
+      return h;
+    }
+
+    function dbSetClass_(id, value, opts) {
+      const row = DbState.rows.find(r => r.t.id === id); if (!row) return;
+      const [cls, sub] = String(value).split(':');
+      const ov = { cls };
+      if (sub) ov.sub = sub;
+      if (cls === 'BILL') { ov.bill = (opts && opts.bill) || row.c.bill || 'Other'; if (row.c.sub && !sub) ov.sub = row.c.sub; }
+      if (cls === 'REFUND' && row.c.cls === 'REFUND') ov.sub = row.c.sub;
+      if (opts && opts.note) ov.note = opts.note;
+      DbState.data.overrides[id] = ov;
+      const mk = dbMerchantKey_(row.t);
+      DbState.rulePrompt = (opts && opts.noRule) || !mk ? null : { key: mk, label: row.t.merchant || row.t.name || mk, ov: { cls: ov.cls, sub: ov.sub, bill: ov.bill } };
+      dbSave_(); dbRender_();
+    }
+
+    function dbRender_() {
+      const root = document.getElementById('dailyRoot');
+      if (!root) return;
+      if (!dbEnabled_()) { root.innerHTML = '<div class="muted">Daily Budget is a test feature that is not available on this account.</div>'; return; }
+      if (!DbState.loaded) {
+        root.innerHTML = DbState.error ? `<div class="error">${escapeHtml_(DbState.error)}</div>` : '<div class="muted">Loading transactions…</div>';
+        return;
+      }
+      dbClassifyAll_();
+      const d = DbState.data, s = d.settings, today = dbToday_();
+      const periods = dbPeriods_(DbState.rows, d.periodStarts, today);
+      if (!periods.length) periods.push({ start: dbAddDays_(today, -13), end: null });
+      let idx = periods.findIndex(p => p.start === DbState.viewStart);
+      if (idx < 0) idx = periods.length - 1;
+      const period = periods[idx], isCurrent = idx === periods.length - 1;
+      const st = dbPeriodStats_(DbState.rows, period, d.days, s, today, d.capOverride[period.start]);
+      const alerts = dbAlerts_(st, isCurrent);
+      const bar = (v, max, color) => `<div style="height:8px;border-radius:99px;background:var(--border);overflow:hidden;margin:6px 0"><div style="height:100%;width:${Math.max(0, Math.min(100, max > 0 ? v / max * 100 : 0)).toFixed(1)}%;background:${color}"></div></div>`;
+      const statusColor = { ok: 'var(--ok-text)', warning: 'var(--warn-text)', over: 'var(--danger-text)' }[st.todayStatus];
+      let h = '';
+
+      // Today
+      if (isCurrent) {
+        h += `<div class="panel"><div class="tab-header"><div><h3 style="margin:0">Today · ${escapeHtml_(dbFmtDay_(today, { weekday: 'short', month: 'short', day: 'numeric' }))}</h3>
+          <div class="muted">${st.todaySet ? escapeHtml_(st.todayType) + ' day' : 'off (not set)'} · budget ${dbMoney_(st.todayBudget)}</div></div>
+          <div class="tab-actions">${DB_DAY_TYPES.map(k => `<button type="button" data-db-daytype="${k}" class="${st.todaySet && st.todayType === k ? 'btn-ok' : ''}" style="text-transform:capitalize">${k}</button>`).join('')}</div></div>
+          <div style="font-size:2.2em;font-weight:800;color:${statusColor};margin-top:6px">${st.todayLeft >= 0 ? dbMoney_(st.todayLeft) + ' <span style="font-size:.4em;font-weight:500" class="muted">left today</span>' : dbMoney_(-st.todayLeft) + ' <span style="font-size:.4em;font-weight:500">over today</span>'}</div>
+          ${bar(st.todaySpent, st.todayBudget, statusColor)}
+          <div class="muted" style="font-size:.85em">Spent ${dbMoney_(st.todaySpent)} of ${dbMoney_(st.todayBudget)} · pace this paycheck: <b style="color:${st.pace >= 0 ? 'var(--ok-text)' : 'var(--danger-text)'}">${st.pace >= 0 ? dbMoney_(st.pace) + ' under' : dbMoney_(-st.pace) + ' over'}</b> (unspent budget carries forward)</div></div>`;
+      }
+
+      // Alerts
+      if (alerts.length) h += `<div class="panel" style="padding:10px 14px">${alerts.map(a => `<div class="${a.kind === 'bad' ? 'status-bad' : 'status-warn'}" style="padding:8px 10px;border-radius:8px;border:1px solid;margin:4px 0;font-size:.9em">${escapeHtml_(a.msg)}</div>`).join('')}</div>`;
+
+      // Paycheck
+      const capColor = st.periodLeft < 0 ? 'var(--danger-text)' : st.periodLeft < st.cap * 0.15 ? 'var(--warn-text)' : 'var(--ok-text)';
+      const subList = o => Object.entries(o).sort((a, b) => b[1] - a[1]).map(([k, v]) => `${escapeHtml_(k)} ${dbMoney_(v)}`).join(' · ') || '—';
+      h += `<div class="panel"><div class="tab-header"><div><h3 style="margin:0">Paycheck ${escapeHtml_(dbFmtDay_(period.start))} – ${period.end ? escapeHtml_(dbFmtDay_(period.end)) : 'now'}</h3>
+          <div class="muted">Cap ${dbMoney_(st.cap)}${st.heavyCapApplies ? ' (heavy period: ' + st.heavy + ' show/shop days)' : ''} · ${st.heavy} show/shop day${st.heavy === 1 ? '' : 's'} set</div></div>
+          <div class="tab-actions"><button type="button" data-db-period="-1" ${idx === 0 ? 'disabled' : ''}>‹</button><button type="button" data-db-period="1" ${isCurrent ? 'disabled' : ''}>›</button><button type="button" id="dbRefreshBtn" title="Reload transactions">↻</button></div></div>
+        <div style="display:flex;justify-content:space-between;align-items:baseline;margin-top:8px"><div><b style="font-size:1.4em;color:${capColor}">${dbMoney_(st.periodLeft)}</b> <span class="muted">left of ${dbMoney_(st.cap)}</span></div><div class="muted">spent ${dbMoney_(st.periodSpent)}</div></div>
+        ${bar(st.periodSpent, st.cap, capColor)}
+        <div style="font-size:.88em;line-height:1.7;margin-top:6px">
+          <div><b>Base</b> ${dbMoney_(st.base)} of ${dbMoney_(s.base)} <span class="muted">(${subList(st.byBaseSub)})</span></div>
+          <div><b>Daily</b> ${dbMoney_(st.daily)} vs ${dbMoney_(st.allowedSoFar)} allowed so far <span class="muted">(${subList(st.byDailySub)})</span></div>
+          ${st.untaggedN ? `<div style="color:var(--warn-text)"><b>${st.untaggedN} need a tag</b> (${dbMoney_(st.untagged)}), not counted until tagged. See below.</div>` : ''}
+        </div>`;
+      // day strip
+      h += '<div style="display:flex;gap:4px;flex-wrap:wrap;margin-top:10px">';
+      for (let day = period.start; day <= st.lastPlanned; day = dbAddDays_(day, 1)) {
+        const ty = d.days[day] || 'off', set = !!d.days[day];
+        const colors = { show: '#7c3aed', shop: '#2563eb', tour: '#d97706', off: 'var(--border)' };
+        h += `<button type="button" data-db-cycle="${day}" title="Tap to change" style="flex:1 0 44px;padding:4px 2px;font-size:.72em;line-height:1.3;border-radius:8px;border:${day === today ? '2px solid var(--text)' : '1px solid var(--border)'};background:${set && ty !== 'off' ? colors[ty] : 'transparent'};color:${set && ty !== 'off' ? '#fff' : 'var(--muted)'}">${escapeHtml_(dbFmtDay_(day, { weekday: 'narrow' }))} ${Number(day.slice(8))}<br>${set ? ty : '–'}</button>`;
+      }
+      h += '</div><div class="muted" style="font-size:.75em;margin-top:4px">Tap a day to cycle off → show → shop → tour. Unset days count as off.</div></div>';
+
+      // Review
+      const end = period.end || today;
+      const inP = r => { const x = dbDay_(r.t); return x >= period.start && x <= end; };
+      const review = DbState.rows.filter(r => inP(r) && !d.dismissed[r.t.id] && (r.c.cls === 'UNTAGGED' || (r.c.suggest && r.c.cls !== 'REIMBURSABLE') || (r.c.ask === 'w2_1099' && !r.c.note)));
+      if (review.length) {
+        h += '<div class="panel"><h3 style="margin:0 0 6px">Needs a decision</h3>';
+        for (const { t, c } of review) {
+          const who = escapeHtml_(t.merchant || t.name || '—'), amt = dbMoney_(Math.abs(t.amount)), id = escapeHtml_(t.id);
+          let q = '', btns = '';
+          if (c.ask === 'p2p') { q = 'Venmo/Zelle: what was it?'; btns = `<button type="button" data-db-set="BILL" data-db-bill="Dog sitter" data-id="${id}">Dog sitter</button><button type="button" data-db-set="DAILY:Other" data-id="${id}">Personal</button><button type="button" data-db-set="EXCLUDED" data-id="${id}">Repayment / other</button>`; }
+          else if (c.ask === 'big') { q = `Over ${dbMoney_(s.bigPurchase)}: count it against ${escapeHtml_(dbFmtDay_(dbDay_(t)))}, or a one-off from Savings?`; btns = `<button type="button" data-db-set="DAILY:${escapeHtml_(c.sub || 'Other')}" data-id="${id}">Count against the day</button><button type="button" data-db-set="ONE_OFF" data-id="${id}">One-off from Savings</button>${c.suggest ? `<button type="button" data-db-set="REIMBURSABLE" data-id="${id}">Reimbursable</button>` : ''}`; }
+          else if (c.suggest) { q = 'Looks like a work expense. Reimbursable?'; btns = `<button type="button" data-db-set="REIMBURSABLE" data-id="${id}">Reimbursable</button><button type="button" data-db-dismiss="${id}">No, it's mine</button>`; }
+          else if (c.ask === 'w2_1099') { q = 'Other income: W-2 or 1099?'; btns = `<button type="button" data-db-income="w2" data-id="${id}">W-2</button><button type="button" data-db-income="1099" data-id="${id}">1099 (move ${dbMoney_(Math.abs(t.amount) * 0.3)} to Taxes)</button>`; }
+          h += `<div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:center;padding:8px 0;border-top:1px solid var(--border)"><div><b>${who}</b> ${amt} <span class="muted">· ${escapeHtml_(dbFmtDay_(dbDay_(t)))}</span><div class="muted" style="font-size:.85em">${q}</div></div><div style="display:flex;gap:6px;flex-wrap:wrap">${btns}</div></div>`;
+        }
+        h += '</div>';
+      }
+
+      // Rule prompt
+      if (DbState.rulePrompt) {
+        const rp = DbState.rulePrompt;
+        h += `<div class="panel status-ok" style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap"><div>Always categorize <b>${escapeHtml_(rp.label)}</b> as <b>${escapeHtml_(DB_CLASS_LABEL[rp.ov.cls] + (rp.ov.sub ? ' · ' + rp.ov.sub : ''))}</b>?</div><div style="display:flex;gap:6px"><button type="button" id="dbRuleYes" class="btn-ok">Always</button><button type="button" id="dbRuleNo">Just this one</button></div></div>`;
+      }
+
+      // Transactions
+      const list = DbState.rows.filter(inP).sort((a, b) => dbDay_(b.t).localeCompare(dbDay_(a.t)));
+      const acctName = {}; for (const a of DbState.accounts) acctName[a.account_id] = (a.name || a.official_name || '') + (a.mask ? ' ••' + a.mask : '');
+      const spendCls = new Set(['DAILY', 'BASE', 'UNTAGGED']);
+      h += `<details class="panel" id="dbTxnPanel"${DbState.txnOpen ? ' open' : ''}><summary style="cursor:pointer"><b>Transactions this paycheck</b> <span class="muted">· ${list.length}</span></summary>
+        <div class="muted" style="font-size:.8em;margin:6px 0">Change a category and it sticks. "via rule" = built-in pattern, "via plaid" = Plaid's category, "via you" = your override.</div>
+        <table class="grid" style="width:100%"><tbody>`;
+      for (const { t, c } of list) {
+        const out = t.amount > 0, dim = !spendCls.has(c.cls) && c.cls !== 'REFUND';
+        h += `<tr style="${dim ? 'opacity:.6' : ''}"><td class="mono" style="white-space:nowrap;font-size:.8em">${escapeHtml_(dbFmtDay_(dbDay_(t)))}</td>
+          <td><div style="font-size:.9em">${escapeHtml_(t.merchant || t.name || '—')}${t.pending ? ' <span class="muted" style="font-size:.75em">pending</span>' : ''}${c.bill ? ' <span class="status-pill" style="font-size:.7em">' + escapeHtml_(c.bill) + '</span>' : ''}</div>
+          <div class="muted" style="font-size:.72em">${escapeHtml_(t.orig && t.orig !== t.merchant ? t.orig : (t.name && t.name !== t.merchant ? t.name : ''))} ${escapeHtml_(acctName[t.account_id] || '')} · via ${escapeHtml_(c.src || '')}</div></td>
+          <td class="mono" style="text-align:right;white-space:nowrap;color:${out ? 'var(--text)' : 'var(--ok-text)'}">${out ? '' : '+'}${dbMoney_(Math.abs(t.amount))}</td>
+          <td><select class="cell-input" data-db-class="${escapeHtml_(t.id)}" style="font-size:.78em;max-width:150px">${dbOptionHtml_(c)}</select></td></tr>`;
+      }
+      h += '</tbody></table></details>';
+
+      // Settings
+      const num = (k, label) => `<label style="display:flex;justify-content:space-between;gap:8px;align-items:center;margin:4px 0;font-size:.88em">${label}<input class="cell-input" type="number" step="1" min="0" data-db-setting="${k}" value="${escapeHtml_(String(s[k]))}" style="width:90px;text-align:right"></label>`;
+      const dep = DbState.accounts.filter(a => a.type === 'depository');
+      h += `<details class="panel"><summary style="cursor:pointer"><b>Daily Budget settings</b></summary>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:4px 24px;margin-top:8px">
+          ${num('cap', 'Paycheck cap')}${num('heavyCap', 'Heavy-period cap')}${num('heavyDays', 'Heavy = show/shop days ≥')}${num('base', 'Base (groceries, gas, household)')}
+          ${num('show', 'Show day')}${num('shop', 'Shop day')}${num('off', 'Off day')}${num('tour', 'Tour day')}
+          ${num('lowBalance', 'Spending low-balance alert')}${num('bigPurchase', 'Ask about purchases over')}${num('paceAlert', 'Alert when behind pace by')}
+          <label style="display:flex;justify-content:space-between;gap:8px;align-items:center;margin:4px 0;font-size:.88em">Cap for this paycheck<input class="cell-input" type="number" step="1" min="0" id="dbCapOverride" placeholder="auto" value="${escapeHtml_(String(d.capOverride[period.start] || ''))}" style="width:90px;text-align:right"></label>
+          <label style="display:flex;justify-content:space-between;gap:8px;align-items:center;margin:4px 0;font-size:.88em">Spending account<select class="cell-input" id="dbSpendingAcct" style="max-width:170px"><option value="">—</option>${dep.map(a => `<option value="${escapeHtml_(a.account_id)}"${a.account_id === d.spendingAcct ? ' selected' : ''}>${escapeHtml_((a.name || a.official_name) + (a.mask ? ' ••' + a.mask : ''))}</option>`).join('')}</select></label>
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px"><button type="button" id="dbNewPeriodBtn">Start a new paycheck today</button>
+        <span class="muted" style="font-size:.8em;align-self:center">${Object.keys(d.rules).length} merchant rule${Object.keys(d.rules).length === 1 ? '' : 's'} · ${Object.keys(d.overrides).length} override${Object.keys(d.overrides).length === 1 ? '' : 's'}</span>
+        ${Object.keys(d.rules).length ? '<button type="button" id="dbClearRulesBtn">Clear merchant rules</button>' : ''}</div></details>`;
+
+      root.innerHTML = h;
+    }
+
+    function dbWire_() {
+      const root = document.getElementById('dailyRoot');
+      if (!root || root.dataset.wired) return;
+      root.dataset.wired = '1';
+      root.addEventListener('click', e => {
+        const b = e.target.closest('button'); if (!b) return;
+        const d = DbState.data, today = dbToday_();
+        if (b.dataset.dbDaytype) { d.days[today] = b.dataset.dbDaytype; dbSave_(); dbRender_(); }
+        else if (b.dataset.dbCycle) { const k = b.dataset.dbCycle, cur = d.days[k]; const nxt = !cur ? 'show' : cur === 'show' ? 'shop' : cur === 'shop' ? 'tour' : cur === 'tour' ? 'off' : null; if (nxt) d.days[k] = nxt; else delete d.days[k]; dbSave_(); dbRender_(); }
+        else if (b.dataset.dbPeriod) {
+          const periods = dbPeriods_(DbState.rows, d.periodStarts, today);
+          let i = periods.findIndex(p => p.start === DbState.viewStart); if (i < 0) i = periods.length - 1;
+          const n = periods[Math.max(0, Math.min(periods.length - 1, i + Number(b.dataset.dbPeriod)))];
+          DbState.viewStart = n ? n.start : null; dbRender_();
+        }
+        else if (b.dataset.dbSet) dbSetClass_(b.dataset.id, b.dataset.dbSet, { bill: b.dataset.dbBill, noRule: b.dataset.dbSet === 'ONE_OFF' || b.dataset.dbSet === 'REIMBURSABLE' || b.dataset.dbSet === 'EXCLUDED' });
+        else if (b.dataset.dbDismiss) { d.dismissed[b.dataset.dbDismiss] = true; dbSave_(); dbRender_(); }
+        else if (b.dataset.dbIncome) { d.overrides[b.dataset.id] = { cls: 'OTHER_INCOME', note: b.dataset.dbIncome }; dbSave_(); dbRender_(); }
+        else if (b.id === 'dbRuleYes' && DbState.rulePrompt) { d.rules[DbState.rulePrompt.key] = DbState.rulePrompt.ov; DbState.rulePrompt = null; dbSave_(); dbRender_(); }
+        else if (b.id === 'dbRuleNo') { DbState.rulePrompt = null; dbRender_(); }
+        else if (b.id === 'dbRefreshBtn') dbLoad_(true);
+        else if (b.id === 'dbNewPeriodBtn') { if (!d.periodStarts.includes(today)) d.periodStarts.push(today); DbState.viewStart = null; dbSave_(); dbRender_(); }
+        else if (b.id === 'dbClearRulesBtn') { d.rules = {}; dbSave_(); dbRender_(); }
+      });
+      root.addEventListener('change', e => {
+        const el = e.target, d = DbState.data;
+        if (el.dataset.dbClass) dbSetClass_(el.dataset.dbClass, el.value);
+        else if (el.dataset.dbSetting) { const v = Number(el.value); if (isFinite(v) && v >= 0) { d.settings[el.dataset.dbSetting] = v; dbSave_(); dbRender_(); } }
+        else if (el.id === 'dbCapOverride') {
+          const periods = dbPeriods_(DbState.rows, d.periodStarts, dbToday_());
+          const p = periods.find(x => x.start === DbState.viewStart) || periods[periods.length - 1];
+          if (p) { const v = Number(el.value); if (v > 0) d.capOverride[p.start] = v; else delete d.capOverride[p.start]; dbSave_(); dbRender_(); }
+        }
+        else if (el.id === 'dbSpendingAcct') { d.spendingAcct = el.value || null; dbSave_(); dbRender_(); }
+      });
+      root.addEventListener('toggle', e => { if (e.target.id === 'dbTxnPanel') DbState.txnOpen = e.target.open; }, true);
+    }
 
     </script>
 
