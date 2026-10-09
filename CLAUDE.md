@@ -15,6 +15,18 @@ Personal budgeting web app. Live at **myallot.money**. Repo: github.com/bryanata
    - `~/budgeter/PLAID_PLAN.md` — durable state of the Plaid integration (scope, human tasks, how to test). **Before changing any Plaid-touching code, consult the Plaid MCP `build_guidance`, and re-run `build_check_acceptance` before calling the change done.**
    - `~/budgeter/ideas-app/index.html` — separate mini-app deployed to `budgeter-ideas.pages.dev` (also gitignored)
 
+## Session start on EITHER machine (METROPLEX/PC or SOUNDWAVE/Mac) — do this before any Allot work
+Code syncs through GitHub only. Docs sync through `~/Dropbox/allot-docs/`. Nothing syncs through a repo copy in Dropbox — never keep one there.
+1. `git pull --ff-only` in `~/budgeter`. If it is not a fast-forward, stop and tell Bryan — the other machine has unpushed work.
+2. Compare the reference doc stamp with the live build:
+   `sed -n 3p ~/Dropbox/allot-docs/BUDGETER_PROJECT_REFERENCE_v9.md` vs `curl -sL https://budgeter-app.pages.dev | grep -o 'BUILD_STAMP = "[^"]*"'`
+   If they differ, the other machine shipped without stamping: read `git log` for the missing versions, add a changelog note per version to the reference doc, fix the stamp line, and run `bash push-ref.sh` (Mac) so the KV copy matches. If Dropbox hangs, the KV copy is at `?api=refGet` on the Worker.
+3. Confirm the Dropbox `CLAUDE.md` mirror is identical to the repo copy (`diff CLAUDE.md ~/Dropbox/allot-docs/CLAUDE.md`). Copy the newer one over the older.
+4. If the session touches the Worker or Plaid: `cd worker && npx wrangler deployments list | tail`. `worker/` is gitignored, so a deploy from the other machine will NOT be in your local files — ask Bryan before editing if the cloud deploy is newer than your local `worker/*.js`.
+5. Read the reference doc's newest changelog entries so you know what the other machine shipped.
+
+When you finish: bump BUILD_STAMP, deploy, stamp + annotate the reference doc, commit, push. Verify the stamp line actually changed — on Windows the `$HOME/Dropbox` path in `push-pages.sh` may not resolve and the stamp step silently skips.
+
 ## Architecture (don't relearn this each session)
 - **The runtime is the single `index.html`** (~9k lines, vanilla JS) served via Cloudflare Pages.
 - The `.js` files (`Code.js`, `WebApp.js`, `Config.js`, etc.) are **dead legacy Google Apps Script** — NOT used at runtime. Make all app changes in `index.html`.
