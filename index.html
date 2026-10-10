@@ -1914,7 +1914,7 @@ body { padding:0; overflow-x: hidden; }
       // ===== Header pills =====
       const whereEl = document.getElementById("where");
       const specEl = document.getElementById("specVersion");
-      const BUILD_STAMP = "v473-pages";
+      const BUILD_STAMP = "v474-pages";
       const SPEC_VERSION = "";
       specEl.textContent = "Spec: " + SPEC_VERSION;
       whereEl.textContent = "Here: " + window.location.href;
@@ -11271,6 +11271,25 @@ document.addEventListener("click", async (e) => {
       DbState.lag = lags.length ? { median: lags[Math.floor(lags.length / 2)], n: lags.length } : null;
       const ctx = { overrides, rules: d.rules, paired: dbPairTransfers_(DbState.txns), acctType, bigPurchase: d.settings.bigPurchase };
       DbState.rows = txns.map(t => ({ t, c: dbClassify_(t, ctx) }));
+      // v474: fresh start. The bank only gives a posting date, so older swipes that post after the
+      // fresh start look like new spending. Spending charges already known when it was pressed
+      // (trackingBaseline) are left out; for 7 days after, a bank-account charge that posts with no
+      // matching alert and no swipe date ≥ the start is left out until Bryan decides (review: 'prestart').
+      const ts = d.trackingStart, spendCls = ['DAILY', 'BASE', 'UNTAGGED'];
+      if (ts) {
+        if (!Array.isArray(d.trackingBaseline)) {
+          d.trackingBaseline = DbState.rows.filter(r => !r.t.quick && spendCls.includes(r.c.cls) && dbDay_(r.t) >= ts).map(r => r.t.id);
+          dbSave_();
+        }
+        const baseline = new Set(d.trackingBaseline);
+        for (const r of DbState.rows) {
+          const t = r.t;
+          if (t.quick || d.overrides[t.id] || !spendCls.includes(r.c.cls) || dbDay_(t) < ts) continue;
+          if (baseline.has(t.id)) r.c = { cls: 'EXCLUDED', src: 'fresh start', was: r.c };
+          else if (acctType[t.account_id] === 'depository' && !(t.authorized_date && t.authorized_date >= ts) && dbDayDiff_(ts, t.date) <= 7)
+            r.c = { cls: 'EXCLUDED', ask: 'prestart', src: 'fresh start', was: r.c };
+        }
+      }
     }
 
     function dbAlerts_(st, isCurrent) {
@@ -11387,13 +11406,14 @@ document.addEventListener("click", async (e) => {
       const end = period.end || today;
       const inP = r => { const x = dbDay_(r.t); return x >= st.effStart && x <= end; };
       const staleQuick = r => r.t.unmatched && dbDayDiff_(dbDay_(r.t), today) > 10 && !(d.trackingStart && dbDay_(r.t) < d.trackingStart);
-      const review = DbState.rows.filter(r => !d.dismissed[r.t.id] && (staleQuick(r) || (inP(r) && (r.c.cls === 'UNTAGGED' || (r.c.suggest && r.c.cls !== 'REIMBURSABLE') || (r.c.ask === 'w2_1099' && !r.c.note)))));
+      const review = DbState.rows.filter(r => !d.dismissed[r.t.id] && (staleQuick(r) || (inP(r) && (r.c.cls === 'UNTAGGED' || (r.c.suggest && r.c.cls !== 'REIMBURSABLE') || (r.c.ask === 'w2_1099' && !r.c.note) || r.c.ask === 'prestart'))));
       if (review.length) {
         h += '<div class="panel"><h3 style="margin:0 0 6px">Needs a decision</h3>';
         for (const { t, c } of review) {
           const who = escapeHtml_(t.merchant || t.name || '—'), amt = dbMoney_(Math.abs(t.amount)), id = escapeHtml_(t.id);
           let q = '', btns = '';
           if (staleQuick({ t })) { q = 'Logged instantly but never showed up at the bank (declined, refunded, or posted at a different amount?)'; btns = `<button type="button" data-db-qremove="${escapeHtml_(t.quick.id)}">Remove it</button><button type="button" data-db-dismiss="${id}">Keep it</button>`; }
+          else if (c.ask === 'prestart') { const w = c.was || {}; q = 'Posted after your fresh start with no matching alert, so it was probably swiped before. Left out for now.'; btns = `<button type="button" data-db-set="${escapeHtml_(w.cls + (w.sub ? ':' + w.sub : ''))}" data-db-norule="1" data-id="${id}">Count it</button><button type="button" data-db-dismiss="${id}">Leave out</button>`; }
           else if (c.ask === 'p2p') { q = 'Venmo/Zelle: what was it?'; btns = `<button type="button" data-db-set="BILL" data-db-bill="Dog sitter" data-id="${id}">Dog sitter</button><button type="button" data-db-set="DAILY:Other" data-id="${id}">Personal</button><button type="button" data-db-set="EXCLUDED" data-id="${id}">Repayment / other</button>`; }
           else if (c.ask === 'big') { q = `Over ${dbMoney_(s.bigPurchase)}: count it against ${escapeHtml_(dbFmtDay_(dbDay_(t)))}, or a one-off from Savings?`; btns = `<button type="button" data-db-set="DAILY:${escapeHtml_(c.sub || 'Other')}" data-id="${id}">Count against the day</button><button type="button" data-db-set="ONE_OFF" data-id="${id}">One-off from Savings</button>${c.suggest ? `<button type="button" data-db-set="REIMBURSABLE" data-id="${id}">Reimbursable</button>` : ''}`; }
           else if (c.suggest) { q = 'Looks like a work expense. Reimbursable?'; btns = `<button type="button" data-db-set="REIMBURSABLE" data-id="${id}">Reimbursable</button><button type="button" data-db-dismiss="${id}">No, it's mine</button>`; }
@@ -11487,7 +11507,7 @@ document.addEventListener("click", async (e) => {
           const n = periods[Math.max(0, Math.min(periods.length - 1, i + Number(b.dataset.dbPeriod)))];
           DbState.viewStart = n ? n.start : null; dbRender_();
         }
-        else if (b.dataset.dbSet) dbSetClass_(b.dataset.id, b.dataset.dbSet, { bill: b.dataset.dbBill, noRule: b.dataset.dbSet === 'ONE_OFF' || b.dataset.dbSet === 'REIMBURSABLE' || b.dataset.dbSet === 'EXCLUDED' });
+        else if (b.dataset.dbSet) dbSetClass_(b.dataset.id, b.dataset.dbSet, { bill: b.dataset.dbBill, noRule: b.dataset.dbNorule === '1' || b.dataset.dbSet === 'ONE_OFF' || b.dataset.dbSet === 'REIMBURSABLE' || b.dataset.dbSet === 'EXCLUDED' });
         else if (b.dataset.dbDismiss) { d.dismissed[b.dataset.dbDismiss] = true; dbSave_(); dbRender_(); }
         else if (b.dataset.dbIncome) { d.overrides[b.dataset.id] = { cls: 'OTHER_INCOME', note: b.dataset.dbIncome }; dbSave_(); dbRender_(); }
         else if (b.id === 'dbRuleYes' && DbState.rulePrompt) { d.rules[DbState.rulePrompt.key] = DbState.rulePrompt.ov; DbState.rulePrompt = null; dbSave_(); dbRender_(); }
@@ -11495,9 +11515,9 @@ document.addEventListener("click", async (e) => {
         else if (b.id === 'dbRefreshBtn') dbLoad_(true);
         else if (b.id === 'dbFreshStartBtn') {
           if (DbState.armed !== 'fresh') { DbState.armed = 'fresh'; dbRender_(); clearTimeout(DbState.armT); DbState.armT = setTimeout(() => { DbState.armed = null; dbRender_(); }, 5000); return; }
-          DbState.armed = null; d.trackingStart = today; DbState.viewStart = null; dbSave_(); dbRender_();
+          DbState.armed = null; d.trackingStart = today; delete d.trackingBaseline; DbState.viewStart = null; dbSave_(); dbRender_();
         }
-        else if (b.id === 'dbFreshUndoBtn') { d.trackingStart = null; dbSave_(); dbRender_(); }
+        else if (b.id === 'dbFreshUndoBtn') { d.trackingStart = null; delete d.trackingBaseline; dbSave_(); dbRender_(); }
         else if (b.id === 'dbNewPeriodBtn') { if (!d.periodStarts.includes(today)) d.periodStarts.push(today); DbState.viewStart = null; dbSave_(); dbRender_(); }
         else if (b.id === 'dbClearRulesBtn') { d.rules = {}; dbSave_(); dbRender_(); }
         // v472: instant logging
