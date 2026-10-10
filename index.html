@@ -1914,7 +1914,7 @@ body { padding:0; overflow-x: hidden; }
       // ===== Header pills =====
       const whereEl = document.getElementById("where");
       const specEl = document.getElementById("specVersion");
-      const BUILD_STAMP = "v471-pages";
+      const BUILD_STAMP = "v472-pages";
       const SPEC_VERSION = "";
       specEl.textContent = "Spec: " + SPEC_VERSION;
       whereEl.textContent = "Here: " + window.location.href;
@@ -11001,7 +11001,8 @@ document.addEventListener("click", async (e) => {
       { re: /payrange|laundr|barber/i, sub: 'Personal care' },
     ];
 
-    function dbDay_(t) { return t.authorized_date || t.date || ''; }
+    // swipe_day = the day an instant log (card alert / Apple Pay) saw the purchase (v472).
+    function dbDay_(t) { return t.swipe_day || t.authorized_date || t.date || ''; }
     function dbDesc_(t) { return t.orig || t.name || t.merchant || ''; }
     function dbMerchantKey_(t) {
       const s = (t.merchant || t.name || t.orig || '').toLowerCase().replace(/[^a-z& ]+/g, ' ').replace(/\s+/g, ' ').trim();
@@ -11147,14 +11148,50 @@ document.addEventListener("click", async (e) => {
         daily, base, periodSpent: daily + base, periodLeft: cap - daily - base, baseLeft: s.base - base,
         allowedSoFar: allowed, pace: allowed - daily, byBaseSub, byDailySub, untagged, untaggedN,
         todayType: typeOf(today), todaySet: !!days[today], todayBudget, todaySpent, todayLeft,
-        todayStatus: pct >= 1 && todaySpent > 0 ? 'over' : pct >= 0.8 ? 'warning' : 'ok',
+        todayPct: pct,
+        // v472: the headline is "safe to spend today" = pace (allowed through today − daily so far),
+        // so a bank charge that posts days late still lands in the right total the moment it arrives.
+        todayStatus: allowed - daily < 0 ? 'over' : allowed - daily < todayBudget * 0.2 ? 'warning' : 'ok',
       };
+    }
+
+    // v472: instant logs (card alerts, Apple Pay) → the Plaid transaction they became.
+    // Pass 1: same amount. Pass 2: posted up to 35% higher (tips) with a shared merchant word.
+    // Posted 1 day before to 10 days after the instant log. Returns Map(quickId → txn).
+    function dbQuickDay_(q) {
+      if (q.at) { const d = new Date(q.at); if (!isNaN(d)) return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
+      return q.day || '';
+    }
+    function dbMatchQuick_(quick, txns) {
+      const pairs = new Map(), used = new Set();
+      const words = s => new Set(String(s || '').toLowerCase().replace(/[^a-z ]+/g, ' ').split(' ').filter(w => w.length > 2));
+      const cands = txns.filter(t => Number(t.amount) > 0);
+      const qs = [...quick].sort((a, b) => dbQuickDay_(a).localeCompare(dbQuickDay_(b)));
+      for (const pass of [1, 2]) for (const q of qs) {
+        if (pairs.has(q.id)) continue;
+        const qd = dbQuickDay_(q), qw = words(q.merchant);
+        let best = null, bestScore = Infinity;
+        for (const t of cands) {
+          if (used.has(t.id)) continue;
+          const lag = dbDayDiff_(qd, t.authorized_date || t.date);
+          if (lag < -1 || lag > 10) continue;
+          const diff = Number(t.amount) - q.amount;
+          let ok = Math.abs(diff) < 0.005;
+          if (!ok && pass === 2) { const tw = words([t.merchant, t.name, t.orig].join(' ')); ok = diff > 0 && diff <= q.amount * 0.35 + 0.01 && [...qw].some(w => tw.has(w)); }
+          if (!ok) continue;
+          const score = Math.abs(lag) + Math.abs(diff) / 100;
+          if (score < bestScore) { best = t; bestScore = score; }
+        }
+        if (best) { pairs.set(q.id, best); used.add(best.id); }
+      }
+      return pairs;
     }
     // @@DB_CLASSIFIER_END
 
     const DB_KV_KEY = 'dailyBudgetV1';
     const DB_LS_KEY = 'ALLOT_DAILY_BUDGET_V1';
-    const DbState = { data: null, txns: [], accounts: [], rows: [], loading: false, loaded: false, error: null, viewStart: null, saveT: null, rulePrompt: null };
+    const DbState = { data: null, txns: [], accounts: [], quick: [], rows: [], lag: null, loading: false, loaded: false, error: null, viewStart: null, saveT: null, rulePrompt: null, keyInfo: null, newKey: null, armed: null };
+    const DB_INGEST_URL = WORKER_URL + '/?api=spendIngest';
 
     function dbToday_() { const d = new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
     function dbEnabled_() {
@@ -11191,6 +11228,8 @@ document.addEventListener("click", async (e) => {
         if (!r || !r.ok) throw new Error((r && r.error) || 'Could not load transactions.');
         DbState.txns = r.transactions || [];
         DbState.accounts = r.accounts || [];
+        DbState.quick = r.quick || [];
+        if (!DbState.keyInfo) { try { const k = await plaidApi_('plaidSpendKey'); if (k && k.ok) DbState.keyInfo = k; } catch(_) {} }
         DbState.loaded = true;
       } catch (e) { DbState.error = String(e && e.message || e); }
       DbState.loading = false;
@@ -11200,16 +11239,36 @@ document.addEventListener("click", async (e) => {
     function dbClassifyAll_() {
       const d = DbState.data, acctType = {};
       for (const a of DbState.accounts) acctType[a.account_id] = a.type;
-      const ctx = { overrides: d.overrides, rules: d.rules, paired: dbPairTransfers_(DbState.txns), acctType, bigPurchase: d.settings.bigPurchase };
-      DbState.rows = DbState.txns.map(t => ({ t, c: dbClassify_(t, ctx) }));
+      // v472: a matched instant log dates the bank txn to the swipe day and hands over its
+      // category override; unmatched logs count now as pending purchases on the Spending account.
+      const txns = DbState.txns.map(t => ({ ...t }));
+      const pairs = dbMatchQuick_(DbState.quick, txns);
+      const overrides = { ...d.overrides }, lags = [];
+      const matchedIds = new Set();
+      for (const q of DbState.quick) {
+        const t = pairs.get(q.id);
+        if (!t) continue;
+        matchedIds.add(q.id);
+        t.quick = q; t.swipe_day = dbQuickDay_(q);
+        if (!overrides[t.id] && overrides['q:' + q.id]) overrides[t.id] = overrides['q:' + q.id];
+        if (!t.pending) lags.push(dbDayDiff_(t.swipe_day, t.date));
+      }
+      for (const q of DbState.quick) {
+        if (matchedIds.has(q.id)) continue;
+        const day = dbQuickDay_(q);
+        txns.push({ id: 'q:' + q.id, account_id: d.spendingAcct || '', date: day, swipe_day: day, name: q.merchant || 'Card purchase', merchant: q.merchant || null, amount: q.amount, pending: true, quick: q, unmatched: true });
+      }
+      lags.sort((a, b) => a - b);
+      DbState.lag = lags.length ? { median: lags[Math.floor(lags.length / 2)], n: lags.length } : null;
+      const ctx = { overrides, rules: d.rules, paired: dbPairTransfers_(DbState.txns), acctType, bigPurchase: d.settings.bigPurchase };
+      DbState.rows = txns.map(t => ({ t, c: dbClassify_(t, ctx) }));
     }
 
     function dbAlerts_(st, isCurrent) {
       const s = DbState.data.settings, out = [];
       if (isCurrent) {
-        if (st.todayStatus === 'over') out.push({ kind: 'bad', msg: `${dbMoney_(-st.todayLeft)} over today. You're ${st.pace >= 0 ? 'still ' + dbMoney_(st.pace) + ' under' : dbMoney_(-st.pace) + ' over'} pace this paycheck.` });
-        else if (st.todayStatus === 'warning') out.push({ kind: 'warn', msg: `${dbMoney_(st.todayLeft)} left today.` });
-        if (st.pace < -s.paceAlert) out.push({ kind: 'bad', msg: `You're ${dbMoney_(-st.pace)} over your daily pace this paycheck.` });
+        if (st.pace < 0) out.push({ kind: st.pace < -s.paceAlert ? 'bad' : 'warn', msg: `You're ${dbMoney_(-st.pace)} over your daily pace this paycheck. Lighter days ahead even it out.` });
+        else if (st.todayPct >= 1 && st.todaySpent > 0) out.push({ kind: 'warn', msg: `${dbMoney_(-st.todayLeft)} over today's ${st.todayType} budget, but still ${dbMoney_(st.pace)} under pace this paycheck.` });
         const sp = DbState.accounts.find(a => a.account_id === DbState.data.spendingAcct);
         const bal = sp && sp.balances ? (sp.balances.available ?? sp.balances.current) : null;
         if (bal !== null && bal !== undefined && bal < s.lowBalance) out.push({ kind: 'bad', msg: `Spending is low (${dbMoney_(bal)}). Overdraft protection kicks in at $0.` });
@@ -11276,9 +11335,16 @@ document.addEventListener("click", async (e) => {
         h += `<div class="panel"><div class="tab-header"><div><h3 style="margin:0">Today · ${escapeHtml_(dbFmtDay_(today, { weekday: 'short', month: 'short', day: 'numeric' }))}</h3>
           <div class="muted">${st.todaySet ? escapeHtml_(st.todayType) + ' day' : 'off (not set)'} · budget ${dbMoney_(st.todayBudget)}</div></div>
           <div class="tab-actions">${DB_DAY_TYPES.map(k => `<button type="button" data-db-daytype="${k}" class="${st.todaySet && st.todayType === k ? 'btn-ok' : ''}" style="text-transform:capitalize">${k}</button>`).join('')}</div></div>
-          <div style="font-size:2.2em;font-weight:800;color:${statusColor};margin-top:6px">${st.todayLeft >= 0 ? dbMoney_(st.todayLeft) + ' <span style="font-size:.4em;font-weight:500" class="muted">left today</span>' : dbMoney_(-st.todayLeft) + ' <span style="font-size:.4em;font-weight:500">over today</span>'}</div>
-          ${bar(st.todaySpent, st.todayBudget, statusColor)}
-          <div class="muted" style="font-size:.85em">Spent ${dbMoney_(st.todaySpent)} of ${dbMoney_(st.todayBudget)} · pace this paycheck: <b style="color:${st.pace >= 0 ? 'var(--ok-text)' : 'var(--danger-text)'}">${st.pace >= 0 ? dbMoney_(st.pace) + ' under' : dbMoney_(-st.pace) + ' over'}</b> (unspent budget carries forward)</div></div>`;
+          <div style="font-size:2.2em;font-weight:800;color:${statusColor};margin-top:6px">${st.pace >= 0 ? dbMoney_(st.pace) + ' <span style="font-size:.4em;font-weight:500" class="muted">safe to spend today</span>' : dbMoney_(-st.pace) + ' <span style="font-size:.4em;font-weight:500">over pace</span>'}</div>
+          ${bar(st.todaySpent, Math.max(st.todaySpent, st.todaySpent + st.pace), statusColor)}
+          <div class="muted" style="font-size:.85em">Today: ${dbMoney_(st.todaySpent)} spent of ${dbMoney_(st.todayBudget)} · unspent days carry forward, and late bank charges come off this number the moment they post.</div>`;
+        const todayQuick = DbState.quick.filter(q => dbQuickDay_(q) === today).length;
+        const lastQ = DbState.quick.reduce((m, q) => Math.max(m, Date.parse(q.at || '') || q.created || 0), 0);
+        const ago = ms => { const m = Math.round(ms / 6e4); return m < 60 ? m + 'm' : m < 1440 ? Math.round(m / 60) + 'h' : Math.round(m / 1440) + 'd'; };
+        const unposted = DbState.rows.filter(r => r.t.unmatched).length;
+        h += `<div style="font-size:.78em;margin-top:8px;padding-top:8px;border-top:1px solid var(--border)" class="muted">${DbState.keyInfo && DbState.keyInfo.hasKey
+          ? `⚡ Instant logging on · ${todayQuick} today${lastQ ? ' · last ' + ago(Date.now() - lastQ) + ' ago' : ''}${unposted ? ' · ' + unposted + ' waiting for the bank' : ''}${DbState.lag ? ' · bank posts ~' + DbState.lag.median + ' day' + (DbState.lag.median === 1 ? '' : 's') + ' late' : ''}`
+          : '⚡ Purchases only show up when the bank posts them (often days later). Turn on <b>Instant logging</b> in settings below so they appear within seconds.'}</div></div>`;
       }
 
       // Alerts
@@ -11309,13 +11375,15 @@ document.addEventListener("click", async (e) => {
       // Review
       const end = period.end || today;
       const inP = r => { const x = dbDay_(r.t); return x >= period.start && x <= end; };
-      const review = DbState.rows.filter(r => inP(r) && !d.dismissed[r.t.id] && (r.c.cls === 'UNTAGGED' || (r.c.suggest && r.c.cls !== 'REIMBURSABLE') || (r.c.ask === 'w2_1099' && !r.c.note)));
+      const staleQuick = r => r.t.unmatched && dbDayDiff_(dbDay_(r.t), today) > 10;
+      const review = DbState.rows.filter(r => !d.dismissed[r.t.id] && (staleQuick(r) || (inP(r) && (r.c.cls === 'UNTAGGED' || (r.c.suggest && r.c.cls !== 'REIMBURSABLE') || (r.c.ask === 'w2_1099' && !r.c.note)))));
       if (review.length) {
         h += '<div class="panel"><h3 style="margin:0 0 6px">Needs a decision</h3>';
         for (const { t, c } of review) {
           const who = escapeHtml_(t.merchant || t.name || '—'), amt = dbMoney_(Math.abs(t.amount)), id = escapeHtml_(t.id);
           let q = '', btns = '';
-          if (c.ask === 'p2p') { q = 'Venmo/Zelle: what was it?'; btns = `<button type="button" data-db-set="BILL" data-db-bill="Dog sitter" data-id="${id}">Dog sitter</button><button type="button" data-db-set="DAILY:Other" data-id="${id}">Personal</button><button type="button" data-db-set="EXCLUDED" data-id="${id}">Repayment / other</button>`; }
+          if (staleQuick({ t })) { q = 'Logged instantly but never showed up at the bank (declined, refunded, or posted at a different amount?)'; btns = `<button type="button" data-db-qremove="${escapeHtml_(t.quick.id)}">Remove it</button><button type="button" data-db-dismiss="${id}">Keep it</button>`; }
+          else if (c.ask === 'p2p') { q = 'Venmo/Zelle: what was it?'; btns = `<button type="button" data-db-set="BILL" data-db-bill="Dog sitter" data-id="${id}">Dog sitter</button><button type="button" data-db-set="DAILY:Other" data-id="${id}">Personal</button><button type="button" data-db-set="EXCLUDED" data-id="${id}">Repayment / other</button>`; }
           else if (c.ask === 'big') { q = `Over ${dbMoney_(s.bigPurchase)}: count it against ${escapeHtml_(dbFmtDay_(dbDay_(t)))}, or a one-off from Savings?`; btns = `<button type="button" data-db-set="DAILY:${escapeHtml_(c.sub || 'Other')}" data-id="${id}">Count against the day</button><button type="button" data-db-set="ONE_OFF" data-id="${id}">One-off from Savings</button>${c.suggest ? `<button type="button" data-db-set="REIMBURSABLE" data-id="${id}">Reimbursable</button>` : ''}`; }
           else if (c.suggest) { q = 'Looks like a work expense. Reimbursable?'; btns = `<button type="button" data-db-set="REIMBURSABLE" data-id="${id}">Reimbursable</button><button type="button" data-db-dismiss="${id}">No, it's mine</button>`; }
           else if (c.ask === 'w2_1099') { q = 'Other income: W-2 or 1099?'; btns = `<button type="button" data-db-income="w2" data-id="${id}">W-2</button><button type="button" data-db-income="1099" data-id="${id}">1099 (move ${dbMoney_(Math.abs(t.amount) * 0.3)} to Taxes)</button>`; }
@@ -11340,7 +11408,7 @@ document.addEventListener("click", async (e) => {
       for (const { t, c } of list) {
         const out = t.amount > 0, dim = !spendCls.has(c.cls) && c.cls !== 'REFUND';
         h += `<tr style="${dim ? 'opacity:.6' : ''}"><td class="mono" style="white-space:nowrap;font-size:.8em">${escapeHtml_(dbFmtDay_(dbDay_(t)))}</td>
-          <td><div style="font-size:.9em">${escapeHtml_(t.merchant || t.name || '—')}${t.pending ? ' <span class="muted" style="font-size:.75em">pending</span>' : ''}${c.bill ? ' <span class="status-pill" style="font-size:.7em">' + escapeHtml_(c.bill) + '</span>' : ''}</div>
+          <td><div style="font-size:.9em">${escapeHtml_(t.merchant || t.name || '—')}${t.unmatched ? ' <span style="font-size:.75em;color:var(--warn-text)">⚡ instant · waiting for bank</span> <button type="button" data-db-qremove="' + escapeHtml_(t.quick.id) + '" title="Remove this instant entry" style="font-size:.7em;padding:0 6px">✕</button>' : t.quick ? ' <span style="font-size:.75em;color:var(--ok-text)" title="Logged instantly, then matched to the bank charge">⚡ matched</span>' : t.pending ? ' <span class="muted" style="font-size:.75em">pending</span>' : ''}${c.bill ? ' <span class="status-pill" style="font-size:.7em">' + escapeHtml_(c.bill) + '</span>' : ''}</div>
           <div class="muted" style="font-size:.72em">${escapeHtml_(t.orig && t.orig !== t.merchant ? t.orig : (t.name && t.name !== t.merchant ? t.name : ''))} ${escapeHtml_(acctName[t.account_id] || '')} · via ${escapeHtml_(c.src || '')}</div></td>
           <td class="mono" style="text-align:right;white-space:nowrap;color:${out ? 'var(--text)' : 'var(--ok-text)'}">${out ? '' : '+'}${dbMoney_(Math.abs(t.amount))}</td>
           <td><select class="cell-input" data-db-class="${escapeHtml_(t.id)}" style="font-size:.78em;max-width:150px">${dbOptionHtml_(c)}</select></td></tr>`;
@@ -11361,6 +11429,34 @@ document.addEventListener("click", async (e) => {
         <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px"><button type="button" id="dbNewPeriodBtn">Start a new paycheck today</button>
         <span class="muted" style="font-size:.8em;align-self:center">${Object.keys(d.rules).length} merchant rule${Object.keys(d.rules).length === 1 ? '' : 's'} · ${Object.keys(d.overrides).length} override${Object.keys(d.overrides).length === 1 ? '' : 's'}</span>
         ${Object.keys(d.rules).length ? '<button type="button" id="dbClearRulesBtn">Clear merchant rules</button>' : ''}</div></details>`;
+
+      // Instant logging (v472)
+      const ki = DbState.keyInfo || {}, key = DbState.newKey;
+      const keyShown = key || 'YOUR-KEY';
+      const step = (n, body) => `<li style="margin:4px 0">${body}</li>`;
+      h += `<details class="panel"${key ? ' open' : ''}><summary style="cursor:pointer"><b>⚡ Instant logging</b> <span class="muted">· ${ki.hasKey ? 'on' + (ki.created ? ' since ' + escapeHtml_(new Date(ki.created).toLocaleDateString()) : '') : 'off'}</span></summary>
+        <div class="muted" style="font-size:.85em;margin:8px 0;line-height:1.5">Your iPhone sends each Patelco card alert (and Apple Pay purchase) here the second it happens. When the bank charge posts days later it's matched up automatically, so nothing counts twice.</div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+          <button type="button" id="dbKeyCreateBtn" class="${ki.hasKey ? '' : 'btn-ok'}">${ki.hasKey ? (DbState.armed === 'replace' ? 'Tap again: old Shortcuts stop working' : 'Replace key') : 'Create key'}</button>
+          ${ki.hasKey ? `<button type="button" id="dbKeyRevokeBtn">${DbState.armed === 'revoke' ? 'Tap again to turn off' : 'Turn off'}</button>` : ''}
+        </div>
+        ${key ? `<div style="margin:10px 0;padding:10px;border:1px solid var(--warn-border);background:var(--warn-bg);border-radius:8px;font-size:.85em"><b>Your key, shown only once.</b> Paste it into both Shortcuts below. If you lose it, just replace it.
+          <div style="display:flex;gap:6px;margin-top:6px"><input class="cell-input mono" readonly value="${escapeHtml_(key)}" style="flex:1;font-size:.85em"><button type="button" data-db-copy="${escapeHtml_(key)}">Copy</button></div></div>` : ''}
+        <div style="font-size:.85em;line-height:1.5;margin-top:10px">
+          <b>1 · Card alert texts</b> (covers every Spending debit purchase)
+          <ol style="margin:4px 0 10px;padding-left:20px">
+            ${step(1, 'Shortcuts app → <b>Automation</b> → <b>+</b> → <b>Message</b>.')}
+            ${step(2, 'Message Contains: <b>Pending charge</b> (optionally also set Sender to Patelco\'s alert number). Choose <b>Run Immediately</b>, then <b>Next</b> → <b>New Blank Automation</b>.')}
+            ${step(3, 'Add the action <b>Get Contents of URL</b>. URL: <span class="mono" style="word-break:break-all">' + escapeHtml_(DB_INGEST_URL) + '</span> <button type="button" data-db-copy="' + escapeHtml_(DB_INGEST_URL) + '" style="font-size:.8em;padding:0 6px">Copy</button>')}
+            ${step(4, 'Tap the arrow to expand it: Method <b>POST</b>. Headers: add <b>X-Allot-Key</b> = <span class="mono">' + escapeHtml_(keyShown) + '</span>. Request Body <b>JSON</b>: add a Text field named <b>text</b> and set its value to the <b>Shortcut Input</b> variable (pick <b>Content</b> if asked).')}
+          </ol>
+          <b>2 · Apple Pay</b> (optional: instant even for cards without alerts, with cleaner merchant names)
+          <ol style="margin:4px 0 10px;padding-left:20px">
+            ${step(1, 'Automation → <b>+</b> → <b>Transaction</b>. Pick your cards, choose <b>Run Immediately</b>, then <b>New Blank Automation</b>.')}
+            ${step(2, 'Add <b>Get Contents of URL</b> with the same URL, Method, and header. JSON fields: <b>source</b> = applepay, <b>amount</b> = Shortcut Input → Amount, <b>merchant</b> = Shortcut Input → Merchant, <b>card</b> = Shortcut Input → Card.')}
+          </ol>
+          <div class="muted">Test it: run the text automation once, or make a small purchase, then tap ↻ on the Paycheck card. Menu names can differ a little between iOS versions. If a text and Apple Pay both report the same purchase, it's kept once.</div>
+        </div></details>`;
 
       root.innerHTML = h;
     }
@@ -11388,6 +11484,20 @@ document.addEventListener("click", async (e) => {
         else if (b.id === 'dbRefreshBtn') dbLoad_(true);
         else if (b.id === 'dbNewPeriodBtn') { if (!d.periodStarts.includes(today)) d.periodStarts.push(today); DbState.viewStart = null; dbSave_(); dbRender_(); }
         else if (b.id === 'dbClearRulesBtn') { d.rules = {}; dbSave_(); dbRender_(); }
+        // v472: instant logging
+        else if (b.dataset.dbCopy) { try { navigator.clipboard.writeText(b.dataset.dbCopy); b.textContent = 'Copied'; } catch(_) {} }
+        else if (b.dataset.dbQremove) { b.disabled = true; plaidApi_('plaidQuickRemove', { id: b.dataset.dbQremove }).then(() => dbLoad_(true)); }
+        else if (b.id === 'dbKeyCreateBtn' || b.id === 'dbKeyRevokeBtn') {
+          const action = b.id === 'dbKeyRevokeBtn' ? 'revoke' : 'replace';
+          const hasKey = DbState.keyInfo && DbState.keyInfo.hasKey;
+          if (hasKey && DbState.armed !== action) { DbState.armed = action; dbRender_(); clearTimeout(DbState.armT); DbState.armT = setTimeout(() => { DbState.armed = null; dbRender_(); }, 5000); return; }
+          DbState.armed = null; b.disabled = true;
+          plaidApi_('plaidSpendKey', action === 'revoke' ? { action: 'revoke' } : {}).then(r => {
+            if (r && r.ok) { DbState.keyInfo = { ok: true, hasKey: r.hasKey, created: r.created || null }; DbState.newKey = r.key || null; }
+            else DbState.error = (r && r.error) || 'Could not update the key.';
+            dbRender_();
+          });
+        }
       });
       root.addEventListener('change', e => {
         const el = e.target, d = DbState.data;
