@@ -1914,7 +1914,7 @@ body { padding:0; overflow-x: hidden; }
       // ===== Header pills =====
       const whereEl = document.getElementById("where");
       const specEl = document.getElementById("specVersion");
-      const BUILD_STAMP = "v474-pages";
+      const BUILD_STAMP = "v475-pages";
       const SPEC_VERSION = "";
       specEl.textContent = "Spec: " + SPEC_VERSION;
       whereEl.textContent = "Here: " + window.location.href;
@@ -4039,9 +4039,13 @@ dashPreviewTbody.appendChild(tr);
           let paidCell;
           if (r.alreadyPaid) {
             const nmAmt = Number(nextMonthPaid[r.key] || 0) || 0;
-            paidCell = nmAmt > 0
-              ? `<td class="mono paid-cell"><span class="paid-word">✓ Funded</span><span class="paid-sub">→ ${escapeHtml_(nextMonthName)}</span></td>`
-              : `<td class="mono paid-cell"><span class="paid-word">✓ Funded</span></td>`;
+            // v475: bank-confirmed payments render "Paid" (with the payment count);
+            // allocation-only rows keep "Funded".
+            const bp = bankPaidInfo_(r.key);
+            const word = bp ? "✓ Paid" : "✓ Funded";
+            const sub = nmAmt > 0 ? `→ ${escapeHtml_(nextMonthName)}` : (bp && bp.count > 1 ? `${bp.count} payments` : (bp ? "bank" : ""));
+            const ttl = bp ? ` title="${escapeHtml_(bankPaidTitle_(bp))}"` : "";
+            paidCell = `<td class="mono paid-cell"${ttl}><span class="paid-word">${word}</span>${sub ? `<span class="paid-sub">${sub}</span>` : ""}</td>`;
           } else {
             paidCell = `<td class="mono">${escapeHtml_(formatMoney_(r.paidMTD))}</td>`;
           }
@@ -4770,9 +4774,12 @@ if (amtTd) {
   const isNextMonth = !!(isGoalMet && (Number(nextMonthPaidAmts[key] || 0) || 0) > 0);
   if (isGoalMet) {
     amtTd.classList.add("paid-cell");
-    amtTd.innerHTML = isNextMonth
-      ? `<span class="paid-word">✓ Funded</span><span class="paid-sub">→ ${escapeHtml_(getNextMonthLabel_())}</span>`
-      : `<span class="paid-word">✓ Funded</span>`;
+    // v475: "Paid" when the bank shows the charge(s) posted this month, else "Funded".
+    const bp = bankPaidInfo_(key);
+    const word = bp ? "✓ Paid" : "✓ Funded";
+    const sub = isNextMonth ? `→ ${escapeHtml_(getNextMonthLabel_())}` : (bp && bp.count > 1 ? `${bp.count} payments` : (bp ? "bank" : ""));
+    if (bp) amtTd.title = bankPaidTitle_(bp);
+    amtTd.innerHTML = `<span class="paid-word">${word}</span>` + (sub ? `<span class="paid-sub">${sub}</span>` : "");
   } else if (showBadge) {
     amtTd.classList.add("paid-cell");
     amtTd.innerHTML = `<span class="paid-word">✓ Funded</span>`;
@@ -5082,6 +5089,7 @@ function resetPaidMTD_(){
       // ============================================================
       const MANUAL_FUNDED_LS_KEY = "BUDGETER_MANUAL_FUNDED";
       const NEXT_MONTH_PAID_LS_KEY = "BUDGETER_NEXT_MONTH_PAID";
+      const BANK_PAID_LS_KEY       = "BUDGETER_BANK_PAID_V1";   // v475: bills confirmed paid by the bank (synced KV key `bankPaid`)
       const SKIP_REDIST_LS_KEY   = "BUDGETER_SKIP_REDIST_V1";
 
       // When the user chooses "Skip" for a bill in the forward-fund modal, the
@@ -5162,6 +5170,7 @@ function resetPaidMTD_(){
       function loadManualFunded_() {
         try {
           const paidByKey = (loadPaidState_().paidByKey) || {};
+          const bank = loadBankPaid_();
           const cats = (typeof getCfgCategoryRows_ === "function") ? getCfgCategoryRows_() : [];
           const result = {};
           for (const c of cats) {
@@ -5170,11 +5179,39 @@ function resetPaidMTD_(){
             const target = Number(appState.billsSplit?.[key]?.monthlyTarget || 0) || 0;
             if (!(target > 0)) continue;
             const paid = Number(paidByKey[key] || 0) || 0;
-            if (paid + 0.005 >= target) result[key] = true;
+            // v475: a bill the bank shows as paid this month counts as funded even
+            // when its allocation is short — the money already left, so the next
+            // deposit should forward-fund it, not top it up.
+            if (paid + 0.005 >= target || (bank[key] && bank[key].paid)) result[key] = true;
           }
           return result;
         } catch(e) { return {}; }
       }
+
+      // v475: "Paid from bank" — computed by bankPaidRefresh_ (Plaid section) from the
+      // recurring streams linked to a bill row (plaidBills.added). Calendar-month
+      // scoped like paidByKey; stale months read as empty. Synced as KV `bankPaid`.
+      // Shape: { monthKey, byKey: { rowKey: { paid, amount, count, expected, txns:[{id,date,amount,name}] } } }
+      function loadBankPaid_() {
+        try {
+          const raw = localStorage.getItem(BANK_PAID_LS_KEY);
+          const st = raw ? JSON.parse(raw) : null;
+          if (!st || typeof st !== "object" || st.monthKey !== monthKeyLocal_()) return {};
+          return (st.byKey && typeof st.byKey === "object") ? st.byKey : {};
+        } catch(e) { return {}; }
+      }
+      function saveBankPaid_(byKey) {
+        const st = { monthKey: monthKeyLocal_(), byKey: byKey || {}, at: new Date().toISOString() };
+        try { localStorage.setItem(BANK_PAID_LS_KEY, JSON.stringify(st)); } catch(e) {}
+        workerSet_("bankPaid", st).catch(()=>{});
+      }
+      function bankPaidInfo_(key) { const b = loadBankPaid_()[key]; return (b && b.paid) ? b : null; }
+      function bankPaidTitle_(b) {
+        if (!b || !Array.isArray(b.txns) || !b.txns.length) return "Paid — the bank shows this bill's charge posted this month.";
+        const lines = b.txns.map(t => `${dbFmtDayShort_(t.date)} · ${formatMoney_(t.amount)} · ${t.name || ""}`.trim());
+        return `Paid from your bank this month (${b.txns.length} payment${b.txns.length === 1 ? "" : "s"}):\n` + lines.join("\n");
+      }
+      function dbFmtDayShort_(d) { try { return new Date(String(d) + "T12:00:00").toLocaleDateString(undefined, { month: "short", day: "numeric" }); } catch(_) { return String(d || ""); } }
 
       // v470: funded state is derived (see loadManualFunded_), so there is
       // nothing to persist. Kept as a no-op so existing callers don't break.
@@ -5878,8 +5915,8 @@ function resetPaidMTD_(){
             div.className = "modal-row";
             div.dataset.key = r.key;
             const amtLabel = (Number(r.alloc || 0) > 0)
-              ? `${escapeHtml_(formatMoney_(r.alloc))} → <strong>${escapeHtml_(nextLabel)}</strong>`
-              : `Fully funded → <strong>${escapeHtml_(nextLabel)}</strong>`;
+              ? `${r.bankPaid ? "Paid from bank · " : ""}${escapeHtml_(formatMoney_(r.alloc))} → <strong>${escapeHtml_(nextLabel)}</strong>`
+              : `${r.bankPaid ? "Paid from bank" : "Fully funded"} → <strong>${escapeHtml_(nextLabel)}</strong>`;
             div.innerHTML = `
               <div class="modal-cat">
                 <div>${escapeHtml_(r.name)}</div>
@@ -6858,7 +6895,7 @@ function resetPaidMTD_(){
     if (manualFunded[key]){
       // Skip re-prompting bills the user just forward-funded above; funded below.
       if (!justForwardFundedKeys.has(key)) {
-        pendingNextMonth.push({ key, name: cats[i].name || cats[i].categoryName || key, alloc: amt });
+        pendingNextMonth.push({ key, name: cats[i].name || cats[i].categoryName || key, alloc: amt, bankPaid: !!bankPaidInfo_(key) });
       }
     } else {
       const dd = _dueDatesForPrompt[key];
@@ -8526,7 +8563,7 @@ document.addEventListener("click", async (e) => {
 
       async function syncDepositStateFromKV_() {
         const _s = (p) => p.catch(() => ({ ok: false, state: null }));
-        const [ps, snap, guard, hist, profile, customPcts, manualFunded, nextMonthPaid, billDueDates, billsSplitRatio, demoMode, demoSeed, debtRedir, skipRedist, ffAsked, debtPaid, allocLedger] = await Promise.all([
+        const [ps, snap, guard, hist, profile, customPcts, manualFunded, nextMonthPaid, billDueDates, billsSplitRatio, demoMode, demoSeed, debtRedir, skipRedist, ffAsked, debtPaid, allocLedger, bankPaid] = await Promise.all([
           _s(workerGet_("paidState")),
           _s(workerGet_("postSnapshot")),
           _s(workerGet_("postGuard")),
@@ -8546,6 +8583,7 @@ document.addEventListener("click", async (e) => {
           _s(workerGet_("ffAsked")),
           _s(workerGet_("debtPaidState")),
           _s(workerGet_("allocLedger")),   // v454
+          _s(workerGet_("bankPaid")),      // v475
         ]);
         // v434: record whether the core read actually reached the worker. A
         // new account legitimately returns ok:true with state:null, so "ok"
@@ -8584,6 +8622,7 @@ document.addEventListener("click", async (e) => {
         }
         if (manualFunded?.ok && manualFunded.state) { try { localStorage.setItem(MANUAL_FUNDED_LS_KEY, JSON.stringify(manualFunded.state)); synced++; } catch(_){} }
         if (nextMonthPaid?.ok && nextMonthPaid.state) { try { localStorage.setItem(NEXT_MONTH_PAID_LS_KEY, JSON.stringify(nextMonthPaid.state)); synced++; } catch(_){} }
+        if (bankPaid?.ok && bankPaid.state) { try { localStorage.setItem(BANK_PAID_LS_KEY, JSON.stringify(bankPaid.state)); synced++; } catch(_){} }   // v475
         if (billDueDates?.ok && billDueDates.state) { try { localStorage.setItem(LS_KEY_BILL_DUE_DATES, JSON.stringify(billDueDates.state)); synced++; } catch(_){} }
         if (billsSplitRatio?.ok && billsSplitRatio.state) { try { localStorage.setItem(LS_KEY_BILLS_SPLIT_RATIO, JSON.stringify(billsSplitRatio.state)); applyBillsSplitRatio_(); synced++; } catch(_){} }
         // v424: demoMode is the 11th synced key. demoSeed persists the seed
@@ -9083,6 +9122,8 @@ document.addEventListener("click", async (e) => {
       // v425l: after month rollover, retroactively flag any fully-funded bill.
       // Covers accounts that had 100%-funded bills before the auto-flip existed.
       try { autoFlipFullyFundedBills_(); } catch(_){}
+      // v475: ask Plaid which linked bills have already posted this month.
+      try { if (typeof bankPaidRefresh_ === "function") bankPaidRefresh_(); } catch(_){}
     } else {
       try { console.warn("[boot] KV sync unreachable — writes deferred this session"); } catch(_){}
       try { if (typeof showDashError_ === "function") showDashError_("Couldn't reach sync. Showing cached data; changes won't save until you reload with a connection."); } catch(_){}
@@ -10756,6 +10797,62 @@ document.addEventListener("click", async (e) => {
         if (r && r.ok) { PlaidBills.streams = r.outflows || []; PlaidBills.lastInfo = r.items || []; PlaidBills.loaded = true; }
       } catch(_) {} finally { PlaidBills.busy = false; }
       plaidBillsRender_();
+      if (PlaidBills.loaded) { try { bankPaidApply_(bankPaidCompute_(PlaidBills.streams, PlaidBills.decisions)); } catch(e) { console.warn('[plaid] bank-paid:', e); } }
+    }
+    // ── v475: "Paid from bank" ─────────────────────────────────────────
+    // A bill row linked to recurring streams (plaidBills.added) is PAID for the
+    // calendar month once every linked charge has posted (a MONTHLY stream needs 1,
+    // BIWEEKLY 2, …) or the posted total reaches the row's target. Flex rent is the
+    // motivating case: two Flex installments → one Rent row. Each stream carries
+    // `recent` (last 75 days of its posted charges, assigned by the worker) so the
+    // app never guesses from merchant names here.
+    function bankPaidCompute_(streams, decisions) {
+      const added = (decisions && decisions.added) || {};
+      const mk = monthKeyLocal_();
+      const byKey = {};
+      const seen = {};
+      for (const st of streams || []) {
+        const key = added[st.stream_id]; if (!key) continue;
+        const target = Number(appState.billsSplit?.[key]?.monthlyTarget || 0) || 0;
+        if (!(target > 0)) continue;
+        const b = byKey[key] || (byKey[key] = { paid: false, amount: 0, count: 0, expected: 0, txns: [] });
+        const s = seen[key] || (seen[key] = new Set());
+        b.expected += Math.max(1, Math.round(PLAID_FREQ_PER_MONTH[st.frequency] || 1));
+        for (const t of st.recent || []) {
+          if (String(t.date || '').slice(0, 7) !== mk || s.has(t.id)) continue;
+          s.add(t.id);
+          b.count++; b.amount = Math.round((b.amount + (Number(t.amount) || 0)) * 100) / 100;
+          b.txns.push({ id: t.id, date: t.date, amount: Number(t.amount) || 0, name: String(t.name || '').slice(0, 40) });
+        }
+        b.target = target;
+        b.paid = b.count > 0 && (b.count >= b.expected || b.amount + 0.005 >= target);
+      }
+      for (const k of Object.keys(byKey)) { if (!byKey[k].count) delete byKey[k]; else byKey[k].txns.sort((a, b) => a.date < b.date ? -1 : 1); }
+      return byKey;
+    }
+    function bankPaidApply_(byKey) {
+      const cur = loadBankPaid_();
+      const same = JSON.stringify(cur) === JSON.stringify(byKey);
+      if (same) return false;
+      saveBankPaid_(byKey);
+      try { if (typeof renderEngineBillsSplitTable_ === 'function') renderEngineBillsSplitTable_(); } catch(_) {}
+      try { if (typeof renderDashboardAppTables_ === 'function') renderDashboardAppTables_(); } catch(_) {}
+      return true;
+    }
+    async function bankPaidRefresh_() {
+      if (!getAuthToken_()) return;
+      try { if (typeof loadDemoMode_ === 'function' && loadDemoMode_()) return; } catch(_) {}
+      try {
+        const d = await plaidBillsLoadDecisions_();
+        if (!d || !Object.keys(d.added || {}).length) { bankPaidApply_({}); return; }
+        if (!PlaidBills.loaded) {
+          const r = await plaidApi_('plaidRecurring');
+          if (!(r && r.ok)) return;
+          PlaidBills.streams = r.outflows || []; PlaidBills.lastInfo = r.items || []; PlaidBills.loaded = true;
+          try { plaidBillsRender_(); } catch(_) {}
+        }
+        bankPaidApply_(bankPaidCompute_(PlaidBills.streams, PlaidBills.decisions));
+      } catch(e) { console.warn('[plaid] bank-paid refresh failed:', e); }
     }
     function plaidBillsRender_() {
       const card = document.getElementById('plaidRecurringCard');
