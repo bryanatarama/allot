@@ -416,6 +416,8 @@
       /* v471: Daily Budget tab — bryanatarama only while Bryan tests it (class set in _refreshAdminMode) */
       #tabBtn-daily { display: none; }
       body.db-owner #tabBtn-daily { display: flex; }
+      /* v477: Daily glance card on Home — same gate (JS also checks dbEnabled_) */
+      body:not(.db-owner) #dailyHomeCard { display: none !important; }
       details.diag summary { cursor:pointer; user-select:none; color: var(--muted); margin-bottom: 8px; }
       .btn-danger{ background: var(--danger-bg); border-color: var(--danger-border); color: var(--danger-text); }
       .btn-ok{ background: var(--ok-bg); border-color: var(--ok-border); color: var(--ok-text); }
@@ -1217,6 +1219,9 @@ body { padding:0; overflow-x: hidden; }
           <div id="plaidInboxList"></div>
         </div>
 
+        <!-- v477: Daily Budget glance (bryanatarama-only test build; rendered by dbRenderHome_, tap → Daily tab) -->
+        <div id="dailyHomeCard" role="button" tabindex="0" title="Open the Daily tab" style="display:none;margin:8px 0 14px;padding:14px 16px 12px;background:linear-gradient(135deg,rgba(245,158,11,.10),rgba(245,158,11,.03));border:1.5px solid var(--border);border-radius:16px;cursor:pointer;"></div>
+
         <!-- Deposit hero card (mirrors Budgeter tab input) -->
         <div id="dashDepositCard" style="display:flex;flex-direction:column;align-items:center;text-align:center;padding:28px 20px 24px;margin:8px 0 20px;background:linear-gradient(135deg,rgba(245,158,11,.10),rgba(245,158,11,.06));border:1px solid #78350f;border-radius:20px;box-shadow:0 0 0 1px #78350f,0 0 20px rgba(245,158,11,0.08);">
           <div style="font-size:.75em;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:10px;">Deposit Amount</div>
@@ -1914,7 +1919,7 @@ body { padding:0; overflow-x: hidden; }
       // ===== Header pills =====
       const whereEl = document.getElementById("where");
       const specEl = document.getElementById("specVersion");
-      const BUILD_STAMP = "v476-pages";
+      const BUILD_STAMP = "v477-pages";
       const SPEC_VERSION = "";
       specEl.textContent = "Spec: " + SPEC_VERSION;
       whereEl.textContent = "Here: " + window.location.href;
@@ -9130,6 +9135,8 @@ document.addEventListener("click", async (e) => {
       try { autoFlipFullyFundedBills_(); } catch(_){}
       // v475: ask Plaid which linked bills have already posted this month.
       try { if (typeof bankPaidRefresh_ === "function") bankPaidRefresh_(); } catch(_){}
+      // v477: Daily glance card on Home (bryanatarama-only) needs the Daily data at boot.
+      try { if (typeof dbLoad_ === "function" && typeof dbEnabled_ === "function" && dbEnabled_()) { dbWire_(); dbLoad_(); } } catch(_){}
     } else {
       try { console.warn("[boot] KV sync unreachable — writes deferred this session"); } catch(_){}
       try { if (typeof showDashError_ === "function") showDashError_("Couldn't reach sync. Showing cached data; changes won't save until you reload with a connection."); } catch(_){}
@@ -11440,7 +11447,54 @@ document.addEventListener("click", async (e) => {
       dbSave_(); dbRender_();
     }
 
+    // v477: everything both the Daily tab and the Home glance card need for one
+    // paycheck. `current` ignores the ‹ › selection and always returns the open one.
+    function dbCurrent_(current) {
+      dbClassifyAll_();
+      const d = DbState.data, s = d.settings, today = dbToday_();
+      const periods = dbPeriods_(DbState.rows, d.periodStarts, today);
+      if (!periods.length) periods.push({ start: dbAddDays_(today, -13), end: null });
+      // v473: paychecks that ended before the fresh-start date are hidden.
+      if (d.trackingStart) { const keep = periods.filter(p => !p.end || p.end >= d.trackingStart); periods.splice(0, periods.length, ...(keep.length ? keep : [periods[periods.length - 1]])); }
+      let idx = current ? -1 : periods.findIndex(p => p.start === DbState.viewStart);
+      if (idx < 0) idx = periods.length - 1;
+      const period = periods[idx], isCurrent = idx === periods.length - 1;
+      const st = dbPeriodStats_(DbState.rows, period, d.days, s, today, d.capOverride[period.start], d.trackingStart);
+      const alerts = dbAlerts_(st, isCurrent);
+      // Needs-a-decision rows for this paycheck
+      const end = period.end || today;
+      const inP = r => { const x = dbDay_(r.t); return x >= st.effStart && x <= end; };
+      const staleQuick = r => r.t.unmatched && dbDayDiff_(dbDay_(r.t), today) > 10 && !(d.trackingStart && dbDay_(r.t) < d.trackingStart);
+      const review = DbState.rows.filter(r => !d.dismissed[r.t.id] && (staleQuick(r) || (inP(r) && (r.c.cls === 'UNTAGGED' || (r.c.suggest && r.c.cls !== 'REIMBURSABLE') || (r.c.ask === 'w2_1099' && !r.c.note) || r.c.ask === 'prestart'))));
+      return { d, s, today, periods, idx, period, isCurrent, st, alerts, inP, staleQuick, review };
+    }
+    function dbBar_(v, max, color) { return `<div style="height:8px;border-radius:99px;background:var(--border);overflow:hidden;margin:6px 0"><div style="height:100%;width:${Math.max(0, Math.min(100, max > 0 ? v / max * 100 : 0)).toFixed(1)}%;background:${color}"></div></div>`; }
+    function dbStatusColor_(st) { return { ok: 'var(--ok-text)', warning: 'var(--warn-text)', over: 'var(--danger-text)' }[st.todayStatus]; }
+    function dbCapColor_(st) { return st.periodLeft < 0 ? 'var(--danger-text)' : st.periodLeft < st.cap * 0.15 ? 'var(--warn-text)' : 'var(--ok-text)'; }
+
+    // v477: Home tab glance card — the two numbers that matter, tap for the rest.
+    function dbRenderHome_() {
+      const card = document.getElementById('dailyHomeCard');
+      if (!card) return;
+      if (!dbEnabled_() || !DbState.loaded) { card.style.display = 'none'; return; }
+      let cur; try { cur = dbCurrent_(true); } catch(e) { card.style.display = 'none'; return; }
+      const { today, st, review } = cur;
+      const color = dbStatusColor_(st), capColor = dbCapColor_(st);
+      const headline = st.pace >= 0
+        ? `${dbMoney_(st.pace)} <span class="muted" style="font-size:.42em;font-weight:500">safe to spend today</span>`
+        : `${dbMoney_(-st.pace)} <span style="font-size:.42em;font-weight:500">over pace</span>`;
+      card.innerHTML = `<div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px;flex-wrap:wrap">
+          <div style="font-size:.72em;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--accent-text)">Daily · ${escapeHtml_(dbFmtDay_(today, { weekday: 'short', month: 'short', day: 'numeric' }))}</div>
+          <div class="muted" style="font-size:.8em">${st.todaySet ? escapeHtml_(st.todayType) + ' day' : 'off (not set)'} · ${dbMoney_(st.todayBudget)} today</div></div>
+        <div style="font-size:2em;font-weight:800;color:${color};margin-top:2px;line-height:1.2">${headline}</div>
+        <div style="display:flex;justify-content:space-between;gap:8px;font-size:.84em;margin-top:6px"><span><b style="color:${capColor}">${dbMoney_(st.periodLeft)}</b> <span class="muted">left of ${dbMoney_(st.cap)} this paycheck</span></span>${review.length ? `<span style="color:var(--warn-text);font-weight:600">${review.length} to decide ›</span>` : '<span class="muted">Open Daily ›</span>'}</div>
+        ${dbBar_(st.periodSpent, st.cap, capColor)}`;
+      card.style.display = '';
+      if (!card.dataset.wired) { card.dataset.wired = '1'; const go = () => { try { setActiveTab_('daily'); } catch(_) {} }; card.addEventListener('click', go); card.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); go(); } }); }
+    }
+
     function dbRender_() {
+      try { dbRenderHome_(); } catch(e) { console.warn('[daily] home card:', e); }
       const root = document.getElementById('dailyRoot');
       if (!root) return;
       if (!dbEnabled_()) { root.innerHTML = '<div class="muted">Daily Budget is a test feature that is not available on this account.</div>'; return; }
@@ -11448,19 +11502,9 @@ document.addEventListener("click", async (e) => {
         root.innerHTML = DbState.error ? `<div class="error">${escapeHtml_(DbState.error)}</div>` : '<div class="muted">Loading transactions…</div>';
         return;
       }
-      dbClassifyAll_();
-      const d = DbState.data, s = d.settings, today = dbToday_();
-      const periods = dbPeriods_(DbState.rows, d.periodStarts, today);
-      if (!periods.length) periods.push({ start: dbAddDays_(today, -13), end: null });
-      // v473: paychecks that ended before the fresh-start date are hidden.
-      if (d.trackingStart) { const keep = periods.filter(p => !p.end || p.end >= d.trackingStart); periods.splice(0, periods.length, ...(keep.length ? keep : [periods[periods.length - 1]])); }
-      let idx = periods.findIndex(p => p.start === DbState.viewStart);
-      if (idx < 0) idx = periods.length - 1;
-      const period = periods[idx], isCurrent = idx === periods.length - 1;
-      const st = dbPeriodStats_(DbState.rows, period, d.days, s, today, d.capOverride[period.start], d.trackingStart);
-      const alerts = dbAlerts_(st, isCurrent);
-      const bar = (v, max, color) => `<div style="height:8px;border-radius:99px;background:var(--border);overflow:hidden;margin:6px 0"><div style="height:100%;width:${Math.max(0, Math.min(100, max > 0 ? v / max * 100 : 0)).toFixed(1)}%;background:${color}"></div></div>`;
-      const statusColor = { ok: 'var(--ok-text)', warning: 'var(--warn-text)', over: 'var(--danger-text)' }[st.todayStatus];
+      const { d, s, today, periods, idx, period, isCurrent, st, alerts, inP, staleQuick, review } = dbCurrent_(false);
+      const bar = dbBar_;
+      const statusColor = dbStatusColor_(st);
       let h = '';
 
       // Today
@@ -11470,24 +11514,25 @@ document.addEventListener("click", async (e) => {
           <div class="tab-actions">${DB_DAY_TYPES.map(k => `<button type="button" data-db-daytype="${k}" class="${st.todaySet && st.todayType === k ? 'btn-ok' : ''}" style="text-transform:capitalize">${k}</button>`).join('')}</div></div>
           <div style="font-size:2.2em;font-weight:800;color:${statusColor};margin-top:6px">${st.pace >= 0 ? dbMoney_(st.pace) + ' <span style="font-size:.4em;font-weight:500" class="muted">safe to spend today</span>' : dbMoney_(-st.pace) + ' <span style="font-size:.4em;font-weight:500">over pace</span>'}</div>
           ${bar(st.todaySpent, Math.max(st.todaySpent, st.todaySpent + st.pace), statusColor)}
-          <div class="muted" style="font-size:.85em">Today: ${dbMoney_(st.todaySpent)} spent of ${dbMoney_(st.todayBudget)} · unspent days carry forward, and late bank charges come off this number the moment they post.</div>`;
-        const todayQuick = DbState.quick.filter(q => dbQuickDay_(q) === today).length;
-        const lastQ = DbState.quick.reduce((m, q) => Math.max(m, Date.parse(q.at || '') || q.created || 0), 0);
-        const ago = ms => { const m = Math.round(ms / 6e4); return m < 60 ? m + 'm' : m < 1440 ? Math.round(m / 60) + 'h' : Math.round(m / 1440) + 'd'; };
-        const unposted = DbState.rows.filter(r => r.t.unmatched).length;
-        h += `<div style="font-size:.78em;margin-top:8px;padding-top:8px;border-top:1px solid var(--border)" class="muted">${DbState.keyInfo && DbState.keyInfo.hasKey
-          ? `⚡ Instant logging on · ${todayQuick} today${lastQ ? ' · last ' + ago(Date.now() - lastQ) + ' ago' : ''}${unposted ? ' · ' + unposted + ' waiting for the bank' : ''}${DbState.lag ? ' · bank posts ~' + DbState.lag.median + ' day' + (DbState.lag.median === 1 ? '' : 's') + ' late' : ''}`
-          : '⚡ Purchases only show up when the bank posts them (often days later). Turn on <b>Instant logging</b> in settings below so they appear within seconds.'}</div></div>`;
+          <div class="muted" style="font-size:.85em">${dbMoney_(st.todaySpent)} spent of ${dbMoney_(st.todayBudget)} today${DbState.keyInfo && DbState.keyInfo.hasKey ? '' : ' · turn on <b>Instant logging</b> below so purchases show up within seconds'}</div></div>`;
       }
+      // v477: instant-logging status moved from the Today card to the ⚡ panel summary.
+      const todayQuick = DbState.quick.filter(q => dbQuickDay_(q) === today).length;
+      const lastQ = DbState.quick.reduce((m, q) => Math.max(m, Date.parse(q.at || '') || q.created || 0), 0);
+      const ago = ms => { const m = Math.round(ms / 6e4); return m < 60 ? m + 'm' : m < 1440 ? Math.round(m / 60) + 'h' : Math.round(m / 1440) + 'd'; };
+      const unposted = DbState.rows.filter(r => r.t.unmatched).length;
+      const quickStatus = DbState.keyInfo && DbState.keyInfo.hasKey
+        ? `on · ${todayQuick} today${lastQ ? ' · last ' + ago(Date.now() - lastQ) + ' ago' : ''}${unposted ? ' · ' + unposted + ' waiting for the bank' : ''}${DbState.lag ? ' · bank posts ~' + DbState.lag.median + ' day' + (DbState.lag.median === 1 ? '' : 's') + ' late' : ''}`
+        : 'off';
 
       // Alerts
       if (alerts.length) h += `<div class="panel" style="padding:10px 14px">${alerts.map(a => `<div class="${a.kind === 'bad' ? 'status-bad' : 'status-warn'}" style="padding:8px 10px;border-radius:8px;border:1px solid;margin:4px 0;font-size:.9em">${escapeHtml_(a.msg)}</div>`).join('')}</div>`;
 
       // Paycheck
-      const capColor = st.periodLeft < 0 ? 'var(--danger-text)' : st.periodLeft < st.cap * 0.15 ? 'var(--warn-text)' : 'var(--ok-text)';
+      const capColor = dbCapColor_(st);
       const subList = o => Object.entries(o).sort((a, b) => b[1] - a[1]).map(([k, v]) => `${escapeHtml_(k)} ${dbMoney_(v)}`).join(' · ') || '—';
       h += `<div class="panel"><div class="tab-header"><div><h3 style="margin:0">Paycheck ${escapeHtml_(dbFmtDay_(period.start))} – ${period.end ? escapeHtml_(dbFmtDay_(period.end)) : 'now'}</h3>
-          <div class="muted">${st.prorated ? 'Tracking since ' + escapeHtml_(dbFmtDay_(st.effStart)) + ' · cap prorated to ' + dbMoney_(st.cap) + ' (' + st.daysLeft + ' of ' + st.totalDays + ' days) · ' : ''}Cap ${dbMoney_(st.cap)}${st.heavyCapApplies ? ' (heavy period: ' + st.heavy + ' show/shop days)' : ''} · ${st.heavy} show/shop day${st.heavy === 1 ? '' : 's'} set</div></div>
+          <div class="muted" style="font-size:.85em">Cap ${dbMoney_(st.cap)}${st.prorated ? ' (prorated, ' + st.daysLeft + ' of ' + st.totalDays + ' days)' : ''}${st.heavyCapApplies ? ' · heavy period' : ''} · ${st.heavy} show/shop day${st.heavy === 1 ? '' : 's'}</div></div>
           <div class="tab-actions"><button type="button" data-db-period="-1" ${idx === 0 ? 'disabled' : ''}>‹</button><button type="button" data-db-period="1" ${isCurrent ? 'disabled' : ''}>›</button><button type="button" id="dbRefreshBtn" title="Reload transactions">↻</button></div></div>
         <div style="display:flex;justify-content:space-between;align-items:baseline;margin-top:8px"><div><b style="font-size:1.4em;color:${capColor}">${dbMoney_(st.periodLeft)}</b> <span class="muted">left of ${dbMoney_(st.cap)}</span></div><div class="muted">spent ${dbMoney_(st.periodSpent)}</div></div>
         ${bar(st.periodSpent, st.cap, capColor)}
@@ -11501,15 +11546,11 @@ document.addEventListener("click", async (e) => {
       for (let day = period.start; day <= st.lastPlanned; day = dbAddDays_(day, 1)) {
         const ty = d.days[day] || 'off', set = !!d.days[day];
         const colors = { show: '#7c3aed', shop: '#2563eb', tour: '#d97706', off: 'var(--border)' };
-        h += `<button type="button" data-db-cycle="${day}" title="Tap to change" style="flex:1 0 44px;padding:4px 2px;font-size:.72em;line-height:1.3;border-radius:8px;border:${day === today ? '2px solid var(--text)' : '1px solid var(--border)'};background:${set && ty !== 'off' ? colors[ty] : 'transparent'};color:${set && ty !== 'off' ? '#fff' : 'var(--muted)'}">${escapeHtml_(dbFmtDay_(day, { weekday: 'narrow' }))} ${Number(day.slice(8))}<br>${set ? ty : '–'}</button>`;
+        h += `<button type="button" data-db-cycle="${day}" title="Tap to cycle off → show → shop → tour" style="flex:1 0 44px;padding:4px 2px;font-size:.72em;line-height:1.3;border-radius:8px;border:${day === today ? '2px solid var(--text)' : '1px solid var(--border)'};background:${set && ty !== 'off' ? colors[ty] : 'transparent'};color:${set && ty !== 'off' ? '#fff' : 'var(--muted)'}">${escapeHtml_(dbFmtDay_(day, { weekday: 'narrow' }))} ${Number(day.slice(8))}<br>${set ? ty : '–'}</button>`;
       }
-      h += '</div><div class="muted" style="font-size:.75em;margin-top:4px">Tap a day to cycle off → show → shop → tour. Unset days count as off.</div></div>';
+      h += '</div></div>';
 
       // Review
-      const end = period.end || today;
-      const inP = r => { const x = dbDay_(r.t); return x >= st.effStart && x <= end; };
-      const staleQuick = r => r.t.unmatched && dbDayDiff_(dbDay_(r.t), today) > 10 && !(d.trackingStart && dbDay_(r.t) < d.trackingStart);
-      const review = DbState.rows.filter(r => !d.dismissed[r.t.id] && (staleQuick(r) || (inP(r) && (r.c.cls === 'UNTAGGED' || (r.c.suggest && r.c.cls !== 'REIMBURSABLE') || (r.c.ask === 'w2_1099' && !r.c.note) || r.c.ask === 'prestart'))));
       if (review.length) {
         h += '<div class="panel"><h3 style="margin:0 0 6px">Needs a decision</h3>';
         for (const { t, c } of review) {
@@ -11537,8 +11578,7 @@ document.addEventListener("click", async (e) => {
       const acctName = {}; for (const a of DbState.accounts) acctName[a.account_id] = (a.name || a.official_name || '') + (a.mask ? ' ••' + a.mask : '');
       const spendCls = new Set(['DAILY', 'BASE', 'UNTAGGED']);
       h += `<details class="panel" id="dbTxnPanel"${DbState.txnOpen ? ' open' : ''}><summary style="cursor:pointer"><b>Transactions this paycheck</b> <span class="muted">· ${list.length}</span></summary>
-        <div class="muted" style="font-size:.8em;margin:6px 0">Change a category and it sticks. "via rule" = built-in pattern, "via plaid" = Plaid's category, "via you" = your override.</div>
-        <table class="grid" style="width:100%"><tbody>`;
+        <table class="grid" style="width:100%;margin-top:6px"><tbody>`;
       for (const { t, c } of list) {
         const out = t.amount > 0, dim = !spendCls.has(c.cls) && c.cls !== 'REFUND';
         h += `<tr style="${dim ? 'opacity:.6' : ''}"><td class="mono" style="white-space:nowrap;font-size:.8em">${escapeHtml_(dbFmtDay_(dbDay_(t)))}</td>
@@ -11568,7 +11608,7 @@ document.addEventListener("click", async (e) => {
       const ki = DbState.keyInfo || {}, key = DbState.newKey;
       const keyShown = key || 'YOUR-KEY';
       const step = (n, body) => `<li style="margin:4px 0">${body}</li>`;
-      h += `<details class="panel"${key ? ' open' : ''}><summary style="cursor:pointer"><b>⚡ Instant logging</b> <span class="muted">· ${ki.hasKey ? 'on' + (ki.created ? ' since ' + escapeHtml_(new Date(ki.created).toLocaleDateString()) : '') : 'off'}</span></summary>
+      h += `<details class="panel"${key ? ' open' : ''}><summary style="cursor:pointer"><b>⚡ Instant logging</b> <span class="muted">· ${quickStatus}</span></summary>
         <div class="muted" style="font-size:.85em;margin:8px 0;line-height:1.5">Your iPhone sends each Patelco card alert (and Apple Pay purchase) here the second it happens. When the bank charge posts days later it's matched up automatically, so nothing counts twice.</div>
         <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
           <button type="button" id="dbKeyCreateBtn" class="${ki.hasKey ? '' : 'btn-ok'}">${ki.hasKey ? (DbState.armed === 'replace' ? 'Tap again: old Shortcuts stop working' : 'Replace key') : 'Create key'}</button>
@@ -11576,7 +11616,8 @@ document.addEventListener("click", async (e) => {
         </div>
         ${key ? `<div style="margin:10px 0;padding:10px;border:1px solid var(--warn-border);background:var(--warn-bg);border-radius:8px;font-size:.85em"><b>Your key, shown only once.</b> Paste it into both Shortcuts below. If you lose it, just replace it.
           <div style="display:flex;gap:6px;margin-top:6px"><input class="cell-input mono" readonly value="${escapeHtml_(key)}" style="flex:1;font-size:.85em"><button type="button" data-db-copy="${escapeHtml_(key)}">Copy</button></div></div>` : ''}
-        <div style="font-size:.85em;line-height:1.5;margin-top:10px">
+        <details style="margin-top:10px"${key ? ' open' : ''}><summary class="muted" style="cursor:pointer;font-size:.85em">iPhone Shortcut setup steps</summary>
+        <div style="font-size:.85em;line-height:1.5;margin-top:6px">
           <b>1 · Card alert texts</b> (covers every Spending debit purchase)
           <ol style="margin:4px 0 10px;padding-left:20px">
             ${step(1, 'Shortcuts app → <b>Automation</b> → <b>+</b> → <b>Message</b>.')}
@@ -11589,8 +11630,8 @@ document.addEventListener("click", async (e) => {
             ${step(1, 'Automation → <b>+</b> → <b>Transaction</b>. Pick your cards, choose <b>Run Immediately</b>, then <b>New Blank Automation</b>.')}
             ${step(2, 'Add <b>Get Contents of URL</b> with the same URL, Method, and header. JSON fields: <b>source</b> = applepay, <b>amount</b> = Shortcut Input → Amount, <b>merchant</b> = Shortcut Input → Merchant, <b>card</b> = Shortcut Input → Card.')}
           </ol>
-          <div class="muted">Test it: run the text automation once, or make a small purchase, then tap ↻ on the Paycheck card. Menu names can differ a little between iOS versions. If a text and Apple Pay both report the same purchase, it's kept once.</div>
-        </div></details>`;
+          <div class="muted">Test it: run the text automation once, or make a small purchase, then tap ↻ on the Paycheck card. Menu names can differ a little between iOS versions. If a text and Apple Pay both report the same purchase, it's kept once. To stop the "Running your automation" banner, open each automation and turn off <b>Notify When Run</b>.</div>
+        </div></details></details>`;
 
       root.innerHTML = h;
     }
