@@ -1914,7 +1914,7 @@ body { padding:0; overflow-x: hidden; }
       // ===== Header pills =====
       const whereEl = document.getElementById("where");
       const specEl = document.getElementById("specVersion");
-      const BUILD_STAMP = "v475-pages";
+      const BUILD_STAMP = "v476-pages";
       const SPEC_VERSION = "";
       specEl.textContent = "Spec: " + SPEC_VERSION;
       whereEl.textContent = "Here: " + window.location.href;
@@ -2624,6 +2624,7 @@ function saveDebtItemsToStorage_(){
         }
         savePaidState_({ monthKey: cur, paidByKey: seededPaidByKey, cycleStartByBill: {} });
         saveNextMonthPaid_({}); // consumed — now reflected in paidByKey
+        saveBankPaid_({});      // v476: bank-paid flags are calendar-month only — clear + sync on the 1st
         // Persist the manualFunded clear so it actually propagates to other devices
         // (loadManualFunded_ already drops stale-month flags on read, but never wrote
         // the cleared state back, so the clear never synced).
@@ -5170,7 +5171,7 @@ function resetPaidMTD_(){
       function loadManualFunded_() {
         try {
           const paidByKey = (loadPaidState_().paidByKey) || {};
-          const bank = loadBankPaid_();
+          const bank = bankPaidEnabled_() ? loadBankPaid_() : {};
           const cats = (typeof getCfgCategoryRows_ === "function") ? getCfgCategoryRows_() : [];
           const result = {};
           for (const c of cats) {
@@ -5205,7 +5206,12 @@ function resetPaidMTD_(){
         try { localStorage.setItem(BANK_PAID_LS_KEY, JSON.stringify(st)); } catch(e) {}
         workerSet_("bankPaid", st).catch(()=>{});
       }
-      function bankPaidInfo_(key) { const b = loadBankPaid_()[key]; return (b && b.paid) ? b : null; }
+      // v476: bryanatarama-only (split-payment rent via Flex). Other users pay rent
+      // in one charge on the 1st and are funded by allocation, so they never see it.
+      function bankPaidEnabled_() {
+        try { return String(JSON.parse(localStorage.getItem(LS_KEY_SESSION) || "null")?.username || "").toLowerCase() === "bryanatarama"; } catch(_) { return false; }
+      }
+      function bankPaidInfo_(key) { if (!bankPaidEnabled_()) return null; const b = loadBankPaid_()[key]; return (b && b.paid) ? b : null; }
       function bankPaidTitle_(b) {
         if (!b || !Array.isArray(b.txns) || !b.txns.length) return "Paid — the bank shows this bill's charge posted this month.";
         const lines = b.txns.map(t => `${dbFmtDayShort_(t.date)} · ${formatMoney_(t.amount)} · ${t.name || ""}`.trim());
@@ -10797,7 +10803,7 @@ document.addEventListener("click", async (e) => {
         if (r && r.ok) { PlaidBills.streams = r.outflows || []; PlaidBills.lastInfo = r.items || []; PlaidBills.loaded = true; }
       } catch(_) {} finally { PlaidBills.busy = false; }
       plaidBillsRender_();
-      if (PlaidBills.loaded) { try { bankPaidApply_(bankPaidCompute_(PlaidBills.streams, PlaidBills.decisions)); } catch(e) { console.warn('[plaid] bank-paid:', e); } }
+      if (PlaidBills.loaded && bankPaidEnabled_()) { try { bankPaidApply_(bankPaidCompute_(PlaidBills.streams, PlaidBills.decisions)); } catch(e) { console.warn('[plaid] bank-paid:', e); } }
     }
     // ── v475: "Paid from bank" ─────────────────────────────────────────
     // A bill row linked to recurring streams (plaidBills.added) is PAID for the
@@ -10840,7 +10846,7 @@ document.addEventListener("click", async (e) => {
       return true;
     }
     async function bankPaidRefresh_() {
-      if (!getAuthToken_()) return;
+      if (!getAuthToken_() || !bankPaidEnabled_()) return;
       try { if (typeof loadDemoMode_ === 'function' && loadDemoMode_()) return; } catch(_) {}
       try {
         const d = await plaidBillsLoadDecisions_();
