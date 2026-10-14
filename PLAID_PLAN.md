@@ -198,6 +198,8 @@ Plaid-touching code, and re-run build_check_acceptance before reporting such a c
 as working. The acceptance above applies only to the code as it was verified — later
 changes invalidate it.
 
+- 2026-10-14 (v475): `recurring()` now attaches `recent` posted charges to each outflow stream (Plaid `transaction_ids` first, then same-account merchant/description match with nearest-amount tie-break) and the slim stream keeps `txn_ids`; the app derives KV `bankPaid` from the streams linked in `plaidBills.added` so a bill paid from the bank (e.g. Flex rent in two installments) reads "✓ Paid" and the next deposit forward-funds it. Acceptance re-run after the change: PASS (CHECK-013/015 against the production Patelco Item).
+
 ## How to test
 
 Sandbox only (`PLAID_ENV = "sandbox"`). Sign in at https://myallot.money as the owner
