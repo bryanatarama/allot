@@ -42,3 +42,6 @@ conversation_transcript.log
 
 # Local data backups (e.g., ideas-backup-YYYY-MM-DD.json)
 ideas-backup-*.json
+
+# GitHub push token for the Cowork session (never commit)
+allot-push-token.txt
